@@ -21,6 +21,8 @@ type TransactionRow = {
   unit_type: string | null
   tenure?: string | null
   price_psf?: number | string | null
+  project_name?: string | null
+  transaction_date?: string | null
 }
 
 type CleanedRow = {
@@ -30,6 +32,8 @@ type CleanedRow = {
   longitude: number
   unit_type: string | null
   tenure: string | null
+  project_name: string | null
+  transaction_date: string | null
   pricePerSqm: number
   pricePerSqft: number
   distanceM: number
@@ -190,7 +194,7 @@ async function fetchBaseRows(
     const { data, error } = await supabase
       .from('property_transactions_v2')
       .select(
-        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf'
+        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
@@ -207,7 +211,7 @@ async function fetchBaseRows(
   const { data, error } = await supabase
     .from('property_transactions_v2')
     .select(
-      'transaction_price, floor_area_sqm, latitude, longitude, unit_type'
+      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date'
     )
     .eq('source', source)
     .eq('unit_type', normalized)
@@ -246,6 +250,8 @@ function cleanRows(
         longitude: rowLon,
         unit_type: row.unit_type,
         tenure: row.tenure || null,
+        project_name: row.project_name || null,
+        transaction_date: row.transaction_date || null,
         pricePerSqm: transactionPrice / areaSqm,
         pricePerSqft,
         distanceM: distanceInMeters(rowLat, rowLon, lat, lon),
