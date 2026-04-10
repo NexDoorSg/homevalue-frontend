@@ -970,12 +970,6 @@ export default function Home() {
                   {isGenerating ? 'Generating...' : 'Get My Estimated Value'}
                 </button>
 
-                <div className="space-y-1">
-                  <p className="text-sm text-[#67707a]">
-                    No obligation. Takes less than 30 seconds.
-                  </p>
-                </div>
-
                 {formMessage && (
                   <p className="text-sm text-[#8b6b52]">{formMessage}</p>
                 )}
