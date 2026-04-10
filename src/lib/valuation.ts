@@ -12,11 +12,12 @@ type ValuationParams = {
 
 type TransactionRow = {
   transaction_price: number | string | null
-  floor_area_sqm: number | string | null
+  floor_area_sc: number | string | null
+  floor_area_sqm?: number | string | null
   latitude: number | string | null
   longitude: number | string | null
   unit_type: string | null
-  transaction_date?: string | null
+  price_psf?: number | string | null
 }
 
 type CleanedRow = {
@@ -25,19 +26,8 @@ type CleanedRow = {
   latitude: number
   longitude: number
   unit_type: string | null
-  transaction_date: string | null
   pricePerSqm: number
   distanceM: number
-  monthsAgo: number
-}
-
-type Candidate = {
-  estimated: number
-  low: number
-  high: number
-  comparables: number
-  radius: number
-  avgPsm: number
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -68,45 +58,21 @@ function percentile(sorted: number[], p: number) {
   return sorted[lower] * (1 - weight) + sorted[upper] * weight
 }
 
-function median(values: number[]) {
-  if (values.length === 0) return null
-  const sorted = [...values].sort((a, b) => a - b)
-  const middle = Math.floor(sorted.length / 2)
-
-  if (sorted.length % 2 === 0) {
-    return (sorted[middle - 1] + sorted[middle]) / 2
-  }
-
-  return sorted[middle]
-}
-
 function weightedAverage(values: number[], weights: number[]) {
   const totalWeight = weights.reduce((sum, w) => sum + w, 0)
   if (!totalWeight) return null
 
-  const weightedSum = values.reduce((sum, value, i) => {
-    return sum + value * weights[i]
-  }, 0)
+  const weightedSum = values.reduce(
+    (sum, value, i) => sum + value * weights[i],
+    0
+  )
 
   return weightedSum / totalWeight
 }
 
-function getMonthsAgo(value: string | null | undefined) {
-  if (!value) return 24
-
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return 24
-
-  const now = new Date()
-  const diffMs = now.getTime() - parsed.getTime()
-  const months = diffMs / (1000 * 60 * 60 * 24 * 30.4375)
-
-  return Math.max(0, months)
-}
-
 function getSearchRadius(propertyCategory: PropertyCategory) {
   if (propertyCategory === 'landed') {
-    return [1000, 2000, 3000, 5000, 8000, 12000]
+    return [300, 600, 1000, 1500, 2000]
   }
 
   if (propertyCategory === 'condo') {
@@ -156,18 +122,6 @@ function isMatchingLandedType(
   return false
 }
 
-function isAnyLandedType(rowUnitType: string | null) {
-  const row = normalizeText(rowUnitType)
-
-  return (
-    row.includes('TERRACE') ||
-    row.includes('SEMI') ||
-    row.includes('DETACHED') ||
-    row.includes('BUNGALOW') ||
-    row.includes('GOOD CLASS BUNGALOW')
-  )
-}
-
 async function fetchBaseRows(
   propertyType: string,
   propertyCategory: PropertyCategory
@@ -178,14 +132,13 @@ async function fetchBaseRows(
     const { data, error } = await supabase
       .from('property_transactions_v2')
       .select(
-        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, transaction_date'
+        'transaction_price, floor_area_sc, floor_area_sqm, latitude, longitude, unit_type, price_psf'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
-      .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
-      .limit(20000)
+      .limit(10000)
 
     return { data, error }
   }
@@ -195,17 +148,26 @@ async function fetchBaseRows(
   const { data, error } = await supabase
     .from('property_transactions_v2')
     .select(
-      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, transaction_date'
+      'transaction_price, floor_area_sc, floor_area_sqm, latitude, longitude, unit_type, price_psf'
     )
     .eq('source', source)
     .eq('unit_type', normalized)
     .not('transaction_price', 'is', null)
-    .not('floor_area_sqm', 'is', null)
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
-    .limit(8000)
+    .limit(5000)
 
   return { data, error }
+}
+
+function resolveAreaSqm(row: TransactionRow) {
+  const areaSc = Number(row.floor_area_sc)
+  const areaSqm = Number(row.floor_area_sqm)
+
+  if (Number.isFinite(areaSc) && areaSc > 0) return areaSc
+  if (Number.isFinite(areaSqm) && areaSqm > 0) return areaSqm
+
+  return NaN
 }
 
 function cleanRows(
@@ -216,20 +178,32 @@ function cleanRows(
   return rows
     .map((row) => {
       const transactionPrice = Number(row.transaction_price)
-      const area = Number(row.floor_area_sqm)
+      const areaSqm = resolveAreaSqm(row)
       const rowLat = Number(row.latitude)
       const rowLon = Number(row.longitude)
+      const pricePsf = Number(row.price_psf)
+
+      let pricePerSqm = NaN
+
+      if (Number.isFinite(pricePsf) && pricePsf > 0) {
+        pricePerSqm = pricePsf * 10.7639
+      } else if (
+        Number.isFinite(transactionPrice) &&
+        transactionPrice > 0 &&
+        Number.isFinite(areaSqm) &&
+        areaSqm > 0
+      ) {
+        pricePerSqm = transactionPrice / areaSqm
+      }
 
       return {
         transaction_price: transactionPrice,
-        floor_area_sqm: area,
+        floor_area_sqm: areaSqm,
         latitude: rowLat,
         longitude: rowLon,
         unit_type: row.unit_type,
-        transaction_date: row.transaction_date || null,
-        pricePerSqm: transactionPrice / area,
+        pricePerSqm,
         distanceM: distanceInMeters(rowLat, rowLon, lat, lon),
-        monthsAgo: getMonthsAgo(row.transaction_date),
       }
     })
     .filter(
@@ -242,45 +216,56 @@ function cleanRows(
         Number.isFinite(row.longitude) &&
         Number.isFinite(row.pricePerSqm) &&
         row.pricePerSqm > 0 &&
-        Number.isFinite(row.distanceM) &&
-        Number.isFinite(row.monthsAgo)
+        Number.isFinite(row.distanceM)
     )
 }
 
-function trimOutliers(rows: CleanedRow[]) {
-  if (rows.length < 5) return rows
-
-  const sortedPsm = rows.map((row) => row.pricePerSqm).sort((a, b) => a - b)
-  const p10 = percentile(sortedPsm, 0.1)
-  const p90 = percentile(sortedPsm, 0.9)
-
-  if (p10 === null || p90 === null) return rows
-
-  const trimmed = rows.filter(
-    (row) => row.pricePerSqm >= p10 && row.pricePerSqm <= p90
-  )
-
-  return trimmed.length >= Math.min(4, rows.length) ? trimmed : rows
-}
-
-function buildStandardCandidate(
+function buildCandidate(
   rows: CleanedRow[],
   radius: number,
   floorAreaSqm: number,
-  propertyCategory: Exclude<PropertyCategory, 'landed'>
-): Candidate | null {
+  propertyCategory: PropertyCategory
+) {
   if (rows.length === 0) return null
 
-  const usable = trimOutliers(rows)
+  let usable = rows
+
+  if (rows.length >= 5) {
+    const sortedPsm = rows
+      .map((row) => row.pricePerSqm)
+      .sort((a, b) => a - b)
+
+    const p10 = percentile(sortedPsm, 0.1)
+    const p90 = percentile(sortedPsm, 0.9)
+
+    if (p10 !== null && p90 !== null) {
+      const trimmed = rows.filter(
+        (row) => row.pricePerSqm >= p10 && row.pricePerSqm <= p90
+      )
+
+      if (trimmed.length >= Math.min(3, rows.length)) {
+        usable = trimmed
+      }
+    }
+  }
+
   const values = usable.map((row) => row.pricePerSqm)
 
   const weights = usable.map((row) => {
+    if (propertyCategory === 'landed') {
+      const distanceWeight = 1 / Math.max(row.distanceM, 25) ** 1.8
+      const sizeDiffRatio =
+        Math.abs(row.floor_area_sqm - floorAreaSqm) / Math.max(floorAreaSqm, 1)
+      const sizeWeight = 1 / Math.max(sizeDiffRatio, 0.08)
+      return distanceWeight * sizeWeight
+    }
+
     const distanceWeight = 1 / Math.max(row.distanceM, 50)
     const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
-    const sizeWeight = 1 / Math.max(sizeDiff, propertyCategory === 'condo' ? 8 : 5)
-    const recencyWeight = 1 / Math.max(row.monthsAgo + 1, 1)
+    const minSizeFloor = propertyCategory === 'condo' ? 8 : 5
+    const sizeWeight = 1 / Math.max(sizeDiff, minSizeFloor)
 
-    return distanceWeight * sizeWeight * recencyWeight
+    return distanceWeight * sizeWeight
   })
 
   const avgPsm = weightedAverage(values, weights)
@@ -290,7 +275,15 @@ function buildStandardCandidate(
   }
 
   const estimated = avgPsm * floorAreaSqm
-  const spread = propertyCategory === 'condo' ? 0.06 : 0.05
+
+  const spread =
+    propertyCategory === 'landed'
+      ? usable.length >= 5
+        ? 0.08
+        : usable.length >= 3
+          ? 0.1
+          : 0.12
+      : 0.05
 
   return {
     estimated,
@@ -299,61 +292,6 @@ function buildStandardCandidate(
     comparables: usable.length,
     radius,
     avgPsm,
-  }
-}
-
-function buildLandedCandidate(
-  rows: CleanedRow[],
-  radius: number,
-  floorAreaSqm: number
-): Candidate | null {
-  if (rows.length === 0) return null
-
-  let usable = rows
-
-  const minArea = floorAreaSqm * 0.6
-  const maxArea = floorAreaSqm * 1.6
-
-  const sizeFiltered = usable.filter(
-    (row) => row.floor_area_sqm >= minArea && row.floor_area_sqm <= maxArea
-  )
-
-  if (sizeFiltered.length >= 4) {
-    usable = sizeFiltered
-  }
-
-  usable = trimOutliers(usable)
-
-  const weightedValues = usable.map((row) => row.pricePerSqm)
-  const weightedWeights = usable.map((row) => {
-    const distanceWeight = 1 / Math.max(row.distanceM, 150)
-    const sizeRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
-    const sizeWeight = 1 / Math.max(sizeRatio, 0.08)
-    const recencyWeight = 1 / Math.max(row.monthsAgo + 1, 1)
-
-    return distanceWeight * sizeWeight * recencyWeight
-  })
-
-  const weightedPsm = weightedAverage(weightedValues, weightedWeights)
-  const medianPsm = median(usable.map((row) => row.pricePerSqm))
-
-  if (!weightedPsm || !medianPsm) {
-    return null
-  }
-
-  const blendedPsm = medianPsm * 0.65 + weightedPsm * 0.35
-  const estimated = blendedPsm * floorAreaSqm
-
-  const spread =
-    usable.length >= 8 ? 0.08 : usable.length >= 5 ? 0.1 : 0.12
-
-  return {
-    estimated,
-    low: estimated * (1 - spread),
-    high: estimated * (1 + spread),
-    comparables: usable.length,
-    radius,
-    avgPsm: blendedPsm,
   }
 }
 
@@ -397,47 +335,47 @@ export async function getValuation({
   }
 
   if (propertyCategory === 'landed') {
-    const exactLandedRows = cleanedRows.filter((row) =>
+    cleanedRows = cleanedRows.filter((row) =>
       isMatchingLandedType(row.unit_type, propertyType)
     )
 
-    console.log('LANDED EXACT GROUP ROWS:', exactLandedRows.length)
+    console.log('LANDED EXACT GROUP ROWS:', cleanedRows.length)
 
-    if (exactLandedRows.length >= 3) {
-      cleanedRows = exactLandedRows
-    } else {
-      const anyLandedRows = cleanedRows.filter((row) =>
-        isAnyLandedType(row.unit_type)
-      )
-
-      console.log('LANDED ANY-TYPE ROWS:', anyLandedRows.length)
-
-      if (anyLandedRows.length > 0) {
-        cleanedRows = anyLandedRows
-      }
+    if (cleanedRows.length === 0) {
+      console.log('No exact landed type matches found.')
+      return null
     }
   }
 
-  let bestCandidate: Candidate | null = null
-  const targetGoodComparables = propertyCategory === 'landed' ? 6 : 5
-  const minimumComparables = propertyCategory === 'landed' ? 3 : 2
+  let bestCandidate: {
+    estimated: number
+    low: number
+    high: number
+    comparables: number
+    radius: number
+    avgPsm: number
+  } | null = null
+
+  const targetGoodComparables = propertyCategory === 'landed' ? 3 : 5
+  const minimumComparables = propertyCategory === 'landed' ? 2 : 2
 
   for (const radius of searchRadius) {
-    const nearby = cleanedRows.filter((row) => row.distanceM <= radius)
+    let nearby = cleanedRows.filter((row) => row.distanceM <= radius)
 
     console.log(`COMPS WITHIN ${radius}m:`, nearby.length)
 
+    if (propertyCategory === 'landed' && nearby.length > 8) {
+      nearby = nearby.sort((a, b) => a.distanceM - b.distanceM).slice(0, 8)
+    }
+
     if (nearby.length < minimumComparables) continue
 
-    const candidate =
-      propertyCategory === 'landed'
-        ? buildLandedCandidate(nearby, radius, floorAreaSqm)
-        : buildStandardCandidate(
-            nearby,
-            radius,
-            floorAreaSqm,
-            propertyCategory as 'hdb' | 'condo'
-          )
+    const candidate = buildCandidate(
+      nearby,
+      radius,
+      floorAreaSqm,
+      propertyCategory
+    )
 
     if (!candidate) continue
 
@@ -475,28 +413,8 @@ export async function getValuation({
     }
   }
 
-  if (!bestCandidate && propertyCategory === 'landed') {
-    const nearestFew = [...cleanedRows]
-      .sort((a, b) => a.distanceM - b.distanceM)
-      .slice(0, 6)
-
-    console.log('LANDED FALLBACK NEAREST FEW:', nearestFew.length)
-
-    if (nearestFew.length >= 3) {
-      bestCandidate = buildLandedCandidate(
-        nearestFew,
-        Math.round(nearestFew[nearestFew.length - 1].distanceM),
-        floorAreaSqm
-      )
-    }
-  }
-
   if (!bestCandidate) {
-    console.log(
-      `Not enough nearby comparables found within ${
-        searchRadius[searchRadius.length - 1]
-      }m.`
-    )
+    console.log('Not enough nearby comparables found.')
     return null
   }
 
