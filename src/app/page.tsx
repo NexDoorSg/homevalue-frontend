@@ -985,6 +985,36 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="mt-6 rounded-2xl border border-[#e5dbcf] bg-gradient-to-r from-[#ffffff] to-[#f8f4ef] p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-[#8b6b52]">
+                  Estimated Value
+                </p>
+
+                {isGenerating && (
+                  <span className="text-xs text-[#8b6b52] animate-pulse">
+                    Calculating...
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-2 text-4xl font-semibold text-[#2d3135] tracking-tight">
+                {hasTeaserResult ? formatTeaserMoney(estimatedPrice) : '$---,---'}
+              </p>
+
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#eee5dc]">
+                <div
+                  className={`h-full rounded-full bg-[#8b6b52] transition-all duration-700 ${
+                    hasTeaserResult ? 'w-[70%]' : 'w-[20%]'
+                  }`}
+                />
+              </div>
+
+              <p className="mt-2 text-xs text-[#7a8289]">
+                Based on nearby 2026 transaction data
+              </p>
+            </div>
+
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm text-[#8b6b52]">Your Instant Estimate</p>
