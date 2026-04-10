@@ -967,7 +967,7 @@ export default function Home() {
                   disabled={isGenerating}
                   className="mt-2 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isGenerating ? 'Generating...' : 'Get My Estimated Value'}
+                  {isGenerating ? 'Generating...' : 'See My Home Value'}
                 </button>
 
                 {formMessage && (
