@@ -1052,15 +1052,14 @@ export default function Home() {
             {hasTeaserResult && !hasUnlockedReport && (
               <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                  Unlock full report
+                  Unlock Full Report
                 </p>
                 <h3 className="mt-2 text-xl font-semibold text-[#2d3135]">
-                  Enter your details to view the full valuation report
+                  See Your Exact Valuation and Nearby Comparables
                 </h3>
                 <p className="mt-2 text-sm text-[#67707a]">
-                  You’ll unlock the exact valuation, indicative range, and recent nearby transactions.
+                  Get your exact valuation range, nearby comparable transactions, and a clearer picture of where your property stands in today’s market.
                 </p>
-
                 <div className="mt-5 grid gap-4">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[#4d555d]">
