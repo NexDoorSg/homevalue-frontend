@@ -1109,6 +1109,10 @@ export default function Home() {
                     {isLoadingFullReport ? 'Unlocking...' : 'See Full Valuation Report'}
                   </button>
 
+                  <p className="text-xs text-[#7a8289]">
+                    Limited free reports available each month
+                  </p>
+                  
                   {unlockMessage && (
                     <p className="text-sm text-[#8b6b52]">{unlockMessage}</p>
                   )}
