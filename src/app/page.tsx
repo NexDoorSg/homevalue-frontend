@@ -764,24 +764,17 @@ export default function Home() {
               Get an instant estimate based on nearby 2026 transaction data.
             </p>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-                <p className="text-sm text-[#8b6b52]">Nearby sales</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Matched to your area</p>
+            <div className="mt-8 grid gap-3">
+              <div className="rounded-2xl border border-[#e8ddd2] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+                <p className="text-sm font-medium text-[#2d3135]">Based on nearby sales</p>
               </div>
 
-              <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-                <p className="text-sm text-[#8b6b52]">Clear valuation</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
-                  Built on real market evidence
-                </p>
+              <div className="rounded-2xl border border-[#e8ddd2] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+                <p className="text-sm font-medium text-[#2d3135]">Built on real market evidence</p>
               </div>
 
-              <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-                <p className="text-sm text-[#8b6b52]">Useful insights</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
-                  Designed for homeowners
-                </p>
+              <div className="rounded-2xl border border-[#e8ddd2] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+                <p className="text-sm font-medium text-[#2d3135]">Designed for homeowners</p>
               </div>
             </div>
 
