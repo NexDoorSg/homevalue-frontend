@@ -4,6 +4,8 @@ import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
 
+type PropertyCategory = 'hdb' | 'condo' | 'landed'
+
 type OneMapResult = {
   ADDRESS: string
   LATITUDE: string
@@ -17,7 +19,7 @@ type OneMapResult = {
 type PropertyTypeOption = {
   label: string
   value: string
-  category: 'hdb' | 'condo' | 'landed'
+  category: PropertyCategory
 }
 
 type ComparableRow = {
@@ -27,6 +29,12 @@ type ComparableRow = {
   floor_area_sqm: number | string | null
   latitude: number | string | null
   longitude: number | string | null
+}
+
+type ResolvedAddress = {
+  lat: number
+  lon: number
+  category: PropertyCategory
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
@@ -103,7 +111,7 @@ function buildLookupCandidates(item: OneMapResult) {
   return Array.from(candidates).filter(Boolean)
 }
 
-function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
+function inferPropertyCategory(item: OneMapResult): PropertyCategory {
   const text = `${item.ADDRESS || ''} ${item.BUILDING || ''}`.toUpperCase()
 
   const landedKeywords = [
@@ -151,7 +159,7 @@ function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
   return 'condo'
 }
 
-function getDefaultPropertyType(category: 'hdb' | 'condo' | 'landed') {
+function getDefaultPropertyType(category: PropertyCategory) {
   const firstOption = PROPERTY_TYPE_OPTIONS.find(
     (option) => option.category === category
   )
@@ -221,7 +229,8 @@ export default function Home() {
   const [selectedLat, setSelectedLat] = useState<number | null>(null)
   const [selectedLon, setSelectedLon] = useState<number | null>(null)
   const [lookupCandidates, setLookupCandidates] = useState<string[]>([])
-  const [propertyCategory, setPropertyCategory] = useState<'hdb' | 'condo' | 'landed'>('hdb')
+  const [propertyCategory, setPropertyCategory] =
+    useState<PropertyCategory>('hdb')
 
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
   const [estimatedLow, setEstimatedLow] = useState<number | null>(null)
@@ -257,7 +266,7 @@ export default function Home() {
   const [unlockEmail, setUnlockEmail] = useState('')
   const [unlockMessage, setUnlockMessage] = useState('')
 
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const filteredPropertyOptions = PROPERTY_TYPE_OPTIONS.filter(
     (option) => option.category === propertyCategory
@@ -310,7 +319,7 @@ export default function Home() {
     }
 
     debounceRef.current = setTimeout(() => {
-      searchAddress(value)
+      void searchAddress(value)
     }, 300)
   }
 
@@ -338,11 +347,12 @@ export default function Home() {
     setUnlockMessage('')
   }
 
-  const resolveAddressForGeneration = async () => {
-    if (selectedLat && selectedLon) {
+  const resolveAddressForGeneration = async (): Promise<ResolvedAddress | null> => {
+    if (selectedLat !== null && selectedLon !== null) {
       return {
         lat: selectedLat,
         lon: selectedLon,
+        category: propertyCategory,
       }
     }
 
@@ -418,7 +428,9 @@ export default function Home() {
       const resolved = await resolveAddressForGeneration()
 
       if (!resolved) {
-        setFormMessage('Could not match this address. Please choose an address from the dropdown.')
+        setFormMessage(
+          'Could not match this address. Please choose an address from the dropdown.'
+        )
         return
       }
 
@@ -437,7 +449,9 @@ export default function Home() {
         setNumOfComps(null)
         setRadiusUsedM(null)
         setHasTeaserResult(false)
-        setFormMessage('Not enough comparable transactions found for this property yet.')
+        setFormMessage(
+          'Not enough comparable transactions found for this property yet.'
+        )
         return
       }
 
@@ -461,8 +475,8 @@ export default function Home() {
         floorLevel.trim() ||
         stackNumber.trim() ||
         floorAreaSqm.trim() ||
-        selectedLat ||
-        selectedLon ||
+        selectedLat !== null ||
+        selectedLon !== null ||
         hasTeaserResult
     )
   }
@@ -558,7 +572,9 @@ export default function Home() {
 
     if (error) {
       console.error('Consultation lead save error:', error)
-      setConsultationMessage('Could not save your details right now. Please try again.')
+      setConsultationMessage(
+        'Could not save your details right now. Please try again.'
+      )
       return
     }
 
@@ -639,8 +655,12 @@ export default function Home() {
       const withinRadius = cleaned
         .filter((row) => row.distance_m <= radius)
         .sort((a, b) => {
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+          const dateA = a.transaction_date
+            ? new Date(a.transaction_date).getTime()
+            : 0
+          const dateB = b.transaction_date
+            ? new Date(b.transaction_date).getTime()
+            : 0
           return dateB - dateA
         })
 
@@ -651,8 +671,12 @@ export default function Home() {
 
     return cleaned
       .sort((a, b) => {
-        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+        const dateA = a.transaction_date
+          ? new Date(a.transaction_date).getTime()
+          : 0
+        const dateB = b.transaction_date
+          ? new Date(b.transaction_date).getTime()
+          : 0
         return dateB - dateA
       })
       .slice(0, 10)
@@ -676,7 +700,7 @@ export default function Home() {
       return
     }
 
-    if (!selectedLat || !selectedLon || !estimatedPrice) {
+    if (selectedLat === null || selectedLon === null || !estimatedPrice) {
       setUnlockMessage('Please generate a teaser valuation first.')
       return
     }
@@ -736,7 +760,9 @@ export default function Home() {
       setHasUnlockedReport(true)
 
       if (!emailResult.ok) {
-        setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
+        setUnlockMessage(
+          'Full report unlocked. Email notification failed; check Vercel logs.'
+        )
       } else {
         setUnlockMessage('Full report unlocked successfully.')
       }
@@ -758,7 +784,9 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 md:px-10">
           <div
             className="text-3xl tracking-tight text-black md:text-4xl"
-            style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
+            style={{
+              fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif',
+            }}
           >
             NexDoor.
           </div>
@@ -796,7 +824,9 @@ export default function Home() {
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
                 <p className="text-sm text-[#8b6b52]">Nearby sales</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Matched to your area</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
+                  Matched to your area
+                </p>
               </div>
 
               <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
@@ -878,7 +908,7 @@ export default function Home() {
                   )}
                 </div>
 
-                {selectedLat && selectedLon && (
+                {selectedLat !== null && selectedLon !== null && (
                   <p className="text-sm font-medium text-green-600">
                     Address matched successfully.
                   </p>
