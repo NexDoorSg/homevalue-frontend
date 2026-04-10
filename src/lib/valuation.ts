@@ -358,6 +358,28 @@ function buildNonLandedCandidate(
   const usable = trimRowsByMetric(preferredRows, (row) => row.pricePerSqm)
 
   const values = usable.map((row) => row.pricePerSqm)
+  const dominantProject = (() => {
+    const counts = new Map<string, number>()
+
+    for (const row of usable) {
+      const project = normalizeText(row.project_name)
+      if (!project) continue
+      counts.set(project, (counts.get(project) || 0) + 1)
+    }
+
+    let bestProject: string | null = null
+    let bestCount = 0
+
+    for (const [project, count] of counts.entries()) {
+      if (count > bestCount) {
+        bestProject = project
+        bestCount = count
+      }
+    }
+
+    return bestProject
+  })()
+
   const weights = usable.map((row) => {
     const distanceWeight = 1 / Math.max(row.distanceM, 50)
 
@@ -376,7 +398,10 @@ function buildNonLandedCandidate(
       else recencyWeight = 0.9
     }
 
-    return distanceWeight * sizeWeight * recencyWeight
+    const projectWeight =
+      dominantProject && normalizeText(row.project_name) === dominantProject ? 1.15 : 1
+
+    return distanceWeight * sizeWeight * recencyWeight * projectWeight
   })
 
   const avgPsm = weightedAverage(values, weights)
