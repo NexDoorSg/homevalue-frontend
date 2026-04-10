@@ -35,6 +35,14 @@ type CleanedRow = {
   distanceM: number
 }
 
+type CandidateResult = {
+  estimated: number
+  low: number
+  high: number
+  comparables: number
+  radius: number
+}
+
 function normalizeText(value: string | null | undefined) {
   return (value || '').toUpperCase().trim()
 }
@@ -67,10 +75,9 @@ function weightedAverage(values: number[], weights: number[]) {
   const totalWeight = weights.reduce((sum, w) => sum + w, 0)
   if (!totalWeight) return null
 
-  const weightedSum = values.reduce(
-    (sum, value, i) => sum + value * weights[i],
-    0
-  )
+  const weightedSum = values.reduce((sum, value, i) => {
+    return sum + value * weights[i]
+  }, 0)
 
   return weightedSum / totalWeight
 }
@@ -260,20 +267,34 @@ function cleanRows(
     )
 }
 
-function trimOutliers(values: number[], rows: CleanedRow[]) {
+function trimRowsByMetric(
+  rows: CleanedRow[],
+  metricGetter: (row: CleanedRow) => number
+) {
   if (rows.length < 5) {
     return rows
   }
 
-  const sorted = [...values].sort((a, b) => a - b)
-  const p10 = percentile(sorted, 0.1)
-  const p90 = percentile(sorted, 0.9)
+  const metricValues = rows
+    .map(metricGetter)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+
+  if (metricValues.length < 5) {
+    return rows
+  }
+
+  const p10 = percentile(metricValues, 0.1)
+  const p90 = percentile(metricValues, 0.9)
 
   if (p10 === null || p90 === null) {
     return rows
   }
 
-  const trimmed = rows.filter((row) => row.pricePerSqft >= p10 && row.pricePerSqft <= p90)
+  const trimmed = rows.filter((row) => {
+    const value = metricGetter(row)
+    return value >= p10 && value <= p90
+  })
 
   return trimmed.length >= 3 ? trimmed : rows
 }
@@ -282,16 +303,10 @@ function buildNonLandedCandidate(
   rows: CleanedRow[],
   radius: number,
   floorAreaSqm: number
-) {
+): CandidateResult | null {
   if (rows.length === 0) return null
 
-  const usable = trimOutliers(
-    rows.map((row) => row.pricePerSqm),
-    rows.map((row) => ({
-      ...row,
-      pricePerSqft: row.pricePerSqm,
-    }))
-  )
+  const usable = trimRowsByMetric(rows, (row) => row.pricePerSqm)
 
   const values = usable.map((row) => row.pricePerSqm)
   const weights = usable.map((row) => {
@@ -322,13 +337,10 @@ function buildLandedCandidate(
   builtUpSqm: number,
   propertyType: string,
   subjectTenureBucket: string
-) {
+): CandidateResult | null {
   if (rows.length === 0) return null
 
-  let usable = trimOutliers(
-    rows.map((row) => row.pricePerSqft),
-    rows
-  )
+  const usable = trimRowsByMetric(rows, (row) => row.pricePerSqft)
 
   const landSizeSqft = landSizeSqm * 10.7639
   const values = usable.map((row) => row.pricePerSqft)
@@ -340,14 +352,12 @@ function buildLandedCandidate(
     const sizeWeight = 1 / Math.max(landSizeDiff, 20)
 
     const rowTenureBucket = normalizeTenureBucket(row.tenure)
-    const tenureWeight =
-      rowTenureBucket === subjectTenureBucket ? 1.2 : 0.9
+    const tenureWeight = rowTenureBucket === subjectTenureBucket ? 1.2 : 0.9
 
     return distanceWeight * sizeWeight * tenureWeight
   })
 
   const avgLandPsf = weightedAverage(values, weights)
-
   if (!avgLandPsf || !Number.isFinite(avgLandPsf)) {
     return null
   }
@@ -355,7 +365,8 @@ function buildLandedCandidate(
   let estimated = avgLandPsf * landSizeSqft
 
   const typicalRatio = getTypicalBuiltUpRatio(propertyType)
-  const subjectRatio = builtUpSqm > 0 && landSizeSqm > 0 ? builtUpSqm / landSizeSqm : typicalRatio
+  const subjectRatio =
+    builtUpSqm > 0 && landSizeSqm > 0 ? builtUpSqm / landSizeSqm : typicalRatio
   const ratioDelta = (subjectRatio - typicalRatio) / typicalRatio
   const cappedAdjustment = Math.max(-0.05, Math.min(0.05, ratioDelta * 0.2))
 
@@ -427,13 +438,7 @@ export async function getValuation({
       cleanedRows = sameTenureRows
     }
 
-    let bestCandidate: {
-      estimated: number
-      low: number
-      high: number
-      comparables: number
-      radius: number
-    } | null = null
+    let bestCandidate: CandidateResult | null = null
 
     for (const radius of searchRadius) {
       const nearby = cleanedRows.filter((row) => row.distanceM <= radius)
@@ -506,23 +511,13 @@ export async function getValuation({
     return bestCandidate
   }
 
-  let bestCandidate: {
-    estimated: number
-    low: number
-    high: number
-    comparables: number
-    radius: number
-  } | null = null
+  let bestCandidate: CandidateResult | null = null
 
   for (const radius of searchRadius) {
     const nearby = cleanedRows.filter((row) => row.distanceM <= radius)
     if (nearby.length < 2) continue
 
-    const candidate = buildNonLandedCandidate(
-      nearby,
-      radius,
-      floorAreaSqm
-    )
+    const candidate = buildNonLandedCandidate(nearby, radius, floorAreaSqm)
 
     if (!candidate) continue
 
