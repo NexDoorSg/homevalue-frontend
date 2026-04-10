@@ -164,6 +164,11 @@ function getDistanceMeters(
   )
 }
 
+type EmailResult = {
+  ok: boolean
+  error?: string
+}
+
 export default function Home() {
   const [address, setAddress] = useState('')
   const [floorLevel, setFloorLevel] = useState('')
@@ -410,6 +415,72 @@ export default function Home() {
     }
   }
 
+  const hasPropertyContext = () => {
+    return Boolean(
+      address.trim() ||
+        floorLevel.trim() ||
+        stackNumber.trim() ||
+        floorAreaSqm.trim() ||
+        selectedLat ||
+        selectedLon ||
+        hasTeaserResult
+    )
+  }
+
+  const buildLeadPayload = (
+    name: string,
+    phone: string,
+    email: string,
+    extra?: { plan?: string | null }
+  ) => {
+    const fullUnitNumber =
+      floorLevel.trim() && stackNumber.trim()
+        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
+        : null
+
+    const propertyContextExists = hasPropertyContext()
+
+    return {
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      address: propertyContextExists ? address.trim() || null : null,
+      unit_number: propertyContextExists ? fullUnitNumber : null,
+      unit_type: propertyContextExists ? propertyType || null : null,
+      floor_area_sqm:
+        propertyContextExists && floorAreaSqm ? Number(floorAreaSqm) : null,
+      plan: extra?.plan ?? null,
+    }
+  }
+
+  const sendLeadEmail = async (payload: Record<string, unknown>): Promise<EmailResult> => {
+    try {
+      const response = await fetch('/api/send-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        console.error('send-lead API failed:', result)
+        return {
+          ok: false,
+          error: result?.error || 'Email API failed',
+        }
+      }
+
+      return { ok: true }
+    } catch (error) {
+      console.error('send-lead fetch failed:', error)
+      return {
+        ok: false,
+        error: 'Could not reach email API',
+      }
+    }
+  }
+
   const handleConsultationSubmit = async () => {
     setConsultationMessage('')
 
@@ -433,20 +504,12 @@ export default function Home() {
       return
     }
 
-    const fullUnitNumber =
-      floorLevel.trim() && stackNumber.trim()
-        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
-        : null
-
-    const leadPayload = {
-      name: consultName.trim(),
-      phone: consultPhone.trim(),
-      email: consultEmail.trim(),
-      address: address.trim() || null,
-      unit_number: fullUnitNumber,
-      unit_type: propertyType || null,
-      floor_area_sqm: floorAreaSqm ? Number(floorAreaSqm) : null,
-    }
+    const leadPayload = buildLeadPayload(
+      consultName,
+      consultPhone,
+      consultEmail,
+      { plan: consultPlan.trim() }
+    )
 
     const { error } = await supabase.from('leads').insert([leadPayload])
 
@@ -456,17 +519,18 @@ export default function Home() {
       return
     }
 
-    await fetch('/api/send-lead', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...leadPayload,
-        source: 'consultation',
-        plan: consultPlan.trim(),
-      }),
+    const emailResult = await sendLeadEmail({
+      ...leadPayload,
+      source: 'consultation',
     })
 
-    setConsultationMessage('Thanks — we will contact you shortly.')
+    if (!emailResult.ok) {
+      setConsultationMessage(
+        'Lead saved, but email notification failed. Check Vercel logs.'
+      )
+    } else {
+      setConsultationMessage('Thanks — we will contact you shortly.')
+    }
 
     setConsultName('')
     setConsultPhone('')
@@ -576,20 +640,11 @@ export default function Home() {
 
     setIsLoadingFullReport(true)
 
-    const fullUnitNumber =
-      floorLevel.trim() && stackNumber.trim()
-        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
-        : null
-
-    const leadPayload = {
-      name: unlockName.trim(),
-      phone: unlockPhone.trim(),
-      email: unlockEmail.trim(),
-      address: address.trim() || null,
-      unit_number: fullUnitNumber,
-      unit_type: propertyType || null,
-      floor_area_sqm: floorAreaSqm ? Number(floorAreaSqm) : null,
-    }
+    const leadPayload = buildLeadPayload(
+      unlockName,
+      unlockPhone,
+      unlockEmail
+    )
 
     const { error } = await supabase.from('leads').insert([leadPayload])
 
@@ -600,13 +655,9 @@ export default function Home() {
       return
     }
 
-    await fetch('/api/send-lead', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...leadPayload,
-        source: 'full_report',
-      }),
+    const emailResult = await sendLeadEmail({
+      ...leadPayload,
+      source: 'full_report',
     })
 
     let source = 'data_gov_hdb'
@@ -623,7 +674,13 @@ export default function Home() {
 
     setRecentComparables(comparables)
     setHasUnlockedReport(true)
-    setUnlockMessage('Full report unlocked successfully.')
+
+    if (!emailResult.ok) {
+      setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
+    } else {
+      setUnlockMessage('Full report unlocked successfully.')
+    }
+
     setIsLoadingFullReport(false)
 
     setUnlockName('')
