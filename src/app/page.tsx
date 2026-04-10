@@ -134,6 +134,13 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [formMessage, setFormMessage] = useState('')
 
+  const [showConsultationModal, setShowConsultationModal] = useState(false)
+  const [consultName, setConsultName] = useState('')
+  const [consultPhone, setConsultPhone] = useState('')
+  const [consultEmail, setConsultEmail] = useState('')
+  const [consultPlan, setConsultPlan] = useState('')
+  const [consultationMessage, setConsultationMessage] = useState('')
+
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const filteredPropertyOptions = PROPERTY_TYPE_OPTIONS.filter(
@@ -315,6 +322,32 @@ export default function Home() {
     }
   }
 
+  const handleConsultationSubmit = async () => {
+    setConsultationMessage('')
+
+    if (!consultName.trim()) {
+      setConsultationMessage('Please enter your name.')
+      return
+    }
+
+    if (!consultPhone.trim()) {
+      setConsultationMessage('Please enter your phone number.')
+      return
+    }
+
+    if (!consultEmail.trim()) {
+      setConsultationMessage('Please enter your email.')
+      return
+    }
+
+    if (!consultPlan.trim()) {
+      setConsultationMessage('Please tell us your plan.')
+      return
+    }
+
+    setConsultationMessage('Thanks — we will contact you shortly.')
+  }
+
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
       <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
@@ -328,6 +361,7 @@ export default function Home() {
 
           <button
             type="button"
+            onClick={() => setShowConsultationModal(true)}
             className="rounded-full bg-[#2f3438] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
           >
             Free Consultation
@@ -669,6 +703,97 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {showConsultationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-[#2d3135]">
+                  Free Consultation
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                  Leave your details and we’ll contact you shortly.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowConsultationModal(false)}
+                className="rounded-full border border-[#e5dbcf] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#f8f4ef]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={consultName}
+                  onChange={(e) => setConsultName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                  Phone number
+                </label>
+                <input
+                  type="text"
+                  value={consultPhone}
+                  onChange={(e) => setConsultPhone(e.target.value)}
+                  placeholder="Your phone number"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={consultEmail}
+                  onChange={(e) => setConsultEmail(e.target.value)}
+                  placeholder="Your email"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                  What’s your plan?
+                </label>
+                <textarea
+                  value={consultPlan}
+                  onChange={(e) => setConsultPlan(e.target.value)}
+                  placeholder="e.g. Thinking of selling in the next 3 months"
+                  rows={4}
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConsultationSubmit}
+                className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d]"
+              >
+                Submit
+              </button>
+
+              {consultationMessage && (
+                <p className="text-sm text-[#8b6b52]">{consultationMessage}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
