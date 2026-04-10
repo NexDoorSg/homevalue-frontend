@@ -804,7 +804,7 @@ export default function Home() {
           </div>
           
           <div className="order-1 relative lg:order-2">
-            <div className="rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.08)] md:p-8">
+            <div className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold text-[#2d3135]">
                   See Your Estimated Value Instantly
