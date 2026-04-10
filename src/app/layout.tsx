@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "HomeValue by NexDoor",
   description:
     "Find out what your property is really worth using real 2026 transaction data in Singapore.",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
