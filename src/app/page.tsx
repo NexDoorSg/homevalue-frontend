@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 
@@ -319,31 +318,22 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
       <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
-  <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 md:px-10">
-    
-    {/* LOGO IMAGE */}
-    <div className="flex items-center">
-      <Image
-        src="/nexdoor-logo.png"
-        alt="NexDoor"
-        width={200}
-        height={60}
-        className="h-14 md:h-16 w-auto object-contain"
-        priority
-      />
-    </div>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 md:px-10">
+          <div
+            className="text-3xl tracking-tight text-black md:text-4xl"
+            style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
+          >
+            NexDoor.
+          </div>
 
-    {/* CTA */}
-    <button
-      type="button"
-      onClick={() => setShowConsultationModal(true)}
-      className="rounded-full bg-[#2f3438] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
-    >
-      Free Consultation
-    </button>
-
-  </div>
-</header>
+          <button
+            type="button"
+            className="rounded-full bg-[#2f3438] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
+          >
+            Free Consultation
+          </button>
+        </div>
+      </header>
 
       <section className="relative overflow-hidden">
         <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
@@ -377,12 +367,16 @@ export default function Home() {
 
               <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
                 <p className="text-sm text-[#8b6b52]">Clear valuation</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Built on real market evidence</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
+                  Built on real market evidence
+                </p>
               </div>
 
               <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
                 <p className="text-sm text-[#8b6b52]">Useful insights</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Designed for homeowners</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
+                  Designed for homeowners
+                </p>
               </div>
             </div>
 
