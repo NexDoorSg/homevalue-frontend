@@ -465,80 +465,81 @@ export default function Home() {
   }
 
   const fetchRecentComparables = async (
-    lat: number,
-    lon: number,
-    source: string,
-    targetPropertyType: string
-  ) => {
-    const { data, error } = await supabase
-      .from('property_transactions_v2')
-      .select(
-        'address, transaction_date, transaction_price, floor_area_sqm, latitude, longitude'
-      )
-      .eq('source', source)
-      .eq('unit_type', targetPropertyType)
-      .not('transaction_price', 'is', null)
-      .not('floor_area_sqm', 'is', null)
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null)
-      .limit(5000)
+  lat: number,
+  lon: number,
+  source: string,
+  targetPropertyType: string
+) => {
+  const { data, error } = await supabase
+    .from('property_transactions_v2')
+    .select(
+      'address, transaction_date, transaction_price, floor_area_sqm, latitude, longitude'
+    )
+    .eq('source', source)
+    .eq('unit_type', targetPropertyType)
+    .not('transaction_price', 'is', null)
+    .not('floor_area_sqm', 'is', null)
+    .not('latitude', 'is', null)
+    .not('longitude', 'is', null)
+    .limit(5000)
 
-    if (error) {
-      console.error('Comparable fetch error:', error)
-      return []
-    }
+  if (error) {
+    console.error('Comparable fetch error:', error)
+    return []
+  }
 
-    const cleaned = ((data || []) as ComparableRow[])
-      .map((row) => {
-        const transactionPrice = Number(row.transaction_price)
-        const floorArea = Number(row.floor_area_sqm)
-        const rowLat = Number(row.latitude)
-        const rowLon = Number(row.longitude)
+  const cleaned = ((data || []) as ComparableRow[])
+    .map((row) => {
+      const transactionPrice = Number(row.transaction_price)
+      const floorArea = Number(row.floor_area_sqm)
+      const rowLat = Number(row.latitude)
+      const rowLon = Number(row.longitude)
+      const floorAreaSqft = floorArea * 10.7639
 
-        return {
-          address: row.address,
-          transaction_date: row.transaction_date,
-          transaction_price: transactionPrice,
-          floor_area_sqm: floorArea,
-          latitude: rowLat,
-          longitude: rowLon,
-          distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
-          psf: floorArea > 0 ? transactionPrice / floorArea : 0,
-        }
-      })
-      .filter(
-        (row) =>
-          Number.isFinite(row.transaction_price) &&
-          row.transaction_price > 0 &&
-          Number.isFinite(row.floor_area_sqm) &&
-          row.floor_area_sqm > 0 &&
-          Number.isFinite(row.latitude) &&
-          Number.isFinite(row.longitude)
-      )
-
-    const searchRadius = [200, 400, 600, 800]
-    for (const radius of searchRadius) {
-      const withinRadius = cleaned
-        .filter((row) => row.distance_m <= radius)
-        .sort((a, b) => {
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-          return dateB - dateA
-        })
-
-      if (withinRadius.length >= 5) {
-        return withinRadius.slice(0, 10)
+      return {
+        address: row.address,
+        transaction_date: row.transaction_date,
+        transaction_price: transactionPrice,
+        floor_area_sqm: floorArea,
+        latitude: rowLat,
+        longitude: rowLon,
+        distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
+        psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
       }
-    }
+    })
+    .filter(
+      (row) =>
+        Number.isFinite(row.transaction_price) &&
+        row.transaction_price > 0 &&
+        Number.isFinite(row.floor_area_sqm) &&
+        row.floor_area_sqm > 0 &&
+        Number.isFinite(row.latitude) &&
+        Number.isFinite(row.longitude)
+    )
 
-    return cleaned
+  const searchRadius = [200, 400, 600, 800]
+  for (const radius of searchRadius) {
+    const withinRadius = cleaned
+      .filter((row) => row.distance_m <= radius)
       .sort((a, b) => {
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
         return dateB - dateA
       })
-      .slice(0, 10)
+
+    if (withinRadius.length >= 5) {
+      return withinRadius.slice(0, 10)
+    }
   }
+
+  return cleaned
+    .sort((a, b) => {
+      const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+      const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+      return dateB - dateA
+    })
+    .slice(0, 10)
+}
 
   const handleUnlockReport = async () => {
     setUnlockMessage('')
