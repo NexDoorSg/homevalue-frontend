@@ -281,48 +281,6 @@ function trimRowsByMetric(
     return rows
   }
 
-  function pickPreferredNonLandedRows(
-    rows: CleanedRow[],
-    floorAreaSqm: number
-  ) {
-    const sizeFiltered = rows.filter((row) => {
-      const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
-      return sizeDiffRatio <= 0.2
-    })
-
-    const candidateRows = sizeFiltered.length >= 3 ? sizeFiltered : rows
-
-    const projectCounts = new Map<string, number>()
-
-    for (const row of candidateRows) {
-      const project = normalizeText(row.project_name)
-      if (!project) continue
-      projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
-    }
-
-    let bestProject: string | null = null
-    let bestCount = 0
-
-    for (const [project, count] of projectCounts.entries()) {
-      if (count > bestCount) {
-        bestProject = project
-        bestCount = count
-      }
-    }
-
-    if (bestProject && bestCount >= 3) {
-      const sameProjectRows = candidateRows.filter(
-        (row) => normalizeText(row.project_name) === bestProject
-      )
-
-      if (sameProjectRows.length >= 3) {
-        return sameProjectRows
-      }
-    }
-
-    return candidateRows
-  }
-
   const metricValues = rows
     .map(metricGetter)
     .filter((value) => Number.isFinite(value) && value > 0)
@@ -347,6 +305,49 @@ function trimRowsByMetric(
   return trimmed.length >= 3 ? trimmed : rows
 }
 
+function pickPreferredNonLandedRows(
+  rows: CleanedRow[],
+  floorAreaSqm: number
+) {
+  const sizeFiltered = rows.filter((row) => {
+    const sizeDiffRatio =
+      Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
+    return sizeDiffRatio <= 0.2
+  })
+
+  const candidateRows = sizeFiltered.length >= 3 ? sizeFiltered : rows
+
+  const projectCounts = new Map<string, number>()
+
+  for (const row of candidateRows) {
+    const project = normalizeText(row.project_name)
+    if (!project) continue
+    projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
+  }
+
+  let bestProject: string | null = null
+  let bestCount = 0
+
+  for (const [project, count] of projectCounts.entries()) {
+    if (count > bestCount) {
+      bestProject = project
+      bestCount = count
+    }
+  }
+
+  if (bestProject && bestCount >= 3) {
+    const sameProjectRows = candidateRows.filter(
+      (row) => normalizeText(row.project_name) === bestProject
+    )
+
+    if (sameProjectRows.length >= 3) {
+      return sameProjectRows
+    }
+  }
+
+  return candidateRows
+}
+
 function buildNonLandedCandidate(
   rows: CleanedRow[],
   radius: number,
@@ -358,6 +359,7 @@ function buildNonLandedCandidate(
   const usable = trimRowsByMetric(preferredRows, (row) => row.pricePerSqm)
 
   const values = usable.map((row) => row.pricePerSqm)
+
   const dominantProject = (() => {
     const counts = new Map<string, number>()
 
@@ -399,7 +401,10 @@ function buildNonLandedCandidate(
     }
 
     const projectWeight =
-      dominantProject && normalizeText(row.project_name) === dominantProject ? 1.15 : 1
+      dominantProject &&
+      normalizeText(row.project_name) === dominantProject
+        ? 1.15
+        : 1
 
     return distanceWeight * sizeWeight * recencyWeight * projectWeight
   })
@@ -436,13 +441,27 @@ function buildLandedCandidate(
   const weights = usable.map((row) => {
     const distanceWeight = 1 / Math.max(row.distanceM, 100)
 
-    const landSizeDiff = Math.abs(row.floor_area_sqm - landSizeSqm)
-    const sizeWeight = 1 / Math.max(landSizeDiff, 20)
+    // Fallback only: dataset has no true land area, so this uses floor_area_sqm
+    // as a rough similarity proxy. Real landed accuracy improves if land area is added.
+    const landSizeProxyDiff = Math.abs(row.floor_area_sqm - landSizeSqm)
+    const sizeWeight = 1 / Math.max(landSizeProxyDiff, 20)
 
     const rowTenureBucket = normalizeTenureBucket(row.tenure)
     const tenureWeight = rowTenureBucket === subjectTenureBucket ? 1.2 : 0.9
 
-    return distanceWeight * sizeWeight * tenureWeight
+    let recencyWeight = 1
+    if (row.transaction_date) {
+      const txnTime = new Date(row.transaction_date).getTime()
+      const now = Date.now()
+      const daysOld = (now - txnTime) / (1000 * 60 * 60 * 24)
+
+      if (daysOld <= 90) recencyWeight = 1.15
+      else if (daysOld <= 180) recencyWeight = 1.08
+      else if (daysOld <= 365) recencyWeight = 1
+      else recencyWeight = 0.92
+    }
+
+    return distanceWeight * sizeWeight * tenureWeight * recencyWeight
   })
 
   const avgLandPsf = weightedAverage(values, weights)
