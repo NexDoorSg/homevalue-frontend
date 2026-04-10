@@ -750,8 +750,8 @@ export default function Home() {
         <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
         <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
 
-        <div className="mx-auto grid max-w-7xl gap-14 px-6 py-12 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:py-20">
-          <div className="pt-4">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-14 px-6 py-12 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:py-20">
+          <div className="order-2 pt-4 lg:order-1">
             <div className="inline-flex rounded-full border border-[#dcc8b5] bg-white px-4 py-2 text-sm font-medium text-[#8b6b52] shadow-sm">
               HomeValue by NexDoor
             </div>
@@ -808,7 +808,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="order-1 relative lg:order-2">
             <div className="rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.08)] md:p-8">
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold text-[#2d3135]">Get your valuation</h2>
