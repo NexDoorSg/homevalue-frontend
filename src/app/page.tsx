@@ -112,7 +112,11 @@ function buildLookupCandidates(item: OneMapResult) {
 }
 
 function inferPropertyCategory(item: OneMapResult): PropertyCategory {
-  const text = `${item.ADDRESS || ''} ${item.BUILDING || ''}`.toUpperCase()
+  const address = (item.ADDRESS || '').toUpperCase()
+  const building = (item.BUILDING || '').toUpperCase()
+  const roadName = (item.ROAD_NAME || '').toUpperCase()
+
+  const text = `${address} ${building} ${roadName}`
 
   const landedKeywords = [
     'TERRACE HOUSE',
@@ -144,6 +148,45 @@ function inferPropertyCategory(item: OneMapResult): PropertyCategory {
     'PENTHOUSE',
   ]
 
+  const hdbKeywords = [
+    'HDB',
+    'BLOCK',
+    'BLK',
+    'TOA PAYOH',
+    'ANG MO KIO',
+    'BEDOK',
+    'BISHAN',
+    'BUKIT BATOK',
+    'BUKIT MERAH',
+    'BUKIT PANJANG',
+    'BUKIT TIMAH',
+    'CHOA CHU KANG',
+    'CLEMENTI',
+    'GEYLANG',
+    'HOUGANG',
+    'JURONG',
+    'KALLANG',
+    'WHAMPOA',
+    'MARINE PARADE',
+    'PASIR RIS',
+    'PUNGGOL',
+    'QUEENSTOWN',
+    'SEMBAWANG',
+    'SENGKANG',
+    'SERANGOON',
+    'TAMPINES',
+    'TIONG BAHRU',
+    'WOODLANDS',
+    'YISHUN',
+    'CIRCUIT RD',
+    'LORONG',
+    'STREET',
+    'AVE',
+    'AVENUE',
+    'DRIVE',
+    'CRESCENT',
+  ]
+
   if (landedKeywords.some((keyword) => text.includes(keyword))) {
     return 'landed'
   }
@@ -152,11 +195,20 @@ function inferPropertyCategory(item: OneMapResult): PropertyCategory {
     return 'condo'
   }
 
-  if (item.BLK_NO && item.ROAD_NAME) {
+  if (
+    building &&
+    building !== 'NIL' &&
+    !condoKeywords.some((keyword) => building.includes(keyword)) &&
+    !hdbKeywords.some((keyword) => building.includes(keyword))
+  ) {
+    return 'landed'
+  }
+
+  if (hdbKeywords.some((keyword) => text.includes(keyword))) {
     return 'hdb'
   }
 
-  return 'condo'
+  return 'landed'
 }
 
 function getDefaultPropertyType(category: PropertyCategory) {
