@@ -319,7 +319,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
       <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
-  <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 md:px-10">
+  <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 md:px-10">
     <div className="flex items-center gap-3">
       <Image
         src="/nexdoor-logo.png"
