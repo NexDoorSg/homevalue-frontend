@@ -485,27 +485,23 @@ export default function Home() {
   const hasReachedFullReportLimit = async (email: string) => {
   const normalizedEmail = email.trim().toLowerCase()
 
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const response = await fetch('/api/check-report-limit', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email: normalizedEmail }),
+  })
 
-  const { data, error } = await supabase
-    .from('leads')
-    .select('id, email, plan, created_at')
-    .eq('email', normalizedEmail)
-    .eq('plan', 'full_report')
-    .gte('created_at', thirtyDaysAgo.toISOString())
+  const result = await response.json()
 
-  console.log('LIMIT CHECK EMAIL:', normalizedEmail)
-  console.log('LIMIT CHECK SINCE:', thirtyDaysAgo.toISOString())
-  console.log('LIMIT CHECK DATA:', data)
-  console.log('LIMIT CHECK ERROR:', error)
+  console.log('CHECK REPORT LIMIT RESULT:', result)
 
-  if (error) {
-    console.error('Error checking full report limit:', error)
-    throw new Error('Failed to check report limit')
+  if (!response.ok || !result.ok) {
+    throw new Error(result?.error || 'Failed to check report limit')
   }
 
-  return (data?.length || 0) >= 3
+  return result.reachedLimit === true
 }
 
   const handleConsultationSubmit = async () => {
