@@ -55,6 +55,23 @@ const TENURE_OPTIONS = [
   { label: 'Other leasehold', value: 'OTHER' },
 ]
 
+function getPropertyCategoryFromType(
+  propertyType: string
+): 'hdb' | 'condo' | 'landed' {
+  const normalized = propertyType.toUpperCase().trim()
+
+  const hdbTypes = ['2 ROOM', '3 ROOM', '4 ROOM', '5 ROOM', 'EXECUTIVE']
+  const landedTypes = [
+    'TERRACE HOUSE',
+    'SEMI-DETACHED HOUSE',
+    'DETACHED HOUSE',
+  ]
+
+  if (hdbTypes.includes(normalized)) return 'hdb'
+  if (landedTypes.includes(normalized)) return 'landed'
+  return 'condo'
+}
+
 function cleanAddress(value: string) {
   return value
     .toUpperCase()
@@ -108,68 +125,6 @@ function buildLookupCandidates(item: OneMapResult) {
   }
 
   return Array.from(candidates).filter(Boolean)
-}
-
-function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
-  const addressText = cleanAddress(item.ADDRESS || '')
-  const buildingText = cleanAddress(item.BUILDING || '')
-  const combinedText = `${addressText} ${buildingText}`.trim()
-
-  const landedKeywords = [
-    'TERRACE HOUSE',
-    'TERRACE',
-    'SEMI-DETACHED HOUSE',
-    'SEMI-DETACHED',
-    'SEMI DETACHED',
-    'DETACHED HOUSE',
-    'DETACHED',
-    'BUNGALOW',
-    'GOOD CLASS BUNGALOW',
-    'STRATA LANDED',
-    'CLUSTER HOUSE',
-  ]
-
-  const condoKeywords = [
-    'EXECUTIVE CONDOMINIUM',
-    'CONDOMINIUM',
-    'APARTMENT',
-    'RESIDENCES',
-    'RESIDENCE',
-    'SUITES',
-    'SUITE',
-    'TOWER',
-    'TOWERS',
-    'LOFT',
-    'PENTHOUSE',
-  ]
-
-  if (landedKeywords.some((keyword) => combinedText.includes(keyword))) {
-    return 'landed'
-  }
-
-  if (condoKeywords.some((keyword) => combinedText.includes(keyword))) {
-    return 'condo'
-  }
-
-  if (
-    buildingText &&
-    buildingText !== 'NIL' &&
-    buildingText !== addressText &&
-    !landedKeywords.some((keyword) => buildingText.includes(keyword))
-  ) {
-    return 'condo'
-  }
-
-  if (item.BLK_NO && item.ROAD_NAME && !buildingText) {
-    return 'hdb'
-  }
-
-  return 'condo'
-}
-
-function getDefaultPropertyType(category: 'hdb' | 'condo' | 'landed') {
-  const first = PROPERTY_TYPE_OPTIONS.find((option) => option.category === category)
-  return first ? first.value : ''
 }
 
 function formatMoney(value: number | null) {
@@ -238,7 +193,6 @@ export default function Home() {
   const [selectedLat, setSelectedLat] = useState<number | null>(null)
   const [selectedLon, setSelectedLon] = useState<number | null>(null)
   const [lookupCandidates, setLookupCandidates] = useState<string[]>([])
-  const [propertyCategory, setPropertyCategory] = useState<'hdb' | 'condo' | 'landed'>('hdb')
 
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
   const [estimatedLow, setEstimatedLow] = useState<number | null>(null)
@@ -275,10 +229,7 @@ export default function Home() {
   const [unlockMessage, setUnlockMessage] = useState('')
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const filteredPropertyOptions = PROPERTY_TYPE_OPTIONS.filter(
-    (option) => option.category === propertyCategory
-  )
+  const propertyCategory = getPropertyCategoryFromType(propertyType)
 
   const searchAddress = async (value: string) => {
     if (value.trim().length < 3) {
@@ -336,71 +287,58 @@ export default function Home() {
   }
 
   const handleSelectAddress = (item: OneMapResult) => {
-    const category = inferPropertyCategory(item)
+  setAddress(item.ADDRESS)
+  setSelectedLat(Number(item.LATITUDE))
+  setSelectedLon(Number(item.LONGITUDE))
+  setLookupCandidates(buildLookupCandidates(item))
+  resetResults()
 
-    setAddress(item.ADDRESS)
-    setSelectedLat(Number(item.LATITUDE))
-    setSelectedLon(Number(item.LONGITUDE))
-    setLookupCandidates(buildLookupCandidates(item))
-    setPropertyCategory(category)
-    setPropertyType(getDefaultPropertyType(category))
-    resetResults()
-
-    setSuggestions([])
-    setShowSuggestions(false)
-  }
+  setSuggestions([])
+  setShowSuggestions(false)
+}
 
   const resolveAddressForGeneration = async () => {
-    if (selectedLat && selectedLon) {
-      return {
-        lat: selectedLat,
-        lon: selectedLon,
-        category: propertyCategory,
-      }
-    }
-
-    if (!address.trim()) {
-      return null
-    }
-
-    try {
-      const res = await fetch(
-        `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(
-          address
-        )}&returnGeom=Y&getAddrDetails=Y&pageNum=1`
-      )
-      const data = await res.json()
-      const results = (data?.results || []) as OneMapResult[]
-
-      if (!results.length) return null
-
-      const exactMatch = results.find(
-        (item) => cleanAddress(item.ADDRESS || '') === cleanAddress(address)
-      )
-
-      const chosen = exactMatch || results[0]
-      const lat = Number(chosen.LATITUDE)
-      const lon = Number(chosen.LONGITUDE)
-      const category = inferPropertyCategory(chosen)
-
-      setSelectedLat(lat)
-      setSelectedLon(lon)
-      setLookupCandidates(buildLookupCandidates(chosen))
-      setPropertyCategory(category)
-      setPropertyType((current) => {
-        const stillValid = PROPERTY_TYPE_OPTIONS.some(
-          (option) => option.category === category && option.value === current
-        )
-        return stillValid ? current : getDefaultPropertyType(category)
-      })
-      setAddress(chosen.ADDRESS)
-
-      return { lat, lon, category }
-    } catch (error) {
-      console.error('Failed to resolve address for generation:', error)
-      return null
+  if (selectedLat && selectedLon) {
+    return {
+      lat: selectedLat,
+      lon: selectedLon,
     }
   }
+
+  if (!address.trim()) {
+    return null
+  }
+
+  try {
+    const res = await fetch(
+      `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(
+        address
+      )}&returnGeom=Y&getAddrDetails=Y&pageNum=1`
+    )
+    const data = await res.json()
+    const results = (data?.results || []) as OneMapResult[]
+
+    if (!results.length) return null
+
+    const exactMatch = results.find(
+      (item) => cleanAddress(item.ADDRESS || '') === cleanAddress(address)
+    )
+
+    const chosen = exactMatch || results[0]
+    const lat = Number(chosen.LATITUDE)
+    const lon = Number(chosen.LONGITUDE)
+
+    setSelectedLat(lat)
+    setSelectedLon(lon)
+    setLookupCandidates(buildLookupCandidates(chosen))
+    setAddress(chosen.ADDRESS)
+
+    return { lat, lon }
+  } catch (error) {
+    console.error('Failed to resolve address for generation:', error)
+    return null
+  }
+}
 
   const handleGenerateReport = async () => {
     setFormMessage('')
@@ -458,7 +396,7 @@ export default function Home() {
         builtUpSqm: propertyCategory === 'landed' ? Number(builtUpSqm) : undefined,
         tenure: propertyCategory === 'landed' ? tenure : undefined,
         propertyType,
-        propertyCategory: resolved.category,
+        propertyCategory,
       })
 
       if (!result) {
@@ -954,8 +892,8 @@ export default function Home() {
                     onChange={(e) => setPropertyType(e.target.value)}
                     className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                   >
-                    {filteredPropertyOptions.map((option) => (
-                      <option key={option.label} value={option.value}>
+                    {PROPERTY_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
