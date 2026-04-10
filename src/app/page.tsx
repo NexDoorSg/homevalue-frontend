@@ -757,7 +757,7 @@ export default function Home() {
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-14 px-6 py-12 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:py-20">
           <div className="order-2 pt-4 lg:order-1">
             <div className="inline-flex rounded-full border border-[#dcc8b5] bg-white px-4 py-2 text-sm font-medium text-[#8b6b52] shadow-sm">
-              Instant Home Valuation by NexDoor
+              HomeValue by NexDoor
             </div>
 
             <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-[#2d3135] md:text-6xl">
