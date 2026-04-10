@@ -993,14 +993,14 @@ export default function Home() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                <p className="text-sm text-[#8b6b52]">Estimated Value</p>
+                <p className="text-sm text-[#8b6b52]">Your Instant Estimate</p>
                 <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
-                  {hasTeaserResult ? formatTeaserMoney(estimatedPrice) : '$4XX,XXX'}
+                  {hasTeaserResult ? formatTeaserMoney(estimatedPrice) : '$8XX,XXX'}
                 </p>
                 <p className="mt-2 text-sm text-[#6a727a]">
-                  Unlock the full report to see the exact valuation
+                  See your exact valuation range and nearby comparable transactions in the full report.
                 </p>
-              </div>
+            </div>
 
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm text-[#8b6b52]">Comparable Evidence</p>
