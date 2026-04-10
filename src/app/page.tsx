@@ -35,10 +35,20 @@ const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
   { label: 'HDB 4 Room', value: '4 ROOM', category: 'hdb' },
   { label: 'HDB 5 Room', value: '5 ROOM', category: 'hdb' },
   { label: 'HDB Executive', value: 'EXECUTIVE', category: 'hdb' },
-  { label: 'Condominium', value: 'CONDOMINIUM', category: 'condo' },
-  { label: 'Terrace', value: 'TERRACE HOUSE', category: 'landed' },
-  { label: 'Semi-D', value: 'SEMI-DETACHED HOUSE', category: 'landed' },
-  { label: 'Detached', value: 'DETACHED HOUSE', category: 'landed' },
+
+  { label: '1 Bedroom', value: '1 BEDROOM', category: 'condo' },
+  { label: '2 Bedroom', value: '2 BEDROOM', category: 'condo' },
+  { label: '3 Bedroom', value: '3 BEDROOM', category: 'condo' },
+  { label: '4 Bedroom', value: '4 BEDROOM', category: 'condo' },
+  { label: '5 Bedroom', value: '5 BEDROOM', category: 'condo' },
+  { label: 'Penthouse', value: 'PENTHOUSE', category: 'condo' },
+
+  { label: '2 Bedroom', value: '2 BEDROOM', category: 'landed' },
+  { label: '3 Bedroom', value: '3 BEDROOM', category: 'landed' },
+  { label: '4 Bedroom', value: '4 BEDROOM', category: 'landed' },
+  { label: '5 Bedroom', value: '5 BEDROOM', category: 'landed' },
+  { label: '6 Bedroom', value: '6 BEDROOM', category: 'landed' },
+  { label: '7 Bedroom', value: '7 BEDROOM', category: 'landed' },
 ]
 
 function cleanAddress(value: string) {
@@ -99,9 +109,53 @@ function buildLookupCandidates(item: OneMapResult) {
 function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
   const text = `${item.ADDRESS || ''} ${item.BUILDING || ''}`.toUpperCase()
 
-  if (item.BLK_NO && item.ROAD_NAME) {
-    return 'hdb'
+  const landedKeywords = [
+    'TERRACE',
+    'TERRACE HOUSE',
+    'SEMI-DETACHED',
+    'SEMI DETACHED',
+    'DETACHED',
+    'DETACHED HOUSE',
+    'BUNGALOW',
+    'GOOD CLASS BUNGALOW',
+    'STRATA LANDED',
+    'CLUSTER HOUSE',
+  ]
+
+  const condoKeywords = [
+    'CONDOMINIUM',
+    'EXECUTIVE CONDOMINIUM',
+    'APARTMENT',
+    'RESIDENCES',
+    'RESIDENCE',
+    'SUITES',
+    'SUITE',
+    'TOWER',
+    'TOWERS',
+    'VILLAS',
+    'VILLA',
+    'LOFT',
+    'PENTHOUSE',
+  ]
+
+  if (landedKeywords.some((keyword) => text.includes(keyword))) {
+    return 'landed'
   }
+
+  if (condoKeywords.some((keyword) => text.includes(keyword))) {
+    return 'condo'
+  }
+
+  if (
+    item.BUILDING &&
+    item.BUILDING !== 'NIL' &&
+    cleanAddress(item.BUILDING) !== cleanAddress(item.ADDRESS || '')
+  ) {
+    return 'condo'
+  }
+
+  return 'hdb'
+}
 
   if (
     text.includes('TERRACE') ||
