@@ -488,19 +488,24 @@ export default function Home() {
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('leads')
-      .select('*', { count: 'exact', head: true })
+      .select('id, email, plan, created_at')
       .eq('email', normalizedEmail)
       .eq('plan', 'full_report')
       .gte('created_at', thirtyDaysAgo.toISOString())
+
+    console.log('LIMIT CHECK EMAIL:', normalizedEmail)
+    console.log('LIMIT CHECK SINCE:', thirtyDaysAgo.toISOString())
+    console.log('LIMIT CHECK DATA:', data)
+    console.log('LIMIT CHECK ERROR:', error)
 
     if (error) {
       console.error('Error checking full report limit:', error)
       throw new Error('Failed to check report limit')
     }
 
-    return (count || 0) >= 3
+    return (data?.length || 0) >= 3
   }
 
   const handleConsultationSubmit = async () => {
