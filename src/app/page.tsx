@@ -652,7 +652,7 @@ export default function Home() {
     }
 
     if (!selectedLat || !selectedLon || !estimatedPrice) {
-      setUnlockMessage('Please generate a teaser valuation first.')
+      setUnlockMessage('Please generate your estimate first.')
       return
     }
 
@@ -1007,12 +1007,12 @@ export default function Home() {
                 <p className="mt-2 text-lg font-semibold text-[#2d3135]">
                   {hasTeaserResult
                     ? `${numOfComps || 0} nearby transactions found`
-                    : 'Generate a teaser valuation first'}
+                    : 'Enter your details to see nearby transaction evidence'}
                 </p>
                 <p className="mt-1 text-sm text-[#6a727a]">
                   {hasTeaserResult
-                    ? 'Submit your details to unlock the full report'
-                    : 'We’ll show a teaser first'}
+                    ? 'Unlock the full report to view more detail'
+                    : 'Your estimate and supporting data will appear here'}
                 </p>
               </div>
             </div>
