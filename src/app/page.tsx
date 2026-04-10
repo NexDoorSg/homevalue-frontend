@@ -43,12 +43,9 @@ const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
   { label: '5 Bedroom', value: '5 BEDROOM', category: 'condo' },
   { label: 'Penthouse', value: 'PENTHOUSE', category: 'condo' },
 
-  { label: '2 Bedroom', value: '2 BEDROOM', category: 'landed' },
-  { label: '3 Bedroom', value: '3 BEDROOM', category: 'landed' },
-  { label: '4 Bedroom', value: '4 BEDROOM', category: 'landed' },
-  { label: '5 Bedroom', value: '5 BEDROOM', category: 'landed' },
-  { label: '6 Bedroom', value: '6 BEDROOM', category: 'landed' },
-  { label: '7 Bedroom', value: '7 BEDROOM', category: 'landed' },
+  { label: 'Terrace', value: 'TERRACE HOUSE', category: 'landed' },
+  { label: 'Semi-D', value: 'SEMI-DETACHED HOUSE', category: 'landed' },
+  { label: 'Detached', value: 'DETACHED HOUSE', category: 'landed' },
 ]
 
 function cleanAddress(value: string) {
