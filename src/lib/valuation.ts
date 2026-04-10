@@ -45,6 +45,7 @@ function distanceInMeters(
 
 function percentile(sorted: number[], p: number) {
   if (sorted.length === 0) return null
+
   const index = (sorted.length - 1) * p
   const lower = Math.floor(index)
   const upper = Math.ceil(index)
@@ -63,12 +64,13 @@ function weightedAverage(values: number[], weights: number[]) {
     (sum, value, i) => sum + value * weights[i],
     0
   )
+
   return weightedSum / totalWeight
 }
 
 function getSearchRadius(propertyCategory: PropertyCategory) {
   if (propertyCategory === 'landed') {
-    return [500, 1000, 1500, 2000, 3000]
+    return [1000, 2000, 3000, 5000]
   }
 
   if (propertyCategory === 'condo') {
@@ -78,98 +80,104 @@ function getSearchRadius(propertyCategory: PropertyCategory) {
   return [200, 400, 600, 800, 1200]
 }
 
-function getUnitTypeCandidates(
+function getLandedGroup(propertyType: string) {
+  const normalized = normalizeText(propertyType)
+
+  if (normalized.includes('TERRACE')) return 'terrace'
+  if (normalized.includes('SEMI')) return 'semi'
+  if (normalized.includes('DETACHED') || normalized.includes('BUNGALOW')) {
+    return 'detached'
+  }
+
+  return 'other'
+}
+
+function isMatchingLandedType(
+  rowUnitType: string | null,
+  requestedPropertyType: string
+) {
+  const row = normalizeText(rowUnitType)
+  const targetGroup = getLandedGroup(requestedPropertyType)
+
+  if (!row) return false
+
+  if (targetGroup === 'terrace') {
+    return row.includes('TERRACE')
+  }
+
+  if (targetGroup === 'semi') {
+    return row.includes('SEMI')
+  }
+
+  if (targetGroup === 'detached') {
+    return (
+      row.includes('DETACHED') ||
+      row.includes('BUNGALOW') ||
+      row.includes('GOOD CLASS BUNGALOW')
+    )
+  }
+
+  return false
+}
+
+function isAnyLandedType(rowUnitType: string | null) {
+  const row = normalizeText(rowUnitType)
+
+  return (
+    row.includes('TERRACE') ||
+    row.includes('SEMI') ||
+    row.includes('DETACHED') ||
+    row.includes('BUNGALOW') ||
+    row.includes('GOOD CLASS BUNGALOW')
+  )
+}
+
+async function fetchBaseRows(
   propertyType: string,
   propertyCategory: PropertyCategory
 ) {
-  const normalized = normalizeText(propertyType)
+  const source = propertyCategory === 'hdb' ? 'data_gov_hdb' : 'ura_private'
 
   if (propertyCategory === 'landed') {
-    if (normalized === 'TERRACE HOUSE') {
-      return ['TERRACE HOUSE', 'TERRACE']
-    }
+    const { data, error } = await supabase
+      .from('property_transactions_v2')
+      .select(
+        'transaction_price, floor_area_sqm, latitude, longitude, unit_type'
+      )
+      .eq('source', source)
+      .not('transaction_price', 'is', null)
+      .not('floor_area_sqm', 'is', null)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .limit(10000)
 
-    if (normalized === 'SEMI-DETACHED HOUSE') {
-      return ['SEMI-DETACHED HOUSE', 'SEMI-DETACHED', 'SEMI DETACHED']
-    }
-
-    if (normalized === 'DETACHED HOUSE') {
-      return [
-        'DETACHED HOUSE',
-        'DETACHED',
-        'BUNGALOW',
-        'GOOD CLASS BUNGALOW',
-      ]
-    }
-
-    return [normalized]
+    return { data, error }
   }
 
-  return [normalized]
-}
+  const normalized = normalizeText(propertyType)
 
-export async function getValuation({
-  lat,
-  lon,
-  floorAreaSqm,
-  propertyType,
-  propertyCategory,
-}: ValuationParams) {
-  const source = propertyCategory === 'hdb' ? 'data_gov_hdb' : 'ura_private'
-  const searchRadius = getSearchRadius(propertyCategory)
-  const unitTypeCandidates = getUnitTypeCandidates(
-    propertyType,
-    propertyCategory
-  )
-
-  let query = supabase
+  const { data, error } = await supabase
     .from('property_transactions_v2')
     .select(
       'transaction_price, floor_area_sqm, latitude, longitude, unit_type'
     )
     .eq('source', source)
+    .eq('unit_type', normalized)
     .not('transaction_price', 'is', null)
     .not('floor_area_sqm', 'is', null)
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
     .limit(5000)
 
-  if (unitTypeCandidates.length === 1) {
-    query = query.eq('unit_type', unitTypeCandidates[0])
-  } else {
-    query = query.in('unit_type', unitTypeCandidates)
-  }
+  return { data, error }
+}
 
-  const { data, error } = await query
-
-  if (error) {
-    console.error('SUPABASE VALUATION ERROR:', error)
-    return null
-  }
-
-  console.log('VALUATION INPUT:', {
-    source,
-    propertyType,
-    propertyCategory,
-    unitTypeCandidates,
-    floorAreaSqm,
-    lat,
-    lon,
-  })
-
-  console.log('RAW DATA LENGTH:', data?.length || 0)
-
-  if (!data || data.length === 0) {
-    console.log('No matching transactions found for source/property type:', {
-      source,
-      propertyType,
-      propertyCategory,
-      unitTypeCandidates,
-    })
-    return null
-  }
-
-  const cleanedRows: CleanedRow[] = (data as TransactionRow[])
+function cleanRows(
+  rows: TransactionRow[],
+  lat: number,
+  lon: number
+): CleanedRow[] {
+  return rows
     .map((row) => {
       const transactionPrice = Number(row.transaction_price)
       const area = Number(row.floor_area_sqm)
@@ -198,12 +206,135 @@ export async function getValuation({
         row.pricePerSqm > 0 &&
         Number.isFinite(row.distanceM)
     )
+}
+
+function buildCandidate(
+  rows: CleanedRow[],
+  radius: number,
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory
+) {
+  if (rows.length === 0) return null
+
+  let usable = rows
+
+  if (rows.length >= 5) {
+    const sortedPsm = rows
+      .map((row) => row.pricePerSqm)
+      .sort((a, b) => a - b)
+
+    const p10 = percentile(sortedPsm, 0.1)
+    const p90 = percentile(sortedPsm, 0.9)
+
+    if (p10 !== null && p90 !== null) {
+      const trimmed = rows.filter(
+        (row) => row.pricePerSqm >= p10 && row.pricePerSqm <= p90
+      )
+
+      if (trimmed.length >= Math.min(3, rows.length)) {
+        usable = trimmed
+      }
+    }
+  }
+
+  const values = usable.map((row) => row.pricePerSqm)
+
+  const weights = usable.map((row) => {
+    const distanceWeight = 1 / Math.max(row.distanceM, 50)
+
+    const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
+    const minSizeFloor = propertyCategory === 'landed' ? 20 : 5
+    const sizeWeight = 1 / Math.max(sizeDiff, minSizeFloor)
+
+    return distanceWeight * sizeWeight
+  })
+
+  const avgPsm = weightedAverage(values, weights)
+
+  if (!avgPsm || !Number.isFinite(avgPsm)) {
+    return null
+  }
+
+  const estimated = avgPsm * floorAreaSqm
+
+  const spread =
+    propertyCategory === 'landed'
+      ? usable.length >= 5
+        ? 0.1
+        : usable.length >= 3
+          ? 0.12
+          : 0.15
+      : 0.05
+
+  return {
+    estimated,
+    low: estimated * (1 - spread),
+    high: estimated * (1 + spread),
+    comparables: usable.length,
+    radius,
+    avgPsm,
+  }
+}
+
+export async function getValuation({
+  lat,
+  lon,
+  floorAreaSqm,
+  propertyType,
+  propertyCategory,
+}: ValuationParams) {
+  const searchRadius = getSearchRadius(propertyCategory)
+
+  const { data, error } = await fetchBaseRows(propertyType, propertyCategory)
+
+  if (error) {
+    console.error('SUPABASE VALUATION ERROR:', error)
+    return null
+  }
+
+  console.log('VALUATION INPUT:', {
+    propertyType,
+    propertyCategory,
+    floorAreaSqm,
+    lat,
+    lon,
+    rawRows: data?.length || 0,
+  })
+
+  if (!data || data.length === 0) {
+    console.log('No transactions found at fetch stage.')
+    return null
+  }
+
+  let cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
 
   console.log('CLEANED ROWS LENGTH:', cleanedRows.length)
 
   if (cleanedRows.length === 0) {
     console.log('No usable cleaned rows after filtering.')
     return null
+  }
+
+  if (propertyCategory === 'landed') {
+    const exactLandedRows = cleanedRows.filter((row) =>
+      isMatchingLandedType(row.unit_type, propertyType)
+    )
+
+    console.log('LANDED EXACT GROUP ROWS:', exactLandedRows.length)
+
+    if (exactLandedRows.length > 0) {
+      cleanedRows = exactLandedRows
+    } else {
+      const anyLandedRows = cleanedRows.filter((row) =>
+        isAnyLandedType(row.unit_type)
+      )
+
+      console.log('LANDED ANY-TYPE ROWS:', anyLandedRows.length)
+
+      if (anyLandedRows.length > 0) {
+        cleanedRows = anyLandedRows
+      }
+    }
   }
 
   let bestCandidate: {
@@ -215,6 +346,7 @@ export async function getValuation({
     avgPsm: number
   } | null = null
 
+  const targetGoodComparables = propertyCategory === 'landed' ? 3 : 5
   const minimumComparables = propertyCategory === 'landed' ? 1 : 2
 
   for (const radius of searchRadius) {
@@ -224,73 +356,22 @@ export async function getValuation({
 
     if (nearby.length < minimumComparables) continue
 
-    let usable = nearby
-
-    if (nearby.length >= 5) {
-      const sortedPsm = nearby
-        .map((row) => row.pricePerSqm)
-        .sort((a, b) => a - b)
-
-      const p10 = percentile(sortedPsm, 0.1)
-      const p90 = percentile(sortedPsm, 0.9)
-
-      if (p10 !== null && p90 !== null) {
-        const trimmed = nearby.filter(
-          (row) => row.pricePerSqm >= p10 && row.pricePerSqm <= p90
-        )
-
-        if (trimmed.length >= minimumComparables) {
-          usable = trimmed
-        }
-      }
-    }
-
-    const values = usable.map((row) => row.pricePerSqm)
-
-    const weights = usable.map((row) => {
-      const distanceWeight = 1 / Math.max(row.distanceM, 50)
-
-      const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
-
-      const minSizeFloor =
-        propertyCategory === 'landed' ? 20 : 5
-
-      const sizeWeight = 1 / Math.max(sizeDiff, minSizeFloor)
-
-      return distanceWeight * sizeWeight
-    })
-
-    const avgPsm = weightedAverage(values, weights)
-
-    if (!avgPsm || !Number.isFinite(avgPsm)) continue
-
-    const estimated = avgPsm * floorAreaSqm
-
-    const spread =
-      propertyCategory === 'landed'
-        ? usable.length >= 3
-          ? 0.08
-          : 0.12
-        : 0.05
-
-    const candidate = {
-      estimated,
-      low: estimated * (1 - spread),
-      high: estimated * (1 + spread),
-      comparables: usable.length,
+    const candidate = buildCandidate(
+      nearby,
       radius,
-      avgPsm,
-    }
+      floorAreaSqm,
+      propertyCategory
+    )
+
+    if (!candidate) continue
 
     if (!bestCandidate) {
       bestCandidate = candidate
       continue
     }
 
-    const currentGood =
-      bestCandidate.comparables >= (propertyCategory === 'landed' ? 3 : 5)
-    const nextGood =
-      candidate.comparables >= (propertyCategory === 'landed' ? 3 : 5)
+    const currentGood = bestCandidate.comparables >= targetGoodComparables
+    const nextGood = candidate.comparables >= targetGoodComparables
 
     if (!currentGood && nextGood) {
       bestCandidate = candidate
@@ -315,6 +396,23 @@ export async function getValuation({
       ) {
         bestCandidate = candidate
       }
+    }
+  }
+
+  if (!bestCandidate && propertyCategory === 'landed') {
+    const nearestFew = [...cleanedRows]
+      .sort((a, b) => a.distanceM - b.distanceM)
+      .slice(0, 3)
+
+    console.log('LANDED FALLBACK NEAREST FEW:', nearestFew.length)
+
+    if (nearestFew.length > 0) {
+      bestCandidate = buildCandidate(
+        nearestFew,
+        Math.round(nearestFew[nearestFew.length - 1].distanceM),
+        floorAreaSqm,
+        propertyCategory
+      )
     }
   }
 
