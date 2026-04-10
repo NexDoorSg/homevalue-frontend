@@ -157,19 +157,6 @@ function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
   return 'hdb'
 }
 
-  if (
-    text.includes('TERRACE') ||
-    text.includes('SEMI-DETACHED') ||
-    text.includes('SEMI DETACHED') ||
-    text.includes('DETACHED') ||
-    text.includes('BUNGALOW')
-  ) {
-    return 'landed'
-  }
-
-  return 'condo'
-}
-
 function formatMoney(value: number | null) {
   if (!value) return '$5XX,XXX'
   return `$${Math.round(value).toLocaleString()}`
@@ -671,98 +658,98 @@ export default function Home() {
   }
 
   const handleUnlockReport = async () => {
-  setUnlockMessage('')
+    setUnlockMessage('')
 
-  if (!unlockName.trim()) {
-    setUnlockMessage('Please enter your name.')
-    return
-  }
-
-  if (!unlockPhone.trim()) {
-    setUnlockMessage('Please enter your phone number.')
-    return
-  }
-
-  if (!unlockEmail.trim()) {
-    setUnlockMessage('Please enter your email.')
-    return
-  }
-
-  if (!selectedLat || !selectedLon || !estimatedPrice) {
-    setUnlockMessage('Please generate a teaser valuation first.')
-    return
-  }
-
-  setIsLoadingFullReport(true)
-
-  try {
-    const normalizedUnlockEmail = unlockEmail.trim().toLowerCase()
-
-    const leadPayload = buildLeadPayload(
-      unlockName,
-      unlockPhone,
-      normalizedUnlockEmail,
-      { plan: 'full_report' }
-    )
-
-    const response = await fetch('/api/unlock-full-report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(leadPayload),
-    })
-
-    const result = await response.json()
-
-    console.log('UNLOCK FULL REPORT RESULT:', result)
-
-    if (!response.ok || !result.ok) {
-      throw new Error(result?.error || 'Failed to unlock full report')
-    }
-
-    if (result.reachedLimit) {
-      setUnlockMessage(
-        result.message ||
-          'You’ve reached the free full-report limit for the past 30 days. Please contact us directly and we’ll be happy to help.'
-      )
+    if (!unlockName.trim()) {
+      setUnlockMessage('Please enter your name.')
       return
     }
 
-    const emailResult = await sendLeadEmail({
-      ...leadPayload,
-      source: 'full_report',
-    })
-
-    let source = 'data_gov_hdb'
-    if (propertyCategory !== 'hdb') {
-      source = 'ura_private'
+    if (!unlockPhone.trim()) {
+      setUnlockMessage('Please enter your phone number.')
+      return
     }
 
-    const comparables = await fetchRecentComparables(
-      selectedLat,
-      selectedLon,
-      source,
-      propertyType
-    )
-
-    setRecentComparables(comparables)
-    setHasUnlockedReport(true)
-
-    if (!emailResult.ok) {
-      setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
-    } else {
-      setUnlockMessage('Full report unlocked successfully.')
+    if (!unlockEmail.trim()) {
+      setUnlockMessage('Please enter your email.')
+      return
     }
 
-    setUnlockName('')
-    setUnlockPhone('')
-    setUnlockEmail('')
-  } catch (error) {
-    console.error('Full report unlock failed:', error)
-    setUnlockMessage('Could not unlock the report right now. Please try again.')
-  } finally {
-    setIsLoadingFullReport(false)
+    if (!selectedLat || !selectedLon || !estimatedPrice) {
+      setUnlockMessage('Please generate a teaser valuation first.')
+      return
+    }
+
+    setIsLoadingFullReport(true)
+
+    try {
+      const normalizedUnlockEmail = unlockEmail.trim().toLowerCase()
+
+      const leadPayload = buildLeadPayload(
+        unlockName,
+        unlockPhone,
+        normalizedUnlockEmail,
+        { plan: 'full_report' }
+      )
+
+      const response = await fetch('/api/unlock-full-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leadPayload),
+      })
+
+      const result = await response.json()
+
+      console.log('UNLOCK FULL REPORT RESULT:', result)
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result?.error || 'Failed to unlock full report')
+      }
+
+      if (result.reachedLimit) {
+        setUnlockMessage(
+          result.message ||
+            'You’ve reached the free full-report limit for the past 30 days. Please contact us directly and we’ll be happy to help.'
+        )
+        return
+      }
+
+      const emailResult = await sendLeadEmail({
+        ...leadPayload,
+        source: 'full_report',
+      })
+
+      let source = 'data_gov_hdb'
+      if (propertyCategory !== 'hdb') {
+        source = 'ura_private'
+      }
+
+      const comparables = await fetchRecentComparables(
+        selectedLat,
+        selectedLon,
+        source,
+        propertyType
+      )
+
+      setRecentComparables(comparables)
+      setHasUnlockedReport(true)
+
+      if (!emailResult.ok) {
+        setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
+      } else {
+        setUnlockMessage('Full report unlocked successfully.')
+      }
+
+      setUnlockName('')
+      setUnlockPhone('')
+      setUnlockEmail('')
+    } catch (error) {
+      console.error('Full report unlock failed:', error)
+      setUnlockMessage('Could not unlock the report right now. Please try again.')
+    } finally {
+      setIsLoadingFullReport(false)
+    }
   }
-}
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
