@@ -274,7 +274,7 @@ export default function Home() {
   const [unlockEmail, setUnlockEmail] = useState('')
   const [unlockMessage, setUnlockMessage] = useState('')
 
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const filteredPropertyOptions = PROPERTY_TYPE_OPTIONS.filter(
     (option) => option.category === propertyCategory
