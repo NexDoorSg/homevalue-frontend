@@ -402,7 +402,6 @@ export default function Home() {
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
       setHasTeaserResult(true)
-      setFormMessage('Teaser valuation generated. Unlock the full report below.')
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -434,11 +433,20 @@ export default function Home() {
       return
     }
 
+    const fullUnitNumber =
+      floorLevel.trim() && stackNumber.trim()
+        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
+        : null
+
     const { error } = await supabase.from('leads').insert([
       {
         name: consultName.trim(),
         phone: consultPhone.trim(),
         email: consultEmail.trim(),
+        address: address.trim() || null,
+        unit_number: fullUnitNumber,
+        unit_type: propertyType || null,
+        floor_area_sqm: floorAreaSqm ? Number(floorAreaSqm) : null,
       },
     ])
 
@@ -557,11 +565,20 @@ export default function Home() {
 
     setIsLoadingFullReport(true)
 
+    const fullUnitNumber =
+      floorLevel.trim() && stackNumber.trim()
+        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
+        : null
+
     const { error } = await supabase.from('leads').insert([
       {
         name: unlockName.trim(),
         phone: unlockPhone.trim(),
         email: unlockEmail.trim(),
+        address: address.trim() || null,
+        unit_number: fullUnitNumber,
+        unit_type: propertyType || null,
+        floor_area_sqm: floorAreaSqm ? Number(floorAreaSqm) : null,
       },
     ])
 
@@ -624,10 +641,6 @@ export default function Home() {
             <div className="inline-flex rounded-full border border-[#dcc8b5] bg-white px-4 py-2 text-sm font-medium text-[#8b6b52] shadow-sm">
               HomeValue by NexDoor
             </div>
-
-            <p className="mt-6 text-sm font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
-              Trusted by 80+ homeowners across Singapore
-            </p>
 
             <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-[#2d3135] md:text-6xl">
               Get Your Real Home Value —
@@ -800,9 +813,6 @@ export default function Home() {
                 <div className="space-y-1">
                   <p className="text-sm text-[#67707a]">
                     No obligation. Takes less than 30 seconds.
-                  </p>
-                  <p className="text-sm text-[#8b6b52]">
-                    Prefer a human breakdown? WhatsApp us at 8988 2212
                   </p>
                 </div>
 
