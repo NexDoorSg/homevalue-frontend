@@ -281,6 +281,48 @@ function trimRowsByMetric(
     return rows
   }
 
+  function pickPreferredNonLandedRows(
+    rows: CleanedRow[],
+    floorAreaSqm: number
+  ) {
+    const sizeFiltered = rows.filter((row) => {
+      const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
+      return sizeDiffRatio <= 0.2
+    })
+
+    const candidateRows = sizeFiltered.length >= 3 ? sizeFiltered : rows
+
+    const projectCounts = new Map<string, number>()
+
+    for (const row of candidateRows) {
+      const project = normalizeText(row.project_name)
+      if (!project) continue
+      projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
+    }
+
+    let bestProject: string | null = null
+    let bestCount = 0
+
+    for (const [project, count] of projectCounts.entries()) {
+      if (count > bestCount) {
+        bestProject = project
+        bestCount = count
+      }
+    }
+
+    if (bestProject && bestCount >= 3) {
+      const sameProjectRows = candidateRows.filter(
+        (row) => normalizeText(row.project_name) === bestProject
+      )
+
+      if (sameProjectRows.length >= 3) {
+        return sameProjectRows
+      }
+    }
+
+    return candidateRows
+  }
+
   const metricValues = rows
     .map(metricGetter)
     .filter((value) => Number.isFinite(value) && value > 0)
