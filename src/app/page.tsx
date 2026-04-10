@@ -974,6 +974,10 @@ export default function Home() {
                   {isGenerating ? 'Generating...' : 'See My Home Value'}
                 </button>
 
+                <p className="mt-2 text-xs text-[#7a8289]">
+                  Powered by real transaction data from HDB & URA
+                </p>
+
                 {formMessage && (
                   <p className="text-sm text-[#8b6b52]">{formMessage}</p>
                 )}
