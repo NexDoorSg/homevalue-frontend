@@ -797,12 +797,16 @@ export default function Home() {
                 </div>
               </div>
           </div>
+          </div>
+          
           <div className="order-1 relative lg:order-2">
             <div className="rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.08)] md:p-8">
               <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-[#2d3135]">Get your valuation</h2>
+                <h2 className="text-2xl font-semibold text-[#2d3135]">
+                  See Your Estimated Value Instantly
+                </h2>
                 <p className="mt-2 text-sm leading-6 text-[#67707a]">
-                  Fill in your property details below. Takes less than 30 seconds.
+                  Enter your property details to get a quick estimate based on nearby 2026 transactions.
                 </p>
               </div>
 
@@ -963,7 +967,7 @@ export default function Home() {
                   disabled={isGenerating}
                   className="mt-2 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isGenerating ? 'Generating...' : 'Get My Valuation'}
+                  {isGenerating ? 'Generating...' : 'Get My Estimated Value'}
                 </button>
 
                 <div className="space-y-1">
