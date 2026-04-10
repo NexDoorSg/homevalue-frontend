@@ -4,8 +4,6 @@ import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
 
-type PropertyCategory = 'hdb' | 'condo' | 'landed'
-
 type OneMapResult = {
   ADDRESS: string
   LATITUDE: string
@@ -19,7 +17,7 @@ type OneMapResult = {
 type PropertyTypeOption = {
   label: string
   value: string
-  category: PropertyCategory
+  category: 'hdb' | 'condo' | 'landed'
 }
 
 type ComparableRow = {
@@ -29,12 +27,6 @@ type ComparableRow = {
   floor_area_sqm: number | string | null
   latitude: number | string | null
   longitude: number | string | null
-}
-
-type ResolvedAddress = {
-  lat: number
-  lon: number
-  category: PropertyCategory
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
@@ -54,6 +46,13 @@ const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
   { label: 'Terrace', value: 'TERRACE HOUSE', category: 'landed' },
   { label: 'Semi-D', value: 'SEMI-DETACHED HOUSE', category: 'landed' },
   { label: 'Detached', value: 'DETACHED HOUSE', category: 'landed' },
+]
+
+const TENURE_OPTIONS = [
+  { label: 'Freehold / 999-year', value: 'FREEHOLD' },
+  { label: '99-year leasehold', value: '99-YEAR' },
+  { label: '999-year leasehold', value: '999-YEAR' },
+  { label: 'Other leasehold', value: 'OTHER' },
 ]
 
 function cleanAddress(value: string) {
@@ -111,12 +110,10 @@ function buildLookupCandidates(item: OneMapResult) {
   return Array.from(candidates).filter(Boolean)
 }
 
-function inferPropertyCategory(item: OneMapResult): PropertyCategory {
-  const address = (item.ADDRESS || '').toUpperCase()
-  const building = (item.BUILDING || '').toUpperCase()
-  const roadName = (item.ROAD_NAME || '').toUpperCase()
-
-  const text = `${address} ${building} ${roadName}`
+function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
+  const addressText = cleanAddress(item.ADDRESS || '')
+  const buildingText = cleanAddress(item.BUILDING || '')
+  const combinedText = `${addressText} ${buildingText}`.trim()
 
   const landedKeywords = [
     'TERRACE HOUSE',
@@ -142,80 +139,37 @@ function inferPropertyCategory(item: OneMapResult): PropertyCategory {
     'SUITE',
     'TOWER',
     'TOWERS',
-    'VILLA',
-    'VILLAS',
     'LOFT',
     'PENTHOUSE',
   ]
 
-  const hdbKeywords = [
-    'HDB',
-    'BLOCK',
-    'BLK',
-    'TOA PAYOH',
-    'ANG MO KIO',
-    'BEDOK',
-    'BISHAN',
-    'BUKIT BATOK',
-    'BUKIT MERAH',
-    'BUKIT PANJANG',
-    'BUKIT TIMAH',
-    'CHOA CHU KANG',
-    'CLEMENTI',
-    'GEYLANG',
-    'HOUGANG',
-    'JURONG',
-    'KALLANG',
-    'WHAMPOA',
-    'MARINE PARADE',
-    'PASIR RIS',
-    'PUNGGOL',
-    'QUEENSTOWN',
-    'SEMBAWANG',
-    'SENGKANG',
-    'SERANGOON',
-    'TAMPINES',
-    'TIONG BAHRU',
-    'WOODLANDS',
-    'YISHUN',
-    'CIRCUIT RD',
-    'LORONG',
-    'STREET',
-    'AVE',
-    'AVENUE',
-    'DRIVE',
-    'CRESCENT',
-  ]
-
-  if (landedKeywords.some((keyword) => text.includes(keyword))) {
+  if (landedKeywords.some((keyword) => combinedText.includes(keyword))) {
     return 'landed'
   }
 
-  if (condoKeywords.some((keyword) => text.includes(keyword))) {
+  if (condoKeywords.some((keyword) => combinedText.includes(keyword))) {
     return 'condo'
   }
 
   if (
-    building &&
-    building !== 'NIL' &&
-    !condoKeywords.some((keyword) => building.includes(keyword)) &&
-    !hdbKeywords.some((keyword) => building.includes(keyword))
+    buildingText &&
+    buildingText !== 'NIL' &&
+    buildingText !== addressText &&
+    !landedKeywords.some((keyword) => buildingText.includes(keyword))
   ) {
-    return 'landed'
+    return 'condo'
   }
 
-  if (hdbKeywords.some((keyword) => text.includes(keyword))) {
+  if (item.BLK_NO && item.ROAD_NAME && !buildingText) {
     return 'hdb'
   }
 
-  return 'landed'
+  return 'condo'
 }
 
-function getDefaultPropertyType(category: PropertyCategory) {
-  const firstOption = PROPERTY_TYPE_OPTIONS.find(
-    (option) => option.category === category
-  )
-  return firstOption ? firstOption.value : ''
+function getDefaultPropertyType(category: 'hdb' | 'condo' | 'landed') {
+  const first = PROPERTY_TYPE_OPTIONS.find((option) => option.category === category)
+  return first ? first.value : ''
 }
 
 function formatMoney(value: number | null) {
@@ -275,14 +229,16 @@ export default function Home() {
   const [stackNumber, setStackNumber] = useState('')
   const [propertyType, setPropertyType] = useState('3 ROOM')
   const [floorAreaSqm, setFloorAreaSqm] = useState('')
+  const [landSizeSqm, setLandSizeSqm] = useState('')
+  const [builtUpSqm, setBuiltUpSqm] = useState('')
+  const [tenure, setTenure] = useState('FREEHOLD')
 
   const [suggestions, setSuggestions] = useState<OneMapResult[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedLat, setSelectedLat] = useState<number | null>(null)
   const [selectedLon, setSelectedLon] = useState<number | null>(null)
   const [lookupCandidates, setLookupCandidates] = useState<string[]>([])
-  const [propertyCategory, setPropertyCategory] =
-    useState<PropertyCategory>('hdb')
+  const [propertyCategory, setPropertyCategory] = useState<'hdb' | 'condo' | 'landed'>('hdb')
 
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
   const [estimatedLow, setEstimatedLow] = useState<number | null>(null)
@@ -318,7 +274,7 @@ export default function Home() {
   const [unlockEmail, setUnlockEmail] = useState('')
   const [unlockMessage, setUnlockMessage] = useState('')
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const filteredPropertyOptions = PROPERTY_TYPE_OPTIONS.filter(
     (option) => option.category === propertyCategory
@@ -350,11 +306,7 @@ export default function Home() {
     }
   }
 
-  const handleAddressChange = (value: string) => {
-    setAddress(value)
-    setSelectedLat(null)
-    setSelectedLon(null)
-    setLookupCandidates([])
+  const resetResults = () => {
     setFormMessage('')
     setEstimatedPrice(null)
     setEstimatedLow(null)
@@ -365,13 +317,21 @@ export default function Home() {
     setHasTeaserResult(false)
     setHasUnlockedReport(false)
     setUnlockMessage('')
+  }
+
+  const handleAddressChange = (value: string) => {
+    setAddress(value)
+    setSelectedLat(null)
+    setSelectedLon(null)
+    setLookupCandidates([])
+    resetResults()
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
     }
 
     debounceRef.current = setTimeout(() => {
-      void searchAddress(value)
+      searchAddress(value)
     }, 300)
   }
 
@@ -384,23 +344,14 @@ export default function Home() {
     setLookupCandidates(buildLookupCandidates(item))
     setPropertyCategory(category)
     setPropertyType(getDefaultPropertyType(category))
+    resetResults()
 
     setSuggestions([])
     setShowSuggestions(false)
-    setFormMessage('')
-    setEstimatedPrice(null)
-    setEstimatedLow(null)
-    setEstimatedHigh(null)
-    setNumOfComps(null)
-    setRadiusUsedM(null)
-    setRecentComparables([])
-    setHasTeaserResult(false)
-    setHasUnlockedReport(false)
-    setUnlockMessage('')
   }
 
-  const resolveAddressForGeneration = async (): Promise<ResolvedAddress | null> => {
-    if (selectedLat !== null && selectedLon !== null) {
+  const resolveAddressForGeneration = async () => {
+    if (selectedLat && selectedLon) {
       return {
         lat: selectedLat,
         lon: selectedLon,
@@ -421,9 +372,7 @@ export default function Home() {
       const data = await res.json()
       const results = (data?.results || []) as OneMapResult[]
 
-      if (!results.length) {
-        return null
-      }
+      if (!results.length) return null
 
       const exactMatch = results.find(
         (item) => cleanAddress(item.ADDRESS || '') === cleanAddress(address)
@@ -439,10 +388,10 @@ export default function Home() {
       setLookupCandidates(buildLookupCandidates(chosen))
       setPropertyCategory(category)
       setPropertyType((current) => {
-        const isStillValid = PROPERTY_TYPE_OPTIONS.some(
+        const stillValid = PROPERTY_TYPE_OPTIONS.some(
           (option) => option.category === category && option.value === current
         )
-        return isStillValid ? current : getDefaultPropertyType(category)
+        return stillValid ? current : getDefaultPropertyType(category)
       })
       setAddress(chosen.ADDRESS)
 
@@ -469,9 +418,26 @@ export default function Home() {
       return
     }
 
-    if (!floorAreaSqm || Number(floorAreaSqm) <= 0) {
-      setFormMessage('Please enter a valid floor area first.')
-      return
+    if (propertyCategory === 'landed') {
+      if (!landSizeSqm || Number(landSizeSqm) <= 0) {
+        setFormMessage('Please enter a valid land size first.')
+        return
+      }
+
+      if (!builtUpSqm || Number(builtUpSqm) <= 0) {
+        setFormMessage('Please enter a valid built-up size first.')
+        return
+      }
+
+      if (!tenure) {
+        setFormMessage('Please choose the tenure first.')
+        return
+      }
+    } else {
+      if (!floorAreaSqm || Number(floorAreaSqm) <= 0) {
+        setFormMessage('Please enter a valid floor area first.')
+        return
+      }
     }
 
     setIsGenerating(true)
@@ -480,16 +446,17 @@ export default function Home() {
       const resolved = await resolveAddressForGeneration()
 
       if (!resolved) {
-        setFormMessage(
-          'Could not match this address. Please choose an address from the dropdown.'
-        )
+        setFormMessage('Could not match this address. Please choose an address from the dropdown.')
         return
       }
 
       const result = await getValuation({
         lat: resolved.lat,
         lon: resolved.lon,
-        floorAreaSqm: Number(floorAreaSqm),
+        floorAreaSqm: propertyCategory === 'landed' ? Number(builtUpSqm) : Number(floorAreaSqm),
+        landSizeSqm: propertyCategory === 'landed' ? Number(landSizeSqm) : undefined,
+        builtUpSqm: propertyCategory === 'landed' ? Number(builtUpSqm) : undefined,
+        tenure: propertyCategory === 'landed' ? tenure : undefined,
         propertyType,
         propertyCategory: resolved.category,
       })
@@ -501,9 +468,7 @@ export default function Home() {
         setNumOfComps(null)
         setRadiusUsedM(null)
         setHasTeaserResult(false)
-        setFormMessage(
-          'Not enough comparable transactions found for this property yet.'
-        )
+        setFormMessage('Not enough comparable transactions found for this property yet.')
         return
       }
 
@@ -527,8 +492,10 @@ export default function Home() {
         floorLevel.trim() ||
         stackNumber.trim() ||
         floorAreaSqm.trim() ||
-        selectedLat !== null ||
-        selectedLon !== null ||
+        landSizeSqm.trim() ||
+        builtUpSqm.trim() ||
+        selectedLat ||
+        selectedLon ||
         hasTeaserResult
     )
   }
@@ -555,7 +522,12 @@ export default function Home() {
       unit_number: propertyContextExists ? fullUnitNumber : null,
       unit_type: propertyContextExists ? propertyType || null : null,
       floor_area_sqm:
-        propertyContextExists && floorAreaSqm ? Number(floorAreaSqm) : null,
+        propertyContextExists
+          ? propertyCategory === 'landed'
+            ? Number(builtUpSqm || 0) || null
+            : Number(floorAreaSqm || 0) || null
+          : null,
+      tenure: propertyContextExists && propertyCategory === 'landed' ? tenure : null,
       plan: extra?.plan ?? null,
     }
   }
@@ -613,20 +585,15 @@ export default function Home() {
       return
     }
 
-    const leadPayload = buildLeadPayload(
-      consultName,
-      consultPhone,
-      consultEmail,
-      { plan: consultPlan.trim() }
-    )
+    const leadPayload = buildLeadPayload(consultName, consultPhone, consultEmail, {
+      plan: consultPlan.trim(),
+    })
 
     const { error } = await supabase.from('leads').insert([leadPayload])
 
     if (error) {
       console.error('Consultation lead save error:', error)
-      setConsultationMessage(
-        'Could not save your details right now. Please try again.'
-      )
+      setConsultationMessage('Could not save your details right now. Please try again.')
       return
     }
 
@@ -707,12 +674,8 @@ export default function Home() {
       const withinRadius = cleaned
         .filter((row) => row.distance_m <= radius)
         .sort((a, b) => {
-          const dateA = a.transaction_date
-            ? new Date(a.transaction_date).getTime()
-            : 0
-          const dateB = b.transaction_date
-            ? new Date(b.transaction_date).getTime()
-            : 0
+          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
           return dateB - dateA
         })
 
@@ -723,12 +686,8 @@ export default function Home() {
 
     return cleaned
       .sort((a, b) => {
-        const dateA = a.transaction_date
-          ? new Date(a.transaction_date).getTime()
-          : 0
-        const dateB = b.transaction_date
-          ? new Date(b.transaction_date).getTime()
-          : 0
+        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
         return dateB - dateA
       })
       .slice(0, 10)
@@ -752,7 +711,7 @@ export default function Home() {
       return
     }
 
-    if (selectedLat === null || selectedLon === null || !estimatedPrice) {
+    if (!selectedLat || !selectedLon || !estimatedPrice) {
       setUnlockMessage('Please generate a teaser valuation first.')
       return
     }
@@ -776,8 +735,6 @@ export default function Home() {
       })
 
       const result = await response.json()
-
-      console.log('UNLOCK FULL REPORT RESULT:', result)
 
       if (!response.ok || !result.ok) {
         throw new Error(result?.error || 'Failed to unlock full report')
@@ -812,9 +769,7 @@ export default function Home() {
       setHasUnlockedReport(true)
 
       if (!emailResult.ok) {
-        setUnlockMessage(
-          'Full report unlocked. Email notification failed; check Vercel logs.'
-        )
+        setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
       } else {
         setUnlockMessage('Full report unlocked successfully.')
       }
@@ -836,9 +791,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 md:px-10">
           <div
             className="text-3xl tracking-tight text-black md:text-4xl"
-            style={{
-              fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif',
-            }}
+            style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
           >
             NexDoor.
           </div>
@@ -876,9 +829,7 @@ export default function Home() {
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
                 <p className="text-sm text-[#8b6b52]">Nearby sales</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
-                  Matched to your area
-                </p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Matched to your area</p>
               </div>
 
               <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
@@ -960,7 +911,7 @@ export default function Home() {
                   )}
                 </div>
 
-                {selectedLat !== null && selectedLon !== null && (
+                {selectedLat && selectedLon && (
                   <p className="text-sm font-medium text-green-600">
                     Address matched successfully.
                   </p>
@@ -1011,18 +962,67 @@ export default function Home() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                    Floor area (sqm)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 177"
-                    value={floorAreaSqm}
-                    onChange={(e) => setFloorAreaSqm(e.target.value)}
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                  />
-                </div>
+                {propertyCategory === 'landed' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                          Land size (sqm)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 420"
+                          value={landSizeSqm}
+                          onChange={(e) => setLandSizeSqm(e.target.value)}
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                          Built-up size (sqm)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 650"
+                          value={builtUpSqm}
+                          onChange={(e) => setBuiltUpSqm(e.target.value)}
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                        Tenure
+                      </label>
+                      <select
+                        value={tenure}
+                        onChange={(e) => setTenure(e.target.value)}
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                      >
+                        {TENURE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Floor area (sqm)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 177"
+                      value={floorAreaSqm}
+                      onChange={(e) => setFloorAreaSqm(e.target.value)}
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+                )}
 
                 <button
                   type="button"
@@ -1040,15 +1040,7 @@ export default function Home() {
                 </div>
 
                 {formMessage && (
-                  <p
-                    className={`text-sm ${
-                      formMessage.toLowerCase().includes('success')
-                        ? 'text-green-600'
-                        : 'text-[#8b6b52]'
-                    }`}
-                  >
-                    {formMessage}
-                  </p>
+                  <p className="text-sm text-[#8b6b52]">{formMessage}</p>
                 )}
               </div>
 
@@ -1150,15 +1142,7 @@ export default function Home() {
                   </button>
 
                   {unlockMessage && (
-                    <p
-                      className={`text-sm ${
-                        unlockMessage.toLowerCase().includes('success')
-                          ? 'text-green-600'
-                          : 'text-[#8b6b52]'
-                      }`}
-                    >
-                      {unlockMessage}
-                    </p>
+                    <p className="text-sm text-[#8b6b52]">{unlockMessage}</p>
                   )}
                 </div>
               </div>
