@@ -360,9 +360,23 @@ function buildNonLandedCandidate(
   const values = usable.map((row) => row.pricePerSqm)
   const weights = usable.map((row) => {
     const distanceWeight = 1 / Math.max(row.distanceM, 50)
+
     const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
     const sizeWeight = 1 / Math.max(sizeDiff, 5)
-    return distanceWeight * sizeWeight
+
+    let recencyWeight = 1
+    if (row.transaction_date) {
+      const txnTime = new Date(row.transaction_date).getTime()
+      const now = Date.now()
+      const daysOld = (now - txnTime) / (1000 * 60 * 60 * 24)
+
+      if (daysOld <= 90) recencyWeight = 1.2
+      else if (daysOld <= 180) recencyWeight = 1.1
+      else if (daysOld <= 365) recencyWeight = 1
+      else recencyWeight = 0.9
+    }
+
+    return distanceWeight * sizeWeight * recencyWeight
   })
 
   const avgPsm = weightedAverage(values, weights)
