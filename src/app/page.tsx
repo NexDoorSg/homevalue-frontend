@@ -1030,7 +1030,7 @@ export default function Home() {
                 </p>
             </div>
 
-              <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+              <div className="rounded-2xl border border-[#eee3d7] bg-[#fcfaf7] p-5 shadow-sm">
                 <p className="text-sm text-[#8b6b52]">Nearby Market Evidence</p>
                 <p className="mt-2 text-lg font-semibold text-[#2d3135]">
                   {hasTeaserResult
