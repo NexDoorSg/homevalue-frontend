@@ -354,7 +354,8 @@ function buildNonLandedCandidate(
 ): CandidateResult | null {
   if (rows.length === 0) return null
 
-  const usable = trimRowsByMetric(rows, (row) => row.pricePerSqm)
+  const preferredRows = pickPreferredNonLandedRows(rows, floorAreaSqm)
+  const usable = trimRowsByMetric(preferredRows, (row) => row.pricePerSqm)
 
   const values = usable.map((row) => row.pricePerSqm)
   const weights = usable.map((row) => {
