@@ -1,11 +1,13 @@
 import { supabase } from './supabase'
 
+type PropertyCategory = 'hdb' | 'condo' | 'landed'
+
 type ValuationParams = {
   lat: number
   lon: number
   floorAreaSqm: number
   propertyType: string
-  propertyCategory: 'hdb' | 'condo' | 'landed'
+  propertyCategory: PropertyCategory
 }
 
 type TransactionRow = {
@@ -21,8 +23,13 @@ type CleanedRow = {
   floor_area_sqm: number
   latitude: number
   longitude: number
+  unit_type: string | null
   pricePerSqm: number
   distanceM: number
+}
+
+function normalizeText(value: string | null | undefined) {
+  return (value || '').toUpperCase().trim()
 }
 
 function distanceInMeters(
@@ -52,8 +59,53 @@ function weightedAverage(values: number[], weights: number[]) {
   const totalWeight = weights.reduce((sum, w) => sum + w, 0)
   if (!totalWeight) return null
 
-  const weightedSum = values.reduce((sum, value, i) => sum + value * weights[i], 0)
+  const weightedSum = values.reduce(
+    (sum, value, i) => sum + value * weights[i],
+    0
+  )
   return weightedSum / totalWeight
+}
+
+function getSearchRadius(propertyCategory: PropertyCategory) {
+  if (propertyCategory === 'landed') {
+    return [500, 1000, 1500, 2000, 3000]
+  }
+
+  if (propertyCategory === 'condo') {
+    return [300, 600, 900, 1200, 1500]
+  }
+
+  return [200, 400, 600, 800, 1200]
+}
+
+function getUnitTypeCandidates(
+  propertyType: string,
+  propertyCategory: PropertyCategory
+) {
+  const normalized = normalizeText(propertyType)
+
+  if (propertyCategory === 'landed') {
+    if (normalized === 'TERRACE HOUSE') {
+      return ['TERRACE HOUSE', 'TERRACE']
+    }
+
+    if (normalized === 'SEMI-DETACHED HOUSE') {
+      return ['SEMI-DETACHED HOUSE', 'SEMI-DETACHED', 'SEMI DETACHED']
+    }
+
+    if (normalized === 'DETACHED HOUSE') {
+      return [
+        'DETACHED HOUSE',
+        'DETACHED',
+        'BUNGALOW',
+        'GOOD CLASS BUNGALOW',
+      ]
+    }
+
+    return [normalized]
+  }
+
+  return [normalized]
 }
 
 export async function getValuation({
@@ -63,44 +115,56 @@ export async function getValuation({
   propertyType,
   propertyCategory,
 }: ValuationParams) {
-  let source = 'data_gov_hdb'
+  const source = propertyCategory === 'hdb' ? 'data_gov_hdb' : 'ura_private'
+  const searchRadius = getSearchRadius(propertyCategory)
+  const unitTypeCandidates = getUnitTypeCandidates(
+    propertyType,
+    propertyCategory
+  )
 
-  if (propertyCategory !== 'hdb') {
-    source = 'ura_private'
-  }
-
-  const searchRadius = [200, 400, 600, 800, 1200]
-
-  const { data, error } = await supabase
+  let query = supabase
     .from('property_transactions_v2')
-    .select('transaction_price, floor_area_sqm, latitude, longitude, unit_type')
+    .select(
+      'transaction_price, floor_area_sqm, latitude, longitude, unit_type'
+    )
     .eq('source', source)
-    .eq('unit_type', propertyType)
     .not('transaction_price', 'is', null)
     .not('floor_area_sqm', 'is', null)
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
     .limit(5000)
 
+  if (unitTypeCandidates.length === 1) {
+    query = query.eq('unit_type', unitTypeCandidates[0])
+  } else {
+    query = query.in('unit_type', unitTypeCandidates)
+  }
+
+  const { data, error } = await query
+
   if (error) {
     console.error('SUPABASE VALUATION ERROR:', error)
     return null
   }
 
-  console.log('RAW DATA LENGTH:', data?.length)
   console.log('VALUATION INPUT:', {
     source,
     propertyType,
     propertyCategory,
+    unitTypeCandidates,
     floorAreaSqm,
     lat,
     lon,
   })
 
+  console.log('RAW DATA LENGTH:', data?.length || 0)
+
   if (!data || data.length === 0) {
     console.log('No matching transactions found for source/property type:', {
       source,
       propertyType,
+      propertyCategory,
+      unitTypeCandidates,
     })
     return null
   }
@@ -111,16 +175,15 @@ export async function getValuation({
       const area = Number(row.floor_area_sqm)
       const rowLat = Number(row.latitude)
       const rowLon = Number(row.longitude)
-      const pricePerSqm = transactionPrice / area
-      const distanceM = distanceInMeters(rowLat, rowLon, lat, lon)
 
       return {
         transaction_price: transactionPrice,
         floor_area_sqm: area,
         latitude: rowLat,
         longitude: rowLon,
-        pricePerSqm,
-        distanceM,
+        unit_type: row.unit_type,
+        pricePerSqm: transactionPrice / area,
+        distanceM: distanceInMeters(rowLat, rowLon, lat, lon),
       }
     })
     .filter(
@@ -138,6 +201,11 @@ export async function getValuation({
 
   console.log('CLEANED ROWS LENGTH:', cleanedRows.length)
 
+  if (cleanedRows.length === 0) {
+    console.log('No usable cleaned rows after filtering.')
+    return null
+  }
+
   let bestCandidate: {
     estimated: number
     low: number
@@ -147,34 +215,48 @@ export async function getValuation({
     avgPsm: number
   } | null = null
 
+  const minimumComparables = propertyCategory === 'landed' ? 1 : 2
+
   for (const radius of searchRadius) {
     const nearby = cleanedRows.filter((row) => row.distanceM <= radius)
+
     console.log(`COMPS WITHIN ${radius}m:`, nearby.length)
 
-    if (nearby.length < 2) continue
+    if (nearby.length < minimumComparables) continue
 
-    const sortedPsm = nearby
-      .map((row) => row.pricePerSqm)
-      .sort((a, b) => a - b)
+    let usable = nearby
 
-    const p10 = percentile(sortedPsm, 0.1)
-    const p90 = percentile(sortedPsm, 0.9)
+    if (nearby.length >= 5) {
+      const sortedPsm = nearby
+        .map((row) => row.pricePerSqm)
+        .sort((a, b) => a - b)
 
-    if (p10 === null || p90 === null) continue
+      const p10 = percentile(sortedPsm, 0.1)
+      const p90 = percentile(sortedPsm, 0.9)
 
-    const trimmed = nearby.filter(
-      (row) => row.pricePerSqm >= p10 && row.pricePerSqm <= p90
-    )
+      if (p10 !== null && p90 !== null) {
+        const trimmed = nearby.filter(
+          (row) => row.pricePerSqm >= p10 && row.pricePerSqm <= p90
+        )
 
-    const usable = trimmed.length >= 2 ? trimmed : nearby
+        if (trimmed.length >= minimumComparables) {
+          usable = trimmed
+        }
+      }
+    }
 
     const values = usable.map((row) => row.pricePerSqm)
 
-    // closer comps get higher weight
     const weights = usable.map((row) => {
       const distanceWeight = 1 / Math.max(row.distanceM, 50)
+
       const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
-      const sizeWeight = 1 / Math.max(sizeDiff, 5)
+
+      const minSizeFloor =
+        propertyCategory === 'landed' ? 20 : 5
+
+      const sizeWeight = 1 / Math.max(sizeDiff, minSizeFloor)
+
       return distanceWeight * sizeWeight
     })
 
@@ -184,24 +266,31 @@ export async function getValuation({
 
     const estimated = avgPsm * floorAreaSqm
 
+    const spread =
+      propertyCategory === 'landed'
+        ? usable.length >= 3
+          ? 0.08
+          : 0.12
+        : 0.05
+
     const candidate = {
       estimated,
-      low: estimated * 0.95,
-      high: estimated * 1.05,
+      low: estimated * (1 - spread),
+      high: estimated * (1 + spread),
       comparables: usable.length,
       radius,
       avgPsm,
     }
 
-    // choose the best radius:
-    // prefer at least 5 comps, otherwise keep best available so far
     if (!bestCandidate) {
       bestCandidate = candidate
       continue
     }
 
-    const currentGood = bestCandidate.comparables >= 5
-    const nextGood = candidate.comparables >= 5
+    const currentGood =
+      bestCandidate.comparables >= (propertyCategory === 'landed' ? 3 : 5)
+    const nextGood =
+      candidate.comparables >= (propertyCategory === 'landed' ? 3 : 5)
 
     if (!currentGood && nextGood) {
       bestCandidate = candidate
@@ -209,10 +298,9 @@ export async function getValuation({
     }
 
     if (currentGood && nextGood) {
-      // if both are good, prefer smaller radius unless comps are much better
       if (
         candidate.radius < bestCandidate.radius ||
-        candidate.comparables >= bestCandidate.comparables + 3
+        candidate.comparables >= bestCandidate.comparables + 2
       ) {
         bestCandidate = candidate
       }
@@ -220,7 +308,6 @@ export async function getValuation({
     }
 
     if (!currentGood && !nextGood) {
-      // prefer more comps first, then smaller radius
       if (
         candidate.comparables > bestCandidate.comparables ||
         (candidate.comparables === bestCandidate.comparables &&
@@ -232,7 +319,11 @@ export async function getValuation({
   }
 
   if (!bestCandidate) {
-    console.log('Not enough nearby comparables found within 1200m.')
+    console.log(
+      `Not enough nearby comparables found within ${
+        searchRadius[searchRadius.length - 1]
+      }m.`
+    )
     return null
   }
 
