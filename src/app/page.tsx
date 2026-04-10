@@ -107,12 +107,13 @@ function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
   const text = `${item.ADDRESS || ''} ${item.BUILDING || ''}`.toUpperCase()
 
   const landedKeywords = [
-    'TERRACE',
     'TERRACE HOUSE',
+    'TERRACE',
+    'SEMI-DETACHED HOUSE',
     'SEMI-DETACHED',
     'SEMI DETACHED',
-    'DETACHED',
     'DETACHED HOUSE',
+    'DETACHED',
     'BUNGALOW',
     'GOOD CLASS BUNGALOW',
     'STRATA LANDED',
@@ -120,8 +121,8 @@ function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
   ]
 
   const condoKeywords = [
-    'CONDOMINIUM',
     'EXECUTIVE CONDOMINIUM',
+    'CONDOMINIUM',
     'APARTMENT',
     'RESIDENCES',
     'RESIDENCE',
@@ -129,8 +130,8 @@ function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
     'SUITE',
     'TOWER',
     'TOWERS',
-    'VILLAS',
     'VILLA',
+    'VILLAS',
     'LOFT',
     'PENTHOUSE',
   ]
@@ -143,15 +144,18 @@ function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
     return 'condo'
   }
 
-  if (
-    item.BUILDING &&
-    item.BUILDING !== 'NIL' &&
-    cleanAddress(item.BUILDING) !== cleanAddress(item.ADDRESS || '')
-  ) {
-    return 'condo'
+  if (item.BLK_NO && item.ROAD_NAME) {
+    return 'hdb'
   }
 
-  return 'hdb'
+  return 'condo'
+}
+
+function getDefaultPropertyType(category: 'hdb' | 'condo' | 'landed') {
+  const firstOption = PROPERTY_TYPE_OPTIONS.find(
+    (option) => option.category === category
+  )
+  return firstOption ? firstOption.value : ''
 }
 
 function formatMoney(value: number | null) {
@@ -197,9 +201,7 @@ function getDistanceMeters(
   lat2: number,
   lon2: number
 ) {
-  return (
-    Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lon2 - lon1, 2)) * 111000
-  )
+  return Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lon2 - lon1, 2)) * 111000
 }
 
 type EmailResult = {
@@ -320,13 +322,7 @@ export default function Home() {
     setSelectedLon(Number(item.LONGITUDE))
     setLookupCandidates(buildLookupCandidates(item))
     setPropertyCategory(category)
-
-    const firstOption = PROPERTY_TYPE_OPTIONS.find(
-      (option) => option.category === category
-    )
-    if (firstOption) {
-      setPropertyType(firstOption.value)
-    }
+    setPropertyType(getDefaultPropertyType(category))
 
     setSuggestions([])
     setShowSuggestions(false)
@@ -380,6 +376,12 @@ export default function Home() {
       setSelectedLon(lon)
       setLookupCandidates(buildLookupCandidates(chosen))
       setPropertyCategory(category)
+      setPropertyType((current) => {
+        const isStillValid = PROPERTY_TYPE_OPTIONS.some(
+          (option) => option.category === category && option.value === current
+        )
+        return isStillValid ? current : getDefaultPropertyType(category)
+      })
       setAddress(chosen.ADDRESS)
 
       return { lat, lon, category }
@@ -425,7 +427,7 @@ export default function Home() {
         lon: resolved.lon,
         floorAreaSqm: Number(floorAreaSqm),
         propertyType,
-        propertyCategory,
+        propertyCategory: resolved.category,
       })
 
       if (!result) {
@@ -492,7 +494,9 @@ export default function Home() {
     }
   }
 
-  const sendLeadEmail = async (payload: Record<string, unknown>): Promise<EmailResult> => {
+  const sendLeadEmail = async (
+    payload: Record<string, unknown>
+  ): Promise<EmailResult> => {
     try {
       const response = await fetch('/api/send-lead', {
         method: 'POST',
