@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
+import { supabase } from '@/lib/supabase'
 
 type OneMapResult = {
   ADDRESS: string
@@ -17,6 +18,15 @@ type PropertyTypeOption = {
   label: string
   value: string
   category: 'hdb' | 'condo' | 'landed'
+}
+
+type ComparableRow = {
+  address: string | null
+  transaction_date: string | null
+  transaction_price: number | string | null
+  floor_area_sqm: number | string | null
+  latitude: number | string | null
+  longitude: number | string | null
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
@@ -111,6 +121,49 @@ function formatMoney(value: number | null) {
   return `$${Math.round(value).toLocaleString()}`
 }
 
+function formatTeaserMoney(value: number | null) {
+  if (!value) return '$4XX,XXX'
+
+  const rounded = Math.round(value).toLocaleString()
+  let seenFirstDigit = false
+
+  const masked = rounded
+    .split('')
+    .map((char) => {
+      if (!/\d/.test(char)) return char
+      if (!seenFirstDigit) {
+        seenFirstDigit = true
+        return char
+      }
+      return 'X'
+    })
+    .join('')
+
+  return `$${masked}`
+}
+
+function formatDate(value: string | null) {
+  if (!value) return '-'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-SG', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function getDistanceMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  return (
+    Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lon2 - lon1, 2)) * 111000
+  )
+}
+
 export default function Home() {
   const [address, setAddress] = useState('')
   const [floorLevel, setFloorLevel] = useState('')
@@ -130,9 +183,22 @@ export default function Home() {
   const [estimatedHigh, setEstimatedHigh] = useState<number | null>(null)
   const [numOfComps, setNumOfComps] = useState<number | null>(null)
   const [radiusUsedM, setRadiusUsedM] = useState<number | null>(null)
+  const [recentComparables, setRecentComparables] = useState<
+    Array<{
+      transaction_date: string | null
+      address: string | null
+      floor_area_sqm: number
+      transaction_price: number
+      psf: number
+      distance_m: number
+    }>
+  >([])
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [formMessage, setFormMessage] = useState('')
+  const [hasTeaserResult, setHasTeaserResult] = useState(false)
+  const [hasUnlockedReport, setHasUnlockedReport] = useState(false)
+  const [isLoadingFullReport, setIsLoadingFullReport] = useState(false)
 
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [consultName, setConsultName] = useState('')
@@ -140,6 +206,11 @@ export default function Home() {
   const [consultEmail, setConsultEmail] = useState('')
   const [consultPlan, setConsultPlan] = useState('')
   const [consultationMessage, setConsultationMessage] = useState('')
+
+  const [unlockName, setUnlockName] = useState('')
+  const [unlockPhone, setUnlockPhone] = useState('')
+  const [unlockEmail, setUnlockEmail] = useState('')
+  const [unlockMessage, setUnlockMessage] = useState('')
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -184,6 +255,10 @@ export default function Home() {
     setEstimatedHigh(null)
     setNumOfComps(null)
     setRadiusUsedM(null)
+    setRecentComparables([])
+    setHasTeaserResult(false)
+    setHasUnlockedReport(false)
+    setUnlockMessage('')
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
@@ -213,6 +288,15 @@ export default function Home() {
     setSuggestions([])
     setShowSuggestions(false)
     setFormMessage('')
+    setEstimatedPrice(null)
+    setEstimatedLow(null)
+    setEstimatedHigh(null)
+    setNumOfComps(null)
+    setRadiusUsedM(null)
+    setRecentComparables([])
+    setHasTeaserResult(false)
+    setHasUnlockedReport(false)
+    setUnlockMessage('')
   }
 
   const resolveAddressForGeneration = async () => {
@@ -264,6 +348,9 @@ export default function Home() {
 
   const handleGenerateReport = async () => {
     setFormMessage('')
+    setUnlockMessage('')
+    setHasUnlockedReport(false)
+    setRecentComparables([])
 
     if (!address.trim()) {
       setFormMessage('Please enter an address first.')
@@ -304,6 +391,7 @@ export default function Home() {
         setEstimatedHigh(null)
         setNumOfComps(null)
         setRadiusUsedM(null)
+        setHasTeaserResult(false)
         setFormMessage('Not enough comparable transactions found for this property yet.')
         return
       }
@@ -313,7 +401,8 @@ export default function Home() {
       setEstimatedHigh(result.high)
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
-      setFormMessage('Valuation generated successfully.')
+      setHasTeaserResult(true)
+      setFormMessage('Teaser valuation generated. Unlock the full report below.')
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -345,7 +434,164 @@ export default function Home() {
       return
     }
 
+    const { error } = await supabase.from('leads').insert([
+      {
+        name: consultName.trim(),
+        phone: consultPhone.trim(),
+        email: consultEmail.trim(),
+      },
+    ])
+
+    if (error) {
+      console.error('Consultation lead save error:', error)
+      setConsultationMessage('Could not save your details right now. Please try again.')
+      return
+    }
+
     setConsultationMessage('Thanks — we will contact you shortly.')
+
+    setConsultName('')
+    setConsultPhone('')
+    setConsultEmail('')
+    setConsultPlan('')
+  }
+
+  const fetchRecentComparables = async (
+    lat: number,
+    lon: number,
+    source: string,
+    targetPropertyType: string
+  ) => {
+    const { data, error } = await supabase
+      .from('property_transactions_v2')
+      .select(
+        'address, transaction_date, transaction_price, floor_area_sqm, latitude, longitude'
+      )
+      .eq('source', source)
+      .eq('unit_type', targetPropertyType)
+      .not('transaction_price', 'is', null)
+      .not('floor_area_sqm', 'is', null)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .limit(5000)
+
+    if (error) {
+      console.error('Comparable fetch error:', error)
+      return []
+    }
+
+    const cleaned = ((data || []) as ComparableRow[])
+      .map((row) => {
+        const transactionPrice = Number(row.transaction_price)
+        const floorArea = Number(row.floor_area_sqm)
+        const rowLat = Number(row.latitude)
+        const rowLon = Number(row.longitude)
+
+        return {
+          address: row.address,
+          transaction_date: row.transaction_date,
+          transaction_price: transactionPrice,
+          floor_area_sqm: floorArea,
+          latitude: rowLat,
+          longitude: rowLon,
+          distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
+          psf: floorArea > 0 ? transactionPrice / floorArea : 0,
+        }
+      })
+      .filter(
+        (row) =>
+          Number.isFinite(row.transaction_price) &&
+          row.transaction_price > 0 &&
+          Number.isFinite(row.floor_area_sqm) &&
+          row.floor_area_sqm > 0 &&
+          Number.isFinite(row.latitude) &&
+          Number.isFinite(row.longitude)
+      )
+
+    const searchRadius = [200, 400, 600, 800]
+    for (const radius of searchRadius) {
+      const withinRadius = cleaned
+        .filter((row) => row.distance_m <= radius)
+        .sort((a, b) => {
+          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+          return dateB - dateA
+        })
+
+      if (withinRadius.length >= 5) {
+        return withinRadius.slice(0, 10)
+      }
+    }
+
+    return cleaned
+      .sort((a, b) => {
+        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+        return dateB - dateA
+      })
+      .slice(0, 10)
+  }
+
+  const handleUnlockReport = async () => {
+    setUnlockMessage('')
+
+    if (!unlockName.trim()) {
+      setUnlockMessage('Please enter your name.')
+      return
+    }
+
+    if (!unlockPhone.trim()) {
+      setUnlockMessage('Please enter your phone number.')
+      return
+    }
+
+    if (!unlockEmail.trim()) {
+      setUnlockMessage('Please enter your email.')
+      return
+    }
+
+    if (!selectedLat || !selectedLon || !estimatedPrice) {
+      setUnlockMessage('Please generate a teaser valuation first.')
+      return
+    }
+
+    setIsLoadingFullReport(true)
+
+    const { error } = await supabase.from('leads').insert([
+      {
+        name: unlockName.trim(),
+        phone: unlockPhone.trim(),
+        email: unlockEmail.trim(),
+      },
+    ])
+
+    if (error) {
+      console.error('Unlock lead save error:', error)
+      setUnlockMessage('Could not unlock the report right now. Please try again.')
+      setIsLoadingFullReport(false)
+      return
+    }
+
+    let source = 'data_gov_hdb'
+    if (propertyCategory !== 'hdb') {
+      source = 'ura_private'
+    }
+
+    const comparables = await fetchRecentComparables(
+      selectedLat,
+      selectedLon,
+      source,
+      propertyType
+    )
+
+    setRecentComparables(comparables)
+    setHasUnlockedReport(true)
+    setUnlockMessage('Full report unlocked successfully.')
+    setIsLoadingFullReport(false)
+
+    setUnlockName('')
+    setUnlockPhone('')
+    setUnlockEmail('')
   }
 
   return (
@@ -587,37 +833,214 @@ export default function Home() {
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm text-[#8b6b52]">Estimated Value</p>
                 <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
-                  {formatMoney(estimatedPrice)}
+                  {hasTeaserResult ? formatTeaserMoney(estimatedPrice) : '$4XX,XXX'}
                 </p>
                 <p className="mt-2 text-sm text-[#6a727a]">
-                  Based on nearby transaction evidence
+                  Unlock the full report to see the exact valuation
                 </p>
               </div>
 
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm text-[#8b6b52]">Comparable Evidence</p>
                 <p className="mt-2 text-lg font-semibold text-[#2d3135]">
-                  {numOfComps ? `${numOfComps} nearby transactions` : 'Waiting for valuation'}
+                  {hasTeaserResult
+                    ? `${numOfComps || 0} nearby transactions found`
+                    : 'Generate a teaser valuation first'}
                 </p>
                 <p className="mt-1 text-sm text-[#6a727a]">
-                  {radiusUsedM
-                    ? `Search radius used: ${radiusUsedM}m`
-                    : 'Generate a report to view supporting data'}
+                  {hasTeaserResult
+                    ? 'Submit your details to unlock the full report'
+                    : 'We’ll show a teaser first'}
                 </p>
               </div>
             </div>
 
-            {(estimatedLow || estimatedHigh) && (
+            {hasTeaserResult && !hasUnlockedReport && (
               <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                <p className="text-sm text-[#8b6b52]">Indicative Range</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
-                  {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
+                  Unlock full report
                 </p>
+                <h3 className="mt-2 text-xl font-semibold text-[#2d3135]">
+                  Enter your details to view the full valuation report
+                </h3>
+                <p className="mt-2 text-sm text-[#67707a]">
+                  You’ll unlock the exact valuation, indicative range, and recent nearby transactions.
+                </p>
+
+                <div className="mt-5 grid gap-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={unlockName}
+                      onChange={(e) => setUnlockName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Phone number
+                    </label>
+                    <input
+                      type="text"
+                      value={unlockPhone}
+                      onChange={(e) => setUnlockPhone(e.target.value)}
+                      placeholder="Your phone number"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={unlockEmail}
+                      onChange={(e) => setUnlockEmail(e.target.value)}
+                      placeholder="Your email"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleUnlockReport}
+                    disabled={isLoadingFullReport}
+                    className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isLoadingFullReport ? 'Unlocking...' : 'Unlock Full Report'}
+                  </button>
+
+                  {unlockMessage && (
+                    <p
+                      className={`text-sm ${
+                        unlockMessage.toLowerCase().includes('success')
+                          ? 'text-green-600'
+                          : 'text-[#8b6b52]'
+                      }`}
+                    >
+                      {unlockMessage}
+                    </p>
+                  )}
+                </div>
               </div>
+            )}
+
+            {hasUnlockedReport && (
+              <>
+                <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                  <p className="text-sm text-[#8b6b52]">Full Estimated Value</p>
+                  <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
+                    {formatMoney(estimatedPrice)}
+                  </p>
+                  <p className="mt-2 text-sm text-[#6a727a]">
+                    Based on nearby transaction evidence
+                  </p>
+                </div>
+
+                {(estimatedLow || estimatedHigh) && (
+                  <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                    <p className="text-sm text-[#8b6b52]">Indicative Range</p>
+                    <p className="mt-2 text-lg font-semibold text-[#2d3135]">
+                      {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                    </p>
+                    <p className="mt-2 text-sm text-[#6a727a]">
+                      Based on {numOfComps || 0} nearby transactions within {radiusUsedM || 0}m
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
       </section>
+
+      {hasUnlockedReport && (
+        <section className="border-t border-[#e8ddd2] bg-white">
+          <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
+            <div className="max-w-3xl">
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
+                Full report
+              </p>
+              <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
+                Recent nearby transactions
+              </h3>
+              <p className="mt-4 text-base leading-7 text-[#646c74]">
+                These are the most recent comparable transactions near your selected property.
+              </p>
+            </div>
+
+            <div className="mt-8 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-[#efe7dd]">
+                  <thead className="bg-[#faf8f4]">
+                    <tr>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                        Date
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                        Address
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                        Size (sqm)
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                        Price
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                        PSF
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                        Distance
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f3ede5]">
+                    {recentComparables.length > 0 ? (
+                      recentComparables.map((row, index) => (
+                        <tr key={`${row.address}-${row.transaction_date}-${index}`}>
+                          <td className="px-5 py-4 text-sm text-[#2d3135]">
+                            {formatDate(row.transaction_date)}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-[#2d3135]">
+                            {row.address || '-'}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-[#2d3135]">
+                            {row.floor_area_sqm.toLocaleString()}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-[#2d3135]">
+                            ${Math.round(row.transaction_price).toLocaleString()}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-[#2d3135]">
+                            ${Math.round(row.psf).toLocaleString()}
+                          </td>
+                          <td className="px-5 py-4 text-sm text-[#2d3135]">
+                            {Math.round(row.distance_m)}m
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-5 py-8 text-center text-sm text-[#67707a]"
+                        >
+                          No recent comparables available yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="border-t border-[#e8ddd2] bg-white">
         <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
