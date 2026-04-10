@@ -780,25 +780,23 @@ export default function Home() {
 
             <div className="mt-8 rounded-3xl border border-[#e8ddd2] bg-white p-6 shadow-sm">
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                Why people use this
+                Why HomeValue
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div>
                   <p className="text-2xl font-semibold text-[#2d3135]">30 sec</p>
-                  <p className="mt-1 text-sm text-[#66707a]">Fast first-pass valuation</p>
+                  <p className="mt-1 text-sm text-[#66707a]">Fast first-pass estimate</p>
                 </div>
                 <div>
                   <p className="text-2xl font-semibold text-[#2d3135]">2026</p>
-                  <p className="mt-1 text-sm text-[#66707a]">Current transaction dataset</p>
+                  <p className="mt-1 text-sm text-[#66707a]">Current transaction data</p>
                 </div>
                 <div>
                   <p className="text-2xl font-semibold text-[#2d3135]">Real comps</p>
-                  <p className="mt-1 text-sm text-[#66707a]">Backed by nearby transactions</p>
+                  <p className="mt-1 text-sm text-[#66707a]">Nearby supporting evidence</p>
                 </div>
               </div>
-            </div>
           </div>
-
           <div className="order-1 relative lg:order-2">
             <div className="rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.08)] md:p-8">
               <div className="mb-6">
