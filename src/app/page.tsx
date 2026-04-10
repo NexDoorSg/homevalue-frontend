@@ -1106,7 +1106,7 @@ export default function Home() {
                     disabled={isLoadingFullReport}
                     className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isLoadingFullReport ? 'Unlocking...' : 'Unlock Full Report'}
+                    {isLoadingFullReport ? 'Unlocking...' : 'See Full Valuation Report'}
                   </button>
 
                   {unlockMessage && (
