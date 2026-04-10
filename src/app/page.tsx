@@ -320,23 +320,28 @@ export default function Home() {
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
       <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
   <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 md:px-10">
-    <div className="flex items-center gap-3">
+    
+    {/* LOGO IMAGE */}
+    <div className="flex items-center">
       <Image
         src="/nexdoor-logo.png"
         alt="NexDoor"
-        width={320}
-        height={84}
-        className="h-30 w-auto md:h-32 object-contain"
+        width={200}
+        height={60}
+        className="h-14 md:h-16 w-auto object-contain"
         priority
       />
     </div>
 
+    {/* CTA */}
     <button
       type="button"
-      className="rounded-full bg-[#2f3438] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
+      onClick={() => setShowConsultationModal(true)}
+      className="rounded-full bg-[#2f3438] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
     >
       Free Consultation
     </button>
+
   </div>
 </header>
 
