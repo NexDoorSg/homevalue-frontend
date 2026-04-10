@@ -1003,16 +1003,16 @@ export default function Home() {
             </div>
 
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                <p className="text-sm text-[#8b6b52]">Comparable Evidence</p>
+                <p className="text-sm text-[#8b6b52]">Nearby Market Evidence</p>
                 <p className="mt-2 text-lg font-semibold text-[#2d3135]">
                   {hasTeaserResult
                     ? `${numOfComps || 0} nearby transactions found`
-                    : 'Enter your details to see nearby transaction evidence'}
+                    : 'Recent nearby transactions will appear here'}
                 </p>
                 <p className="mt-1 text-sm text-[#6a727a]">
                   {hasTeaserResult
-                    ? 'Unlock the full report to view more detail'
-                    : 'Your estimate and supporting data will appear here'}
+                    ? 'Unlock the full report to see the full breakdown'
+                    : 'Use your estimate to unlock the exact valuation and comparables'}
                 </p>
               </div>
             </div>
