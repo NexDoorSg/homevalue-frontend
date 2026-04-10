@@ -439,11 +439,12 @@ export default function Home() {
         : null
 
     const propertyContextExists = hasPropertyContext()
+    const normalizedEmail = email.trim().toLowerCase()
 
     return {
       name: name.trim(),
       phone: phone.trim(),
-      email: email.trim(),
+      email: normalizedEmail,
       address: propertyContextExists ? address.trim() || null : null,
       unit_number: propertyContextExists ? fullUnitNumber : null,
       unit_type: propertyContextExists ? propertyType || null : null,
@@ -479,6 +480,27 @@ export default function Home() {
         error: 'Could not reach email API',
       }
     }
+  }
+
+  const hasReachedFullReportLimit = async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase()
+
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const { count, error } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('email', normalizedEmail)
+      .eq('plan', 'full_report')
+      .gte('created_at', thirtyDaysAgo.toISOString())
+
+    if (error) {
+      console.error('Error checking full report limit:', error)
+      throw new Error('Failed to check report limit')
+    }
+
+    return (count || 0) >= 3
   }
 
   const handleConsultationSubmit = async () => {
@@ -640,52 +662,70 @@ export default function Home() {
 
     setIsLoadingFullReport(true)
 
-    const leadPayload = buildLeadPayload(
-      unlockName,
-      unlockPhone,
-      unlockEmail
-    )
+    try {
+      const normalizedUnlockEmail = unlockEmail.trim().toLowerCase()
 
-    const { error } = await supabase.from('leads').insert([leadPayload])
+      const reachedLimit = await hasReachedFullReportLimit(normalizedUnlockEmail)
 
-    if (error) {
-      console.error('Unlock lead save error:', error)
-      setUnlockMessage('Could not unlock the report right now. Please try again.')
+      if (reachedLimit) {
+        setUnlockMessage(
+          'You’ve reached the free full-report limit for the past 30 days. Please contact us directly and we’ll be happy to help.'
+        )
+        setIsLoadingFullReport(false)
+        return
+      }
+
+      const leadPayload = buildLeadPayload(
+        unlockName,
+        unlockPhone,
+        normalizedUnlockEmail,
+        { plan: 'full_report' }
+      )
+
+      const { error } = await supabase.from('leads').insert([leadPayload])
+
+      if (error) {
+        console.error('Unlock lead save error:', error)
+        setUnlockMessage('Could not unlock the report right now. Please try again.')
+        setIsLoadingFullReport(false)
+        return
+      }
+
+      const emailResult = await sendLeadEmail({
+        ...leadPayload,
+        source: 'full_report',
+      })
+
+      let source = 'data_gov_hdb'
+      if (propertyCategory !== 'hdb') {
+        source = 'ura_private'
+      }
+
+      const comparables = await fetchRecentComparables(
+        selectedLat,
+        selectedLon,
+        source,
+        propertyType
+      )
+
+      setRecentComparables(comparables)
+      setHasUnlockedReport(true)
+
+      if (!emailResult.ok) {
+        setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
+      } else {
+        setUnlockMessage('Full report unlocked successfully.')
+      }
+
+      setUnlockName('')
+      setUnlockPhone('')
+      setUnlockEmail('')
+    } catch (error) {
+      console.error('Full report limit check failed:', error)
+      setUnlockMessage('Could not check your report limit right now. Please try again.')
+    } finally {
       setIsLoadingFullReport(false)
-      return
     }
-
-    const emailResult = await sendLeadEmail({
-      ...leadPayload,
-      source: 'full_report',
-    })
-
-    let source = 'data_gov_hdb'
-    if (propertyCategory !== 'hdb') {
-      source = 'ura_private'
-    }
-
-    const comparables = await fetchRecentComparables(
-      selectedLat,
-      selectedLon,
-      source,
-      propertyType
-    )
-
-    setRecentComparables(comparables)
-    setHasUnlockedReport(true)
-
-    if (!emailResult.ok) {
-      setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
-    } else {
-      setUnlockMessage('Full report unlocked successfully.')
-    }
-
-    setIsLoadingFullReport(false)
-
-    setUnlockName('')
-    setUnlockPhone('')
-    setUnlockEmail('')
   }
 
   return (
