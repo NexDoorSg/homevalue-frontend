@@ -757,11 +757,11 @@ export default function Home() {
             </div>
 
             <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-[#2d3135] md:text-6xl">
-              What’s Your Home Really Worth?
+              Find Out What Your Home Could Be Worth
             </h1>
 
             <p className="mt-5 max-w-2xl text-base leading-7 text-[#616971] md:text-lg">
-              Get an instant estimate based on nearby 2026 transaction data.
+              Get an instant estimate based on nearby 2026 transaction data and recent comparable sales.
             </p>
 
             <div className="mt-8 grid gap-3">
