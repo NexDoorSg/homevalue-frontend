@@ -1019,7 +1019,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div ref={resultRef} className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div ref={resultRef} className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm text-[#8b6b52]">Your Instant Estimate</p>
                 <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
