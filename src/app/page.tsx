@@ -231,6 +231,7 @@ export default function Home() {
   const [unlockMessage, setUnlockMessage] = useState('')
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resultRef = useRef<HTMLDivElement | null>(null)
   const propertyCategory = getPropertyCategoryFromType(propertyType)
 
   const searchAddress = async (value: string) => {
@@ -418,6 +419,9 @@ export default function Home() {
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
       setHasTeaserResult(true)
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 200)
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -1015,7 +1019,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div ref={resultRef} className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm text-[#8b6b52]">Your Instant Estimate</p>
                 <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
