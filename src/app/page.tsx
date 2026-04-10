@@ -326,7 +326,7 @@ export default function Home() {
         alt="NexDoor"
         width={320}
         height={84}
-        className="h-24 w-auto md:h-28"
+        className="h-30 w-auto md:h-32 object-contain"
         priority
       />
     </div>
