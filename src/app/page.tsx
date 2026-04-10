@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 
@@ -106,14 +107,20 @@ function inferPropertyCategory(item: OneMapResult): 'hdb' | 'condo' | 'landed' {
   return 'condo'
 }
 
+function formatMoney(value: number | null) {
+  if (!value) return '$5XX,XXX'
+  return `$${Math.round(value).toLocaleString()}`
+}
+
 export default function Home() {
   const [address, setAddress] = useState('')
+  const [floorLevel, setFloorLevel] = useState('')
+  const [stackNumber, setStackNumber] = useState('')
   const [propertyType, setPropertyType] = useState('3 ROOM')
   const [floorAreaSqm, setFloorAreaSqm] = useState('')
 
   const [suggestions, setSuggestions] = useState<OneMapResult[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-
   const [selectedLat, setSelectedLat] = useState<number | null>(null)
   const [selectedLon, setSelectedLon] = useState<number | null>(null)
   const [lookupCandidates, setLookupCandidates] = useState<string[]>([])
@@ -147,6 +154,7 @@ export default function Home() {
           value
         )}&returnGeom=Y&getAddrDetails=Y&pageNum=1`
       )
+
       const data = await res.json()
       const results = (data?.results || []) as OneMapResult[]
 
@@ -309,84 +317,287 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-black px-10 py-10 text-white">
-      <div className="max-w-xl">
-        <h1 className="mb-6 text-3xl font-bold">Home Valuation</h1>
+    <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
+      <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 md:px-10">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/nexdoor-logo.png"
+              alt="NexDoor"
+              width={210}
+              height={56}
+              className="h-12 w-auto md:h-14"
+              priority
+            />
+          </div>
 
-        <div className="space-y-4">
-          <input
-            value={address}
-            onChange={(e) => handleAddressChange(e.target.value)}
-            placeholder="Enter address"
-            className="w-full border border-white bg-black p-3 text-white placeholder:text-white/50"
-          />
-
-          {selectedLat && selectedLon && (
-            <p className="text-sm text-green-400">Address matched successfully.</p>
-          )}
-
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="border border-white bg-black">
-              {suggestions.map((item, index) => (
-                <button
-                  key={`${item.ADDRESS}-${index}`}
-                  type="button"
-                  onClick={() => handleSelectAddress(item)}
-                  className="block w-full border-b border-white/20 px-3 py-2 text-left text-white hover:bg-white/10 last:border-b-0"
-                >
-                  {item.ADDRESS}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <select
-            value={propertyType}
-            onChange={(e) => setPropertyType(e.target.value)}
-            className="w-full border border-white bg-black p-3 text-white"
-          >
-            {filteredPropertyOptions.map((option) => (
-              <option key={option.label} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          <input
-            value={floorAreaSqm}
-            onChange={(e) => setFloorAreaSqm(e.target.value)}
-            placeholder="Size sqm"
-            className="w-full border border-white bg-black p-3 text-white placeholder:text-white/50"
-          />
-
-          <button
-            onClick={handleGenerateReport}
-            disabled={isGenerating}
-            className="w-full bg-zinc-900 p-3 text-white disabled:opacity-60"
-          >
-            {isGenerating ? 'Generating...' : 'Generate'}
-          </button>
-
-          {formMessage && (
-            <p className="text-sm text-white/80">{formMessage}</p>
-          )}
-
-          {estimatedPrice && (
-            <div className="mt-6 space-y-2 border border-white p-4">
-              <p className="text-xl font-bold">
-                ${Math.round(estimatedPrice).toLocaleString()}
-              </p>
-              <p>
-                Range: ${Math.round(estimatedLow || 0).toLocaleString()} - $
-                {Math.round(estimatedHigh || 0).toLocaleString()}
-              </p>
-              <p>
-                {numOfComps} comps • {radiusUsedM}m
-              </p>
-            </div>
-          )}
+          <div className="hidden items-center gap-8 text-sm text-[#606971] md:flex">
+            <span>Home Valuation</span>
+            <span>Insights</span>
+            <span>Contact</span>
+          </div>
         </div>
-      </div>
+      </header>
+
+      <section className="relative overflow-hidden">
+        <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
+        <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
+
+        <div className="mx-auto grid max-w-7xl gap-12 px-6 py-12 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:py-20">
+          <div className="pt-4">
+            <div className="inline-flex rounded-full border border-[#dcc8b5] bg-white px-4 py-2 text-sm font-medium text-[#8b6b52] shadow-sm">
+              HomeValue by NexDoor
+            </div>
+
+            <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-[#2d3135] md:text-6xl">
+              Find out what your
+              <span className="block text-[#8b6b52]">home could be worth</span>
+            </h1>
+
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[#616971] md:text-lg">
+              Get a data-backed home valuation based on recent nearby transactions,
+              real market movement, and practical comparable evidence.
+            </p>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+                <p className="text-sm text-[#8b6b52]">Nearby sales</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Matched to your area</p>
+              </div>
+
+              <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+                <p className="text-sm text-[#8b6b52]">Clear valuation</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Built on live market data</p>
+              </div>
+
+              <div className="rounded-2xl border border-[#e8ddd2] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+                <p className="text-sm text-[#8b6b52]">Useful insights</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">Designed for homeowners</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.08)] md:p-8">
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-[#2d3135]">Generate your valuation</h2>
+                <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                  Enter your property details below to get started.
+                </p>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="relative">
+                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                    Full address
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 419 Woodlands Street 41"
+                    value={address}
+                    onChange={(e) => handleAddressChange(e.target.value)}
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  />
+
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-[#ddd3c7] bg-white shadow-[0_14px_40px_rgba(37,42,46,0.12)]">
+                      {suggestions.map((item, index) => (
+                        <button
+                          key={`${item.ADDRESS}-${index}`}
+                          type="button"
+                          onClick={() => handleSelectAddress(item)}
+                          className="block w-full border-b border-[#f1ebe4] px-4 py-3 text-left text-sm text-[#2d3135] hover:bg-[#f8f4ef] last:border-b-0"
+                        >
+                          <div className="font-medium">{item.ADDRESS}</div>
+                          {item.POSTAL && (
+                            <div className="mt-1 text-xs text-[#7a8289]">
+                              Singapore {item.POSTAL}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedLat && selectedLon && (
+                  <p className="text-sm font-medium text-green-600">
+                    Address matched successfully.
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Floor level
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 11"
+                      value={floorLevel}
+                      onChange={(e) => setFloorLevel(e.target.value)}
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Stack number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 389"
+                      value={stackNumber}
+                      onChange={(e) => setStackNumber(e.target.value)}
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                    Property type
+                  </label>
+                  <select
+                    value={propertyType}
+                    onChange={(e) => setPropertyType(e.target.value)}
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  >
+                    {filteredPropertyOptions.map((option) => (
+                      <option key={option.label} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                    Floor area (sqm)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 177"
+                    value={floorAreaSqm}
+                    onChange={(e) => setFloorAreaSqm(e.target.value)}
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateReport}
+                  disabled={isGenerating}
+                  className="mt-2 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isGenerating ? 'Generating...' : 'Generate Valuation Report'}
+                </button>
+
+                {formMessage && (
+                  <p
+                    className={`text-sm ${
+                      formMessage.toLowerCase().includes('success')
+                        ? 'text-green-600'
+                        : 'text-[#8b6b52]'
+                    }`}
+                  >
+                    {formMessage}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-[#f8f4ef] p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-[#8b6b52]">
+                  Data-backed insight
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#606971]">
+                  Built around nearby comparable transactions to give you a clearer starting point.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                <p className="text-sm text-[#8b6b52]">Estimated Value</p>
+                <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
+                  {formatMoney(estimatedPrice)}
+                </p>
+                <p className="mt-2 text-sm text-[#6a727a]">
+                  Based on recent nearby market activity
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                <p className="text-sm text-[#8b6b52]">Comparable Evidence</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
+                  {numOfComps ? `${numOfComps} nearby transactions` : 'Waiting for valuation'}
+                </p>
+                <p className="mt-1 text-sm text-[#6a727a]">
+                  {radiusUsedM ? `Search radius used: ${radiusUsedM}m` : 'Generate a report to view supporting data'}
+                </p>
+              </div>
+            </div>
+
+            {(estimatedLow || estimatedHigh) && (
+              <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                <p className="text-sm text-[#8b6b52]">Indicative Range</p>
+                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
+                  {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[#e8ddd2] bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
+          <div className="max-w-2xl">
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
+              Why use HomeValue
+            </p>
+            <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
+              A clearer way to understand your property’s value
+            </h3>
+            <p className="mt-4 text-base leading-7 text-[#646c74]">
+              Designed to help homeowners and buyers get a more informed view of the market using
+              recent nearby sales and structured transaction data.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-6">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2f3438] text-lg text-white">
+                1
+              </div>
+              <h4 className="mt-5 text-xl font-semibold text-[#2d3135]">Market-based estimate</h4>
+              <p className="mt-3 text-sm leading-6 text-[#67707a]">
+                Valuations are anchored to actual nearby transactions rather than guesswork.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-6">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#8b6b52] text-lg text-white">
+                2
+              </div>
+              <h4 className="mt-5 text-xl font-semibold text-[#2d3135]">Nearby comparables</h4>
+              <p className="mt-3 text-sm leading-6 text-[#67707a]">
+                Recent nearby sales help explain how the estimate is formed.
+              </p>
+            </div>
+
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-6">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#c8a287] text-lg text-white">
+                3
+              </div>
+              <h4 className="mt-5 text-xl font-semibold text-[#2d3135]">Useful starting point</h4>
+              <p className="mt-3 text-sm leading-6 text-[#67707a]">
+                Use it to benchmark price expectations before your next move.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   )
 }
