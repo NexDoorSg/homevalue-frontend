@@ -60,6 +60,8 @@ function getPropertyCategoryFromType(
 ): 'hdb' | 'condo' | 'landed' {
   const normalized = propertyType.toUpperCase().trim()
 
+  if (!normalized) return 'condo'
+
   const hdbTypes = ['2 ROOM', '3 ROOM', '4 ROOM', '5 ROOM', 'EXECUTIVE']
   const landedTypes = [
     'TERRACE HOUSE',
@@ -182,7 +184,7 @@ export default function Home() {
   const [address, setAddress] = useState('')
   const [floorLevel, setFloorLevel] = useState('')
   const [stackNumber, setStackNumber] = useState('')
-  const [propertyType, setPropertyType] = useState('3 ROOM')
+  const [propertyType, setPropertyType] = useState('')
   const [floorAreaSqm, setFloorAreaSqm] = useState('')
   const [landSizeSqm, setLandSizeSqm] = useState('')
   const [builtUpSqm, setBuiltUpSqm] = useState('')
@@ -892,6 +894,10 @@ export default function Home() {
                     onChange={(e) => setPropertyType(e.target.value)}
                     className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                   >
+                    <option value="" disabled>
+                      e.g. Select property type
+                    </option>
+                    
                     {PROPERTY_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
