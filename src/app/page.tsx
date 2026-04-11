@@ -30,6 +30,7 @@ type ComparableRow = {
   latitude: number | string | null
   longitude: number | string | null
   unit_type?: string | null
+  floor_range?: string | null
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
@@ -225,6 +226,7 @@ export default function Home() {
       address: string | null
       street_name?: string | null
       project_name?: string | null
+      floor_range?: string | null
       floor_area_sqm: number
       transaction_price: number
       unit_type?: string | null
@@ -254,6 +256,9 @@ export default function Home() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
   const propertyCategory = getPropertyCategoryFromType(propertyType)
+  const showFloorRangeColumn = recentComparables.some(
+    (row) => row.floor_range && row.floor_range.trim() !== ''
+  )
 
   const searchAddress = async (value: string) => {
     if (value.trim().length < 3) {
@@ -715,7 +720,19 @@ export default function Home() {
     function escapeForOr(value: string) {
       return value.replace(/,/g, '').trim()
     }
-  
+    
+    function sortByLatestDateThenDistance<
+      T extends { transaction_date: string | null; distance_m: number }
+    >(rows: T[]) {
+      return [...rows].sort((a, b) => {
+        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+    
+        if (dateB !== dateA) return dateB - dateA
+        return a.distance_m - b.distance_m
+      })
+    }
+    
     const subjectFloorAreaSqm =
       category === 'landed'
         ? Number(sqftToSqm(landSizeSqm || builtUpSqm))
@@ -730,7 +747,7 @@ export default function Home() {
     let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type'
+        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_range'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
@@ -840,6 +857,7 @@ export default function Home() {
           latitude: rowLat,
           longitude: rowLon,
           unit_type: row.unit_type || null,
+          floor_range: row.floor_range || null,
           distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
           psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
         }
@@ -889,7 +907,9 @@ export default function Home() {
         return dateB - dateA
       })
   
-      return ranked.filter((row) => row._sizeBand !== 'different').slice(0, 10)
+      return sortByLatestDateThenDistance(
+        ranked.filter((row) => row._sizeBand !== 'different')
+      ).slice(0, 10)
     }
   
     if (category === 'condo') {
@@ -931,7 +951,10 @@ export default function Home() {
           return dateB - dateA
         })
   
-      return [...sameProjectRanked, ...nearbyOtherProjects].slice(0, 10)
+      return sortByLatestDateThenDistance([
+        ...sameProjectRanked,
+        ...nearbyOtherProjects,
+      ]).slice(0, 10)
     }
   
     if (category === 'landed') {
@@ -983,7 +1006,10 @@ export default function Home() {
           return dateB - dateA
         })
   
-      return [...sameClusterRanked, ...nearbyOtherClusters].slice(0, 10)
+      return sortByLatestDateThenDistance([
+        ...sameClusterRanked,
+        ...nearbyOtherClusters,
+      ]).slice(0, 10)
     }
   
     return []
@@ -1528,6 +1554,11 @@ export default function Home() {
                       <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
                         Address
                       </th>
+                      {showFloorRangeColumn && (
+                        <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                          Floor Range
+                        </th>
+                      )}
                       <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
                         Size (sqft)
                       </th>
@@ -1552,6 +1583,11 @@ export default function Home() {
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
                             {row.address || '-'}
                           </td>
+                          {showFloorRangeColumn && (
+                            <td className="px-5 py-4 text-sm text-[#2d3135]">
+                              {row.floor_range || '-'}
+                            </td>
+                          )}
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
                             {sqmToSqft(row.floor_area_sqm)}
                           </td>
@@ -1569,7 +1605,7 @@ export default function Home() {
                     ) : (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={showFloorRangeColumn ? 7 : 6}
                           className="px-5 py-8 text-center text-sm text-[#67707a]"
                         >
                           No recent comparables available yet.
