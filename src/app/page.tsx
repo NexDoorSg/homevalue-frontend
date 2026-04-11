@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
+import { rankComparables } from '@/lib/comparableRanking'
 
 type OneMapResult = {
   ADDRESS: string
