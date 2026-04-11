@@ -747,7 +747,7 @@ export default function Home() {
     let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type'
+        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_range'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
@@ -856,7 +856,7 @@ export default function Home() {
           latitude: rowLat,
           longitude: rowLon,
           unit_type: row.unit_type || null,
-          floor_range: null,
+          floor_range: row.floor_range || null,
           distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
           psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
         }
