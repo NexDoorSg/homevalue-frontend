@@ -586,20 +586,26 @@ export default function Home() {
     lat: number,
     lon: number,
     source: string,
-    targetPropertyType: string
+    targetPropertyType: string,
+    category: 'hdb' | 'condo' | 'landed'
   ) => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, transaction_date, transaction_price, floor_area_sqm, latitude, longitude'
+        'address, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type'
       )
       .eq('source', source)
-      .eq('unit_type', targetPropertyType)
       .not('transaction_price', 'is', null)
       .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .limit(5000)
+    
+    if (category === 'hdb') {
+      query = query.eq('unit_type', targetPropertyType)
+    }
+    
+    const { data, error } = await query
 
     if (error) {
       console.error('Comparable fetch error:', error)
@@ -635,7 +641,10 @@ export default function Home() {
           Number.isFinite(row.longitude)
       )
 
-    const searchRadius = [200, 400, 600, 800]
+    const searchRadius =
+      category === 'landed'
+        ? [500, 1000, 1500, 2000]
+        : [200, 400, 600, 800]
     for (const radius of searchRadius) {
       const withinRadius = cleaned
         .filter((row) => row.distance_m <= radius)
@@ -728,7 +737,8 @@ export default function Home() {
         selectedLat,
         selectedLon,
         source,
-        propertyType
+        propertyType,
+        propertyCategory
       )
 
       setRecentComparables(comparables)
