@@ -784,7 +784,27 @@ export default function Home() {
     }
   
     if (category === 'landed') {
-      query = query.limit(5000)
+      const landedVariants = Array.from(
+        new Set([
+          selectedStreetName ? normalizeText(selectedStreetName) : '',
+          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
+          subjectStreet,
+          subjectCluster,
+          normalizedAddress,
+          ...lookupCandidates.map((v) => normalizeText(v)),
+        ].filter(Boolean))
+      )
+    
+      const orParts = [
+        ...landedVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
+        ...landedVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
+      ]
+    
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(','))
+      }
+    
+      query = query.limit(2000)
     }
   
     const { data, error } = await query
@@ -935,50 +955,41 @@ export default function Home() {
         )
       })
     
-      const sameClusterRows = landedOnly.filter(
-        (row) => row._cluster && row._cluster === subjectCluster
-      )
+      const landedCandidates = landedOnly
+        .map((row) => {
+          const sameCluster =
+            !!row._cluster &&
+            !!subjectCluster &&
+            row._cluster === subjectCluster
     
-      const sameClusterRanked = [...sameClusterRows].sort((a, b) => {
-        const bucket = (row: (typeof sameClusterRows)[number]) => {
-          if (row._sizeBand === 'same') return 1
-          if (row._sizeBand === 'similar') return 2
-          return 99
-        }
+          const sameStreet =
+            !!row._normStreet &&
+            !!subjectStreet &&
+            row._normStreet === subjectStreet
     
-        const bucketDiff = bucket(a) - bucket(b)
-        if (bucketDiff !== 0) return bucketDiff
+          let priority = 999
     
-        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        if (dateB !== dateA) return dateB - dateA
+          if (sameStreet && row._sizeBand === 'same' && row.distance_m <= 500) priority = 1
+          else if (sameStreet && row._sizeBand === 'similar' && row.distance_m <= 500) priority = 2
+          else if (sameCluster && row._sizeBand === 'same' && row.distance_m <= 1000) priority = 3
+          else if (sameCluster && row._sizeBand === 'similar' && row.distance_m <= 1000) priority = 4
+          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 5
+          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 6
+          else if (row.distance_m <= 1000 && row._sizeBand === 'same') priority = 7
+          else if (row.distance_m <= 1000 && row._sizeBand === 'similar') priority = 8
+          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 9
+          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 10
+          else if (row.distance_m <= 3000) priority = 11
+          else if (row.distance_m <= 5000) priority = 12
     
-        return a.distance_m - b.distance_m
-      })
-    
-      let nearbyLimit =
-        preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 5000) : 5000
-    
-      if (sameClusterRanked.length < 8) nearbyLimit = Math.max(nearbyLimit, 8000)
-      if (sameClusterRanked.length < 5) nearbyLimit = Math.max(nearbyLimit, 12000)
-      if (sameClusterRanked.length < 3) nearbyLimit = Math.max(nearbyLimit, 15000)
-    
-      const nearbyOtherClusters = landedOnly
-        .filter((row) => row.distance_m <= nearbyLimit)
-        .sort((a, b) => {
-          const sameClusterA = a._cluster === subjectCluster
-          const sameClusterB = b._cluster === subjectCluster
-    
-          if (sameClusterA !== sameClusterB) return sameClusterA ? -1 : 1
-    
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-          if (dateB !== dateA) return dateB - dateA
-    
-          return a.distance_m - b.distance_m
+          return {
+            ...row,
+            _priority: priority,
+          }
         })
+        .filter((row) => row._priority < 999)
     
-      const deduped = nearbyOtherClusters.filter((row, index, arr) => {
+      const deduped = landedCandidates.filter((row, index, arr) => {
         const key = `${row.address}-${row.transaction_date}-${row.transaction_price}`
         return (
           index ===
@@ -989,7 +1000,17 @@ export default function Home() {
         )
       })
     
-      return deduped.slice(0, 10)
+      return [...deduped]
+        .sort((a, b) => {
+          if (a._priority !== b._priority) return a._priority - b._priority
+    
+          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+          if (dateB !== dateA) return dateB - dateA
+    
+          return a.distance_m - b.distance_m
+        })
+        .slice(0, 10)
     }
   
     return []
