@@ -601,7 +601,7 @@ export default function Home() {
     let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type'
+        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
@@ -609,18 +609,18 @@ export default function Home() {
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .limit(20000)
-    
+  
     if (category === 'hdb') {
       query = query.eq('unit_type', targetPropertyType)
     }
-    
+  
     const { data, error } = await query
-
+  
     if (error) {
       console.error('Comparable fetch error:', error)
       return []
     }
-
+  
     const cleaned = ((data || []) as ComparableRow[])
       .map((row) => {
         const transactionPrice = Number(row.transaction_price)
@@ -628,9 +628,10 @@ export default function Home() {
         const rowLat = Number(row.latitude)
         const rowLon = Number(row.longitude)
         const floorAreaSqft = floorArea * 10.7639
-
+  
         return {
           address: row.address,
+          street_name: row.street_name || null,
           project_name: row.project_name || null,
           transaction_date: row.transaction_date,
           transaction_price: transactionPrice,
@@ -651,21 +652,12 @@ export default function Home() {
           Number.isFinite(row.latitude) &&
           Number.isFinite(row.longitude)
       )
-
-    const targetProject =
-      category === 'condo'
-        ? (
-            [...cleaned]
-              .sort((a, b) => a.distance_m - b.distance_m)[0]?.project_name || ''
-          ).toUpperCase()
-        : ''
-    
+  
     let filtered = cleaned
-    
+  
     if (category === 'landed') {
       filtered = cleaned.filter((row) => {
         const unitType = (row.unit_type || '').toUpperCase()
-    
         return (
           unitType.includes('TERRACE') ||
           unitType.includes('SEMI') ||
@@ -674,29 +666,36 @@ export default function Home() {
         )
       })
     }
-    
+  
     if (category === 'condo') {
       filtered = cleaned.filter((row) => {
         const unitType = (row.unit_type || '').toUpperCase()
-    
         return (
           unitType.includes('BEDROOM') ||
           unitType.includes('PENTHOUSE') ||
           unitType.includes('CONDOMINIUM') ||
-          unitType.includes('APARTMENT')
+          unitType.includes('APARTMENT') ||
+          unitType.includes('EXECUTIVE CONDOMINIUM') ||
+          unitType.includes('EC')
         )
       })
     }
-
-    const searchRadius =
-      preferredRadius && preferredRadius > 0
-        ? [preferredRadius]
-        : category === 'landed'
-        ? [1000, 2000, 3000]
-        : category === 'condo'
-        ? [300, 600, 900, 1200, 1500]
-        : [200, 400, 600, 800, 1200]
-    
+  
+    const nearestRow = [...filtered].sort((a, b) => a.distance_m - b.distance_m)[0]
+  
+    const subjectFloorAreaSqm =
+      category === 'landed'
+        ? Number(sqftToSqm(landSizeSqm || builtUpSqm))
+        : Number(sqftToSqm(floorAreaSqm))
+  
+    const ranked = rankComparables(filtered, {
+      address,
+      street_name: nearestRow?.street_name || null,
+      project_name: nearestRow?.project_name || null,
+      floor_area_sqm: subjectFloorAreaSqm,
+      propertyCategory: category,
+    })
+  
     const maxDisplayDistance =
       preferredRadius && preferredRadius > 0
         ? preferredRadius
@@ -705,81 +704,8 @@ export default function Home() {
         : category === 'condo'
         ? 1500
         : 1200
-    for (const radius of searchRadius) {
-      const withinRadius = filtered
-        .filter((row) => row.distance_m <= radius)
-        .sort((a, b) => {
-          const getScore = (row: (typeof filtered)[number]) => {
-            let score = 0
-        
-            const rowProject = (row.project_name || '').toUpperCase()
-            const rowUnitType = (row.unit_type || '').toUpperCase()
-            const targetUnitType = targetPropertyType.toUpperCase()
-        
-            if (category === 'condo' && targetProject && rowProject === targetProject) {
-              score += 100
-            }
-        
-            if (rowUnitType === targetUnitType) {
-              score += 40
-            }
-        
-            score += Math.max(0, 30 - row.distance_m / 50)
-        
-            const dateValue = row.transaction_date
-              ? new Date(row.transaction_date).getTime()
-              : 0
-            score += dateValue / 1e13
-        
-            return score
-          }
-        
-          return getScore(b) - getScore(a)
-        })
-
-      if (withinRadius.length >= 5) {
-        return withinRadius.slice(0, 10)
-      }
-    }
-
-    const cappedFiltered = filtered.filter(
-      (row) => row.distance_m <= maxDisplayDistance
-    )
-    
-    if (cappedFiltered.length === 0) {
-      return []
-    }
-    
-    return cappedFiltered
-      .sort((a, b) => {
-        const getScore = (row: (typeof cappedFiltered)[number]) => {
-          let score = 0
-    
-          const rowProject = (row.project_name || '').toUpperCase()
-          const rowUnitType = (row.unit_type || '').toUpperCase()
-          const targetUnitType = targetPropertyType.toUpperCase()
-    
-          if (category === 'condo' && targetProject && rowProject === targetProject) {
-            score += 100
-          }
-    
-          if (rowUnitType === targetUnitType) {
-            score += 40
-          }
-    
-          score += Math.max(0, 30 - row.distance_m / 50)
-    
-          const dateValue = row.transaction_date
-            ? new Date(row.transaction_date).getTime()
-            : 0
-          score += dateValue / 1e13
-    
-          return score
-        }
-    
-        return getScore(b) - getScore(a)
-      })
-      .slice(0, 10)
+  
+    return ranked.filter((row) => row.distance_m <= maxDisplayDistance).slice(0, 10)
   }
 
   const handleUnlockReport = async () => {
