@@ -30,7 +30,7 @@ type ComparableRow = {
   latitude: number | string | null
   longitude: number | string | null
   unit_type?: string | null
-  floor_range?: string | null
+  floor_level?: string | null
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
@@ -226,7 +226,7 @@ export default function Home() {
       address: string | null
       street_name?: string | null
       project_name?: string | null
-      floor_range?: string | null
+      floor_level?: string | null
       floor_area_sqm: number
       transaction_price: number
       unit_type?: string | null
@@ -256,9 +256,11 @@ export default function Home() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
   const propertyCategory = getPropertyCategoryFromType(propertyType)
-  const showFloorRangeColumn = recentComparables.some(
-    (row) => row.floor_range && row.floor_range.trim() !== ''
-  )
+  const showFloorRangeColumn =
+    propertyCategory === 'hdb' &&
+    recentComparables.some(
+      (row) => row.floor_level && row.floor_level.trim() !== ''
+    )
 
   const searchAddress = async (value: string) => {
     if (value.trim().length < 3) {
@@ -747,7 +749,7 @@ export default function Home() {
     let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_range'
+        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
@@ -856,7 +858,7 @@ export default function Home() {
           latitude: rowLat,
           longitude: rowLon,
           unit_type: row.unit_type || null,
-          floor_range: row.floor_range || null,
+          floor_level: row.floor_level || null,
           distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
           psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
         }
@@ -1576,7 +1578,7 @@ export default function Home() {
                       </th>
                       {showFloorRangeColumn && (
                         <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
-                          Floor Range
+                          Floor Level
                         </th>
                       )}
                       <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
@@ -1605,7 +1607,7 @@ export default function Home() {
                           </td>
                           {showFloorRangeColumn && (
                             <td className="px-5 py-4 text-sm text-[#2d3135]">
-                              {row.floor_range || '-'}
+                              {row.floor_level || '-'}
                             </td>
                           )}
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
