@@ -710,17 +710,25 @@ export default function Home() {
       propertyCategory: category,
     })
   
-    const maxDisplayDistance =
-      preferredRadius && preferredRadius > 0
-        ? preferredRadius
-        : category === 'landed'
-        ? 3000
-        : category === 'condo'
-        ? 1500
-        : 1200
-  
-    return ranked.filter((row) => row.distance_m <= maxDisplayDistance).slice(0, 10)
-  }
+    const withinDistance = ranked.filter((row) => {
+      const maxDisplayDistance =
+        preferredRadius && preferredRadius > 0
+          ? preferredRadius
+          : category === 'landed'
+          ? 3000
+          : category === 'condo'
+          ? 1500
+          : 1200
+    
+      return row.distance_m <= maxDisplayDistance
+    })
+    
+    if (withinDistance.length >= 10) {
+      return withinDistance.slice(0, 10)
+    }
+    
+    return ranked.slice(0, 10)
+    }
 
   const handleUnlockReport = async () => {
     setUnlockMessage('')
