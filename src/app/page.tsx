@@ -934,7 +934,7 @@ export default function Home() {
                         </label>
                         <input
                           type="number"
-                          placeholder="e.g. 420"
+                          placeholder="e.g. 3200"
                           value={landSizeSqm}
                           onChange={(e) => setLandSizeSqm(e.target.value)}
                           className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
@@ -947,7 +947,7 @@ export default function Home() {
                         </label>
                         <input
                           type="number"
-                          placeholder="e.g. 650"
+                          placeholder="e.g. 4500"
                           value={builtUpSqm}
                           onChange={(e) => setBuiltUpSqm(e.target.value)}
                           className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
@@ -979,7 +979,7 @@ export default function Home() {
                     </label>
                     <input
                       type="number"
-                      placeholder="e.g. 177"
+                      placeholder="e.g. 990"
                       value={floorAreaSqm}
                       onChange={(e) => setFloorAreaSqm(e.target.value)}
                       className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
