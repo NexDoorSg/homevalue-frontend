@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
-import { rankComparables } from '@/lib/comparableRanking'
 
 type OneMapResult = {
   ADDRESS: string
@@ -685,6 +684,26 @@ export default function Home() {
       return normalizeProject(addressValue)
     }
   
+    function getLandedCluster(
+      streetName: string | null | undefined,
+      addressValue: string | null | undefined
+    ) {
+      const street = getEffectiveStreet(streetName, addressValue)
+      if (!street) return ''
+  
+      const parts = street.split(' ')
+      if (parts.length === 0) return ''
+  
+      if (
+        parts.length >= 2 &&
+        ['HILL', 'VIEW', 'PARK', 'GARDEN'].includes(parts[1])
+      ) {
+        return `${parts[0]} ${parts[1]}`
+      }
+  
+      return parts[0]
+    }
+  
     function getSizeBand(subjectSqm: number, rowSqm: number) {
       if (!subjectSqm || !rowSqm) return 'different'
       const diffRatio = Math.abs(rowSqm - subjectSqm) / subjectSqm
@@ -705,6 +724,7 @@ export default function Home() {
     const subjectStreet = getEffectiveStreet(selectedStreetName, address)
     const subjectProject = getEffectiveProject(selectedProjectName, address)
     const subjectBlock = extractBlock(address)
+    const subjectCluster = getLandedCluster(selectedStreetName, address)
     const normalizedAddress = normalizeText(address)
   
     let query = supabase
@@ -772,19 +792,20 @@ export default function Home() {
     }
   
     if (category === 'landed') {
-      const streetVariants = Array.from(
+      const landedVariants = Array.from(
         new Set([
           selectedStreetName ? normalizeText(selectedStreetName) : '',
           selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
           subjectStreet,
+          subjectCluster,
           normalizedAddress,
           ...lookupCandidates.map((v) => normalizeText(v)),
         ].filter(Boolean))
       )
   
       const orParts = [
-        ...streetVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
-        ...streetVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
+        ...landedVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
+        ...landedVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
       ]
   
       if (orParts.length > 0) {
@@ -838,6 +859,7 @@ export default function Home() {
       _normStreet: getEffectiveStreet(row.street_name, row.address),
       _normProject: getEffectiveProject(row.project_name, row.address),
       _block: extractBlock(row.address),
+      _cluster: getLandedCluster(row.street_name, row.address),
       _sizeBand: getSizeBand(subjectFloorAreaSqm, row.floor_area_sqm),
     }))
   
@@ -923,12 +945,12 @@ export default function Home() {
         )
       })
   
-      const sameStreetRows = landedOnly.filter(
-        (row) => row._normStreet && row._normStreet === subjectStreet
+      const sameClusterRows = landedOnly.filter(
+        (row) => row._cluster && row._cluster === subjectCluster
       )
   
-      const sameStreetRanked = [...sameStreetRows].sort((a, b) => {
-        const bucket = (row: (typeof sameStreetRows)[number]) => {
+      const sameClusterRanked = [...sameClusterRows].sort((a, b) => {
+        const bucket = (row: (typeof sameClusterRows)[number]) => {
           if (row._sizeBand === 'same') return 1
           if (row._sizeBand === 'similar') return 2
           return 99
@@ -946,10 +968,10 @@ export default function Home() {
       const nearbyLimit =
         preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 3000) : 3000
   
-      const nearbyOtherStreets = landedOnly
+      const nearbyOtherClusters = landedOnly
         .filter(
           (row) =>
-            row._normStreet !== subjectStreet &&
+            row._cluster !== subjectCluster &&
             row.distance_m <= nearbyLimit &&
             row._sizeBand !== 'different'
         )
@@ -961,7 +983,7 @@ export default function Home() {
           return dateB - dateA
         })
   
-      return [...sameStreetRanked, ...nearbyOtherStreets].slice(0, 10)
+      return [...sameClusterRanked, ...nearbyOtherClusters].slice(0, 10)
     }
   
     return []
