@@ -784,27 +784,7 @@ export default function Home() {
     }
   
     if (category === 'landed') {
-      const landedVariants = Array.from(
-        new Set([
-          selectedStreetName ? normalizeText(selectedStreetName) : '',
-          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
-          subjectStreet,
-          subjectCluster,
-          normalizedAddress,
-          ...lookupCandidates.map((v) => normalizeText(v)),
-        ].filter(Boolean))
-      )
-    
-      const orParts = [
-        ...landedVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
-        ...landedVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
-      ]
-    
-      if (orParts.length > 0) {
-        query = query.or(orParts.join(','))
-      }
-    
-      query = query.limit(2000)
+      query = query.limit(5000)
     }
   
     const { data, error } = await query
@@ -979,8 +959,8 @@ export default function Home() {
           else if (row.distance_m <= 2500 && row._sizeBand === 'similar') priority = 8
           else if (row.distance_m <= 4000 && row._sizeBand === 'same') priority = 9
           else if (row.distance_m <= 4000 && row._sizeBand === 'similar') priority = 10
-          else if (row.distance_m <= 6000) priority = 11
-          else if (row.distance_m <= 8000) priority = 12
+          else if (row.distance_m <= 5000) priority = 11
+          else if (row.distance_m <= 7000) priority = 12
     
           return {
             ...row,
