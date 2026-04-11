@@ -768,7 +768,6 @@ export default function Home() {
   
       const blockVariants = Array.from(
         new Set([
-          subjectBlock ? `${subjectBlock}` : '',
           normalizedAddress,
           ...lookupCandidates.map((v) => normalizeText(v)),
         ].filter(Boolean))
@@ -885,8 +884,12 @@ export default function Home() {
         const hdbCandidates = withNormalized
           .filter((row) => row._sizeBand !== 'different')
           .map((row) => {
-            const sameStreet = row._normStreet && row._normStreet === subjectStreet
-            const sameBlock = !!row._block && !!subjectBlock && row._block === subjectBlock
+            const sameStreet = !!row._normStreet && row._normStreet === subjectStreet
+            const sameBlock =
+              sameStreet &&
+              !!row._block &&
+              !!subjectBlock &&
+              row._block === subjectBlock
       
             let priority = 999
       
