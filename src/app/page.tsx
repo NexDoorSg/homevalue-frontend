@@ -784,27 +784,16 @@ export default function Home() {
     }
   
     if (category === 'landed') {
-      const landedVariants = Array.from(
-        new Set([
-          selectedStreetName ? normalizeText(selectedStreetName) : '',
-          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
-          subjectStreet,
-          subjectCluster,
-          normalizedAddress,
-          ...lookupCandidates.map((v) => normalizeText(v)),
-        ].filter(Boolean))
-      )
-    
-      const orParts = [
-        ...landedVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
-        ...landedVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
-      ]
-    
-      if (orParts.length > 0) {
-        query = query.or(orParts.join(','))
-      }
-    
-      query = query.limit(5000)
+      query = query
+        .or(
+          [
+            'unit_type.ilike.%TERRACE%',
+            'unit_type.ilike.%SEMI%',
+            'unit_type.ilike.%DETACHED%',
+            'unit_type.ilike.%BUNGALOW%',
+          ].join(',')
+        )
+        .limit(8000)
     }
   
     const { data, error } = await query
@@ -957,43 +946,40 @@ export default function Home() {
     
       const landedCandidates = landedOnly
         .map((row) => {
-          const sameCluster =
-            !!row._cluster &&
-            !!subjectCluster &&
-            row._cluster === subjectCluster
-    
           const sameStreet =
             !!row._normStreet &&
             !!subjectStreet &&
             row._normStreet === subjectStreet
     
-          let priority = 999
+          const sameCluster =
+            !!row._cluster &&
+            !!subjectCluster &&
+            row._cluster === subjectCluster
     
-          // 1) Goldhill / same exact street first
-          if (sameStreet && row.distance_m <= 1500) priority = 1
+          let bucket = 999
     
-          // 2) Same Goldhill cluster next
-          else if (sameCluster && row.distance_m <= 2500) priority = 2
+          // Goldhill / same exact street
+          if (sameStreet) bucket = 1
     
-          // 3) Same cluster but slightly wider
-          else if (sameCluster && row.distance_m <= 5000) priority = 3
+          // Same area cluster like GOLDHILL VIEW / DRIVE / RISE
+          else if (sameCluster) bucket = 2
     
-          // 4) Nearby landed with same/similar size
-          else if (row.distance_m <= 1500 && row._sizeBand === 'same') priority = 4
-          else if (row.distance_m <= 1500 && row._sizeBand === 'similar') priority = 5
-          else if (row.distance_m <= 3000 && row._sizeBand === 'same') priority = 6
-          else if (row.distance_m <= 3000 && row._sizeBand === 'similar') priority = 7
+          // Nearby landed with similar size
+          else if (row.distance_m <= 1500 && row._sizeBand === 'same') bucket = 3
+          else if (row.distance_m <= 1500 && row._sizeBand === 'similar') bucket = 4
+          else if (row.distance_m <= 3000 && row._sizeBand === 'same') bucket = 5
+          else if (row.distance_m <= 3000 && row._sizeBand === 'similar') bucket = 6
     
-          // 5) Broader nearby fallback
-          else if (row.distance_m <= 5000) priority = 8
-          else if (row.distance_m <= 8000) priority = 9
+          // Nearby fallback regardless of size
+          else if (row.distance_m <= 5000) bucket = 7
+          else if (row.distance_m <= 8000) bucket = 8
     
           return {
             ...row,
-            _priority: priority,
+            _bucket: bucket,
           }
         })
-        .filter((row) => row._priority < 999)
+        .filter((row) => row._bucket < 999)
     
       const deduped = landedCandidates.filter((row, index, arr) => {
         const key = `${row.address}-${row.transaction_date}-${row.transaction_price}`
@@ -1006,36 +992,35 @@ export default function Home() {
         )
       })
     
-      const sameStreetRows = deduped
-        .filter((row) => row._priority === 1)
-        .sort((a, b) => {
+      const sortRows = <T extends { transaction_date: string | null; distance_m: number }>(
+        rows: T[]
+      ) => {
+        return [...rows].sort((a, b) => {
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
           const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-          if (dateB !== dateA) return dateB - dateA
-          return a.distance_m - b.distance_m
-        })
     
-      const sameClusterRows = deduped
-        .filter((row) => row._priority === 2 || row._priority === 3)
-        .sort((a, b) => {
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
           if (dateB !== dateA) return dateB - dateA
           return a.distance_m - b.distance_m
         })
+      }
     
-      const fallbackRows = deduped
-        .filter((row) => row._priority >= 4)
-        .sort((a, b) => {
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-          if (dateB !== dateA) return dateB - dateA
-          return a.distance_m - b.distance_m
-        })
+      const sameStreetRows = sortRows(deduped.filter((row) => row._bucket === 1))
+      const sameClusterRows = sortRows(deduped.filter((row) => row._bucket === 2))
+      const nearSameRows = sortRows(
+        deduped.filter((row) => row._bucket === 3 || row._bucket === 4)
+      )
+      const nearSimilarRows = sortRows(
+        deduped.filter((row) => row._bucket === 5 || row._bucket === 6)
+      )
+      const fallbackRows = sortRows(
+        deduped.filter((row) => row._bucket === 7 || row._bucket === 8)
+      )
     
       const mixedRows = [
-        ...sameStreetRows.slice(0, 4),
+        ...sameStreetRows.slice(0, 3),
         ...sameClusterRows.slice(0, 3),
+        ...nearSameRows.slice(0, 2),
+        ...nearSimilarRows.slice(0, 1),
         ...fallbackRows.slice(0, 3),
       ]
     
