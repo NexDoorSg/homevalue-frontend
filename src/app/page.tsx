@@ -684,14 +684,17 @@ export default function Home() {
 
     const searchRadius =
       category === 'landed'
-        ? [500, 1000, 1500, 2000]
-        : [200, 400, 600, 800]
+        ? [1000, 2000, 3000]
+        : category === 'condo'
+        ? [300, 600, 900, 1200, 1500]
+        : [200, 400, 600, 800, 1200]
+    
     const maxDisplayDistance =
       category === 'landed'
         ? 3000
         : category === 'condo'
         ? 1500
-        : 800
+        : 1200
     for (const radius of searchRadius) {
       const withinRadius = filtered
         .filter((row) => row.distance_m <= radius)
