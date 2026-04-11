@@ -100,7 +100,21 @@ function getSearchRadius(propertyCategory: PropertyCategory) {
     return [300, 600, 900, 1200, 1500, 2000, 3000]
   }
 
-  return [200, 400, 600, 800, 1200]
+  return [300, 600, 900, 1200, 1500]
+}
+
+function getBoundingBox(lat: number, lon: number, radiusM: number) {
+  const latDelta = radiusM / 111000
+  const cosLat = Math.cos((lat * Math.PI) / 180)
+  const safeCosLat = Math.max(Math.abs(cosLat), 0.2)
+  const lonDelta = radiusM / (111000 * safeCosLat)
+
+  return {
+    minLat: lat - latDelta,
+    maxLat: lat + latDelta,
+    minLon: lon - lonDelta,
+    maxLon: lon + lonDelta,
+  }
 }
 
 function getLandedGroup(propertyType: string) {
@@ -215,15 +229,15 @@ function getRecencyWeight(
   if (daysOld === null) return 1
 
   if (propertyCategory === 'landed') {
-    if (daysOld <= 90) return 1.18
-    if (daysOld <= 180) return 1.1
+    if (daysOld <= 90) return 1.15
+    if (daysOld <= 180) return 1.08
     if (daysOld <= 365) return 1
     if (daysOld <= 730) return 0.94
     return 0.88
   }
 
-  if (daysOld <= 90) return 1.22
-  if (daysOld <= 180) return 1.12
+  if (daysOld <= 90) return 1.2
+  if (daysOld <= 180) return 1.1
   if (daysOld <= 365) return 1
   if (daysOld <= 730) return 0.94
   return 0.88
@@ -245,66 +259,48 @@ function getFloorWeight(subjectFloor?: number, comparableFloor?: number | null) 
 
   const diff = Math.abs(subjectFloor - comparableFloor)
 
-  if (diff <= 2) return 1.06
-  if (diff <= 5) return 1.03
+  if (diff <= 2) return 1.05
+  if (diff <= 5) return 1.02
   if (diff <= 10) return 1
-  if (diff <= 15) return 0.97
-  return 0.94
+  if (diff <= 15) return 0.98
+  return 0.95
 }
 
-async function fetchBaseRows(
+async function fetchRowsForRadius(
+  lat: number,
+  lon: number,
+  radiusM: number,
   propertyType: string,
   propertyCategory: PropertyCategory
 ) {
   const source = propertyCategory === 'hdb' ? 'data_gov_hdb' : 'ura_private'
+  const box = getBoundingBox(lat, lon, radiusM)
 
-  if (propertyCategory === 'landed') {
-    const { data, error } = await supabase
-      .from('property_transactions_v2')
-      .select(
-        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
-      )
-      .eq('source', source)
-      .not('transaction_price', 'is', null)
-      .not('floor_area_sqm', 'is', null)
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null)
-      .limit(30000)
-
-    return { data, error }
-  }
-
-  if (propertyCategory === 'condo') {
-    const { data, error } = await supabase
-      .from('property_transactions_v2')
-      .select(
-        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
-      )
-      .eq('source', source)
-      .not('transaction_price', 'is', null)
-      .not('floor_area_sqm', 'is', null)
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null)
-      .limit(15000)
-
-    return { data, error }
-  }
-
-  const normalized = normalizeText(propertyType)
-
-  const { data, error } = await supabase
+  let query = supabase
     .from('property_transactions_v2')
     .select(
       'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
     )
     .eq('source', source)
-    .eq('unit_type', normalized)
+    .gte('latitude', box.minLat)
+    .lte('latitude', box.maxLat)
+    .gte('longitude', box.minLon)
+    .lte('longitude', box.maxLon)
     .not('transaction_price', 'is', null)
     .not('floor_area_sqm', 'is', null)
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
-    .limit(8000)
+    .order('transaction_date', { ascending: false })
 
+  if (propertyCategory === 'hdb') {
+    query = query.eq('unit_type', normalizeText(propertyType)).limit(1000)
+  } else if (propertyCategory === 'condo') {
+    query = query.limit(2000)
+  } else {
+    query = query.limit(3000)
+  }
+
+  const { data, error } = await query
   return { data, error }
 }
 
@@ -339,7 +335,7 @@ function cleanRows(
         address: row.address || null,
         pricePerSqm: transactionPrice / areaSqm,
         pricePerSqft,
-        distanceM: distanceInMeters(rowLat, rowLon, lat, lon),
+        distanceM: distanceInMeters(lat, lon, rowLat, rowLon),
         parsedFloorLevel: parseFloorLevelFromAddress(row.address),
       }
     })
@@ -393,18 +389,18 @@ function pickPreferredNonLandedRows(
   const normalizedSubjectProject = normalizeText(subjectProjectName)
 
   const strictSizeFiltered = rows.filter((row) => {
-    const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
-    return sizeDiffRatio <= 0.15
+    const ratio = row.floor_area_sqm / floorAreaSqm
+    return ratio >= 0.9 && ratio <= 1.1
   })
 
   const mediumSizeFiltered = rows.filter((row) => {
-    const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
-    return sizeDiffRatio <= 0.25
+    const ratio = row.floor_area_sqm / floorAreaSqm
+    return ratio >= 0.8 && ratio <= 1.2
   })
 
   const broadSizeFiltered = rows.filter((row) => {
-    const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
-    return sizeDiffRatio <= 0.35
+    const ratio = row.floor_area_sqm / floorAreaSqm
+    return ratio >= 0.7 && ratio <= 1.3
   })
 
   const baseRows =
@@ -422,34 +418,6 @@ function pickPreferredNonLandedRows(
     )
 
     if (sameProjectRows.length >= 2) {
-      return sameProjectRows
-    }
-  }
-
-  const projectCounts = new Map<string, number>()
-
-  for (const row of baseRows) {
-    const project = normalizeText(row.project_name)
-    if (!project) continue
-    projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
-  }
-
-  let bestProject: string | null = null
-  let bestCount = 0
-
-  for (const [project, count] of projectCounts.entries()) {
-    if (count > bestCount) {
-      bestProject = project
-      bestCount = count
-    }
-  }
-
-  if (bestProject && bestCount >= 3) {
-    const sameProjectRows = baseRows.filter(
-      (row) => normalizeText(row.project_name) === bestProject
-    )
-
-    if (sameProjectRows.length >= 3) {
       return sameProjectRows
     }
   }
@@ -490,18 +458,12 @@ function buildNonLandedCandidate(
     const sameProjectWeight =
       normalizedSubjectProject &&
       normalizeText(row.project_name) === normalizedSubjectProject
-        ? 1.35
+        ? 1.2
         : 1
 
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
 
-    return (
-      distanceWeight *
-      sizeWeight *
-      recencyWeight *
-      sameProjectWeight *
-      floorWeight
-    )
+    return distanceWeight * sizeWeight * recencyWeight * sameProjectWeight * floorWeight
   })
 
   const avgPsm = weightedAverage(values, weights)
@@ -510,10 +472,10 @@ function buildNonLandedCandidate(
   const estimated = avgPsm * floorAreaSqm
 
   const spread =
-    usable.length >= 6 ? 0.06 :
-    usable.length >= 4 ? 0.08 :
-    usable.length >= 2 ? 0.12 :
-    0.15
+    usable.length >= 6 ? 0.05 :
+    usable.length >= 4 ? 0.07 :
+    usable.length >= 2 ? 0.1 :
+    0.12
 
   return {
     estimated,
@@ -542,7 +504,6 @@ function buildNonLandedFallback(
     const sameProjectRows = fallbackPool.filter(
       (row) => normalizeText(row.project_name) === normalizedSubjectProject
     )
-
     if (sameProjectRows.length >= 1) {
       fallbackPool = sameProjectRows
     }
@@ -550,7 +511,7 @@ function buildNonLandedFallback(
 
   const similarSizeRows = fallbackPool.filter((row) => {
     const ratio = row.floor_area_sqm / floorAreaSqm
-    return ratio >= 0.7 && ratio <= 1.4
+    return ratio >= 0.75 && ratio <= 1.35
   })
 
   if (similarSizeRows.length >= 2) {
@@ -573,18 +534,12 @@ function buildNonLandedFallback(
     const sameProjectWeight =
       normalizedSubjectProject &&
       normalizeText(row.project_name) === normalizedSubjectProject
-        ? 1.25
+        ? 1.15
         : 1
 
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
 
-    return (
-      distanceWeight *
-      sizeWeight *
-      recencyWeight *
-      sameProjectWeight *
-      floorWeight
-    )
+    return distanceWeight * sizeWeight * recencyWeight * sameProjectWeight * floorWeight
   })
 
   const avgPsm = weightedAverage(values, weights)
@@ -594,8 +549,8 @@ function buildNonLandedFallback(
 
   return {
     estimated,
-    low: estimated * 0.85,
-    high: estimated * 1.15,
+    low: estimated * 0.88,
+    high: estimated * 1.12,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
     method: normalizedSubjectProject ? 'same_project_fallback' : 'broad_fallback'
@@ -612,12 +567,18 @@ function buildLandedCandidate(
 ): CandidateResult | null {
   if (rows.length === 0) return null
 
-  const similarSizeRows = rows.filter((row) => {
+  const exactTypeRows = rows.filter((row) =>
+    isMatchingLandedType(row.unit_type, propertyType)
+  )
+
+  const baseRows = exactTypeRows.length >= 2 ? exactTypeRows : rows
+
+  const similarSizeRows = baseRows.filter((row) => {
     const ratio = row.floor_area_sqm / landSizeSqm
-    return ratio >= 0.5 && ratio <= 1.5
+    return ratio >= 0.6 && ratio <= 1.4
   })
 
-  const candidateRows = similarSizeRows.length >= 3 ? similarSizeRows : rows
+  const candidateRows = similarSizeRows.length >= 3 ? similarSizeRows : baseRows
   const usable = trimRowsByMetric(candidateRows, (row) => row.pricePerSqft)
 
   if (usable.length === 0) return null
@@ -630,14 +591,14 @@ function buildLandedCandidate(
 
     const landSizeRatio = row.floor_area_sqm / landSizeSqm
     const sizeWeight =
-      landSizeRatio >= 0.7 && landSizeRatio <= 1.3
+      landSizeRatio >= 0.8 && landSizeRatio <= 1.2
         ? 1.2
-        : landSizeRatio >= 0.5 && landSizeRatio <= 1.5
+        : landSizeRatio >= 0.6 && landSizeRatio <= 1.4
         ? 1
-        : 0.6
+        : 0.65
 
     const rowTenureBucket = normalizeTenureBucket(row.tenure)
-    const tenureWeight = rowTenureBucket === subjectTenureBucket ? 1.2 : 0.9
+    const tenureWeight = rowTenureBucket === subjectTenureBucket ? 1.15 : 0.92
     const recencyWeight = getRecencyWeight(row.transaction_date, 'landed')
 
     return distanceWeight * sizeWeight * tenureWeight * recencyWeight
@@ -652,15 +613,15 @@ function buildLandedCandidate(
   const subjectRatio =
     builtUpSqm > 0 && landSizeSqm > 0 ? builtUpSqm / landSizeSqm : typicalRatio
   const ratioDelta = (subjectRatio - typicalRatio) / typicalRatio
-  const cappedAdjustment = Math.max(-0.05, Math.min(0.05, ratioDelta * 0.2))
+  const cappedAdjustment = Math.max(-0.04, Math.min(0.04, ratioDelta * 0.15))
 
   estimated = estimated * (1 + cappedAdjustment)
 
   const spread =
     usable.length >= 5 ? 0.08 :
     usable.length >= 3 ? 0.1 :
-    usable.length >= 2 ? 0.15 :
-    0.2
+    usable.length >= 2 ? 0.14 :
+    0.18
 
   return {
     estimated,
@@ -700,7 +661,7 @@ function buildLandedFallback(
 
   const similarSizeRows = fallbackPool.filter((row) => {
     const ratio = row.floor_area_sqm / landSizeSqm
-    return ratio >= 0.5 && ratio <= 1.5
+    return ratio >= 0.6 && ratio <= 1.4
   })
   if (similarSizeRows.length >= 2) {
     fallbackPool = similarSizeRows
@@ -720,11 +681,11 @@ function buildLandedFallback(
 
     const ratio = row.floor_area_sqm / landSizeSqm
     const sizeWeight =
-      ratio >= 0.7 && ratio <= 1.3
+      ratio >= 0.8 && ratio <= 1.2
         ? 1.15
-        : ratio >= 0.5 && ratio <= 1.5
+        : ratio >= 0.6 && ratio <= 1.4
         ? 1
-        : 0.65
+        : 0.7
 
     const recencyWeight = getRecencyWeight(row.transaction_date, 'landed')
     return distanceWeight * sizeWeight * recencyWeight
@@ -737,8 +698,8 @@ function buildLandedFallback(
 
   return {
     estimated,
-    low: estimated * 0.8,
-    high: estimated * 1.2,
+    low: estimated * 0.82,
+    high: estimated * 1.18,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
     method: 'landed_fallback'
@@ -757,24 +718,6 @@ export async function getValuation({
   floorLevel,
 }: ValuationParams) {
   const searchRadius = getSearchRadius(propertyCategory)
-  const { data, error } = await fetchBaseRows(propertyType, propertyCategory)
-
-  if (error) {
-    console.error('SUPABASE VALUATION ERROR:', error)
-    return null
-  }
-
-  if (!data || data.length === 0) {
-    console.log('No transactions found at fetch stage.')
-    return null
-  }
-
-  let cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
-
-  if (cleanedRows.length === 0) {
-    console.log('No usable cleaned rows after filtering.')
-    return null
-  }
 
   if (propertyCategory === 'landed') {
     if (!landSizeSqm || !builtUpSqm) {
@@ -782,30 +725,45 @@ export async function getValuation({
       return null
     }
 
-    const exactTypeRows = cleanedRows.filter((row) =>
-      isMatchingLandedType(row.unit_type, propertyType)
-    )
-    if (exactTypeRows.length > 0) {
-      cleanedRows = exactTypeRows
-    }
-
-    const subjectTenureBucket = getSubjectTenureBucket(tenure)
-
-    const sameTenureRows = cleanedRows.filter(
-      (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
-    )
-    if (sameTenureRows.length >= 3) {
-      cleanedRows = sameTenureRows
-    }
-
     let bestCandidate: CandidateResult | null = null
 
     for (const radius of searchRadius) {
-      const nearby = cleanedRows.filter((row) => row.distanceM <= radius)
-      if (nearby.length < 1) continue
+      const { data, error } = await fetchRowsForRadius(
+        lat,
+        lon,
+        radius,
+        propertyType,
+        propertyCategory
+      )
+
+      if (error) {
+        console.error('SUPABASE VALUATION ERROR:', error)
+        continue
+      }
+
+      if (!data || data.length === 0) continue
+
+      let cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
+      if (cleanedRows.length === 0) continue
+
+      const exactTypeRows = cleanedRows.filter((row) =>
+        isMatchingLandedType(row.unit_type, propertyType)
+      )
+      if (exactTypeRows.length > 0) {
+        cleanedRows = exactTypeRows
+      }
+
+      const subjectTenureBucket = getSubjectTenureBucket(tenure)
+
+      const sameTenureRows = cleanedRows.filter(
+        (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
+      )
+      if (sameTenureRows.length >= 2) {
+        cleanedRows = sameTenureRows
+      }
 
       const candidate = buildLandedCandidate(
-        nearby,
+        cleanedRows,
         radius,
         landSizeSqm,
         builtUpSqm,
@@ -847,57 +805,79 @@ export async function getValuation({
       }
     }
 
-    if (!bestCandidate) {
-      const fallback = buildLandedFallback(
-        cleanedRows,
-        landSizeSqm,
-        propertyType,
-        tenure
-      )
-      if (fallback) return fallback
-      return null
-    }
+    if (bestCandidate) return bestCandidate
 
-    return bestCandidate
+    const { data, error } = await fetchRowsForRadius(
+      lat,
+      lon,
+      8000,
+      propertyType,
+      propertyCategory
+    )
+
+    if (error || !data || data.length === 0) return null
+
+    const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
+    return buildLandedFallback(fallbackRows, landSizeSqm, propertyType, tenure)
   }
 
   let bestCandidate: CandidateResult | null = null
 
-  const sameTypeRows = cleanedRows.filter((row) =>
-    isMatchingNonLandedType(row.unit_type, propertyType)
-  )
+  for (const radius of searchRadius) {
+    const { data, error } = await fetchRowsForRadius(
+      lat,
+      lon,
+      radius,
+      propertyType,
+      propertyCategory
+    )
 
-  const valuationPool = sameTypeRows.length >= 3 ? sameTypeRows : cleanedRows
-
-  const detectedProjectName = (() => {
-    const projectCounts = new Map<string, number>()
-
-    for (const row of valuationPool) {
-      const project = normalizeText(row.project_name)
-      if (!project) continue
-      if (row.distanceM > 400) continue
-      projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
+    if (error) {
+      console.error('SUPABASE VALUATION ERROR:', error)
+      continue
     }
 
-    let bestProject: string | null = null
-    let bestCount = 0
+    if (!data || data.length === 0) continue
 
-    for (const [project, count] of projectCounts.entries()) {
-      if (count > bestCount) {
-        bestProject = project
-        bestCount = count
+    const cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
+    if (cleanedRows.length === 0) continue
+
+    let valuationPool = cleanedRows
+
+    if (propertyCategory === 'condo') {
+      const sameTypeRows = cleanedRows.filter((row) =>
+        isMatchingNonLandedType(row.unit_type, propertyType)
+      )
+      if (sameTypeRows.length >= 2) {
+        valuationPool = sameTypeRows
       }
     }
 
-    return bestProject
-  })()
+    const detectedProjectName = (() => {
+      const projectCounts = new Map<string, number>()
 
-  for (const radius of searchRadius) {
-    const nearby = valuationPool.filter((row) => row.distanceM <= radius)
-    if (nearby.length < 2) continue
+      for (const row of valuationPool) {
+        const project = normalizeText(row.project_name)
+        if (!project) continue
+        if (row.distanceM > Math.min(radius, 400)) continue
+        projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
+      }
+
+      let bestProject: string | null = null
+      let bestCount = 0
+
+      for (const [project, count] of projectCounts.entries()) {
+        if (count > bestCount) {
+          bestProject = project
+          bestCount = count
+        }
+      }
+
+      return bestProject
+    })()
 
     const candidate = buildNonLandedCandidate(
-      nearby,
+      valuationPool,
       radius,
       floorAreaSqm,
       propertyCategory,
@@ -939,17 +919,59 @@ export async function getValuation({
     }
   }
 
-  if (!bestCandidate) {
-    const fallback = buildNonLandedFallback(
-      valuationPool,
-      floorAreaSqm,
-      propertyCategory,
-      floorLevel,
-      detectedProjectName
+  if (bestCandidate) return bestCandidate
+
+  const fallbackRadius = propertyCategory === 'hdb' ? 2000 : 3000
+  const { data, error } = await fetchRowsForRadius(
+    lat,
+    lon,
+    fallbackRadius,
+    propertyType,
+    propertyCategory
+  )
+
+  if (error || !data || data.length === 0) return null
+
+  let fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
+  if (fallbackRows.length === 0) return null
+
+  if (propertyCategory === 'condo') {
+    const sameTypeRows = fallbackRows.filter((row) =>
+      isMatchingNonLandedType(row.unit_type, propertyType)
     )
-    if (fallback) return fallback
-    return null
+    if (sameTypeRows.length >= 2) {
+      fallbackRows = sameTypeRows
+    }
   }
 
-  return bestCandidate
+  const detectedProjectName = (() => {
+    const projectCounts = new Map<string, number>()
+
+    for (const row of fallbackRows) {
+      const project = normalizeText(row.project_name)
+      if (!project) continue
+      if (row.distanceM > 400) continue
+      projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
+    }
+
+    let bestProject: string | null = null
+    let bestCount = 0
+
+    for (const [project, count] of projectCounts.entries()) {
+      if (count > bestCount) {
+        bestProject = project
+        bestCount = count
+      }
+    }
+
+    return bestProject
+  })()
+
+  return buildNonLandedFallback(
+    fallbackRows,
+    floorAreaSqm,
+    propertyCategory,
+    floorLevel,
+    detectedProjectName
+  )
 }
