@@ -23,6 +23,7 @@ type PropertyTypeOption = {
 
 type ComparableRow = {
   address: string | null
+  street_name?: string | null
   project_name?: string | null
   transaction_date: string | null
   transaction_price: number | string | null
@@ -221,8 +222,11 @@ export default function Home() {
     Array<{
       transaction_date: string | null
       address: string | null
+      street_name?: string | null
+      project_name?: string | null
       floor_area_sqm: number
       transaction_price: number
+      unit_type?: string | null
       psf: number
       distance_m: number
     }>
