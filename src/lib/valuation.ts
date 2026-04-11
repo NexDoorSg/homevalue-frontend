@@ -11,6 +11,7 @@ type ValuationParams = {
   landSizeSqm?: number
   builtUpSqm?: number
   tenure?: string
+  floorLevel?: number
 }
 
 type TransactionRow = {
@@ -23,6 +24,7 @@ type TransactionRow = {
   price_psf?: number | string | null
   project_name?: string | null
   transaction_date?: string | null
+  address?: string | null
 }
 
 type CleanedRow = {
@@ -34,9 +36,11 @@ type CleanedRow = {
   tenure: string | null
   project_name: string | null
   transaction_date: string | null
+  address: string | null
   pricePerSqm: number
   pricePerSqft: number
   distanceM: number
+  parsedFloorLevel: number | null
 }
 
 type CandidateResult = {
@@ -45,6 +49,7 @@ type CandidateResult = {
   high: number
   comparables: number
   radius: number
+  method?: string
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -92,7 +97,7 @@ function getSearchRadius(propertyCategory: PropertyCategory) {
   }
 
   if (propertyCategory === 'condo') {
-    return [300, 600, 900, 1200, 1500, 2000]
+    return [300, 600, 900, 1200, 1500, 2000, 3000]
   }
 
   return [200, 400, 600, 800, 1200]
@@ -210,18 +215,41 @@ function getRecencyWeight(
   if (daysOld === null) return 1
 
   if (propertyCategory === 'landed') {
-    if (daysOld <= 90) return 1.15
-    if (daysOld <= 180) return 1.08
+    if (daysOld <= 90) return 1.18
+    if (daysOld <= 180) return 1.1
     if (daysOld <= 365) return 1
-    if (daysOld <= 730) return 0.95
-    return 0.9
+    if (daysOld <= 730) return 0.94
+    return 0.88
   }
 
-  if (daysOld <= 90) return 1.2
-  if (daysOld <= 180) return 1.1
+  if (daysOld <= 90) return 1.22
+  if (daysOld <= 180) return 1.12
   if (daysOld <= 365) return 1
-  if (daysOld <= 730) return 0.95
-  return 0.9
+  if (daysOld <= 730) return 0.94
+  return 0.88
+}
+
+function parseFloorLevelFromAddress(address: string | null | undefined) {
+  const text = normalizeText(address)
+  if (!text) return null
+
+  const match = text.match(/#(\d{1,2})-\d+/)
+  if (!match) return null
+
+  const level = Number(match[1])
+  return Number.isFinite(level) ? level : null
+}
+
+function getFloorWeight(subjectFloor?: number, comparableFloor?: number | null) {
+  if (!subjectFloor || !comparableFloor) return 1
+
+  const diff = Math.abs(subjectFloor - comparableFloor)
+
+  if (diff <= 2) return 1.06
+  if (diff <= 5) return 1.03
+  if (diff <= 10) return 1
+  if (diff <= 15) return 0.97
+  return 0.94
 }
 
 async function fetchBaseRows(
@@ -234,14 +262,14 @@ async function fetchBaseRows(
     const { data, error } = await supabase
       .from('property_transactions_v2')
       .select(
-        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date'
+        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
       .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
-      .limit(20000)
+      .limit(30000)
 
     return { data, error }
   }
@@ -250,14 +278,14 @@ async function fetchBaseRows(
     const { data, error } = await supabase
       .from('property_transactions_v2')
       .select(
-        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date'
+        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
       .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
-      .limit(10000)
+      .limit(15000)
 
     return { data, error }
   }
@@ -267,7 +295,7 @@ async function fetchBaseRows(
   const { data, error } = await supabase
     .from('property_transactions_v2')
     .select(
-      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date'
+      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
     )
     .eq('source', source)
     .eq('unit_type', normalized)
@@ -275,7 +303,7 @@ async function fetchBaseRows(
     .not('floor_area_sqm', 'is', null)
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
-    .limit(5000)
+    .limit(8000)
 
   return { data, error }
 }
@@ -308,9 +336,11 @@ function cleanRows(
         tenure: row.tenure || null,
         project_name: row.project_name || null,
         transaction_date: row.transaction_date || null,
+        address: row.address || null,
         pricePerSqm: transactionPrice / areaSqm,
         pricePerSqft,
         distanceM: distanceInMeters(rowLat, rowLon, lat, lon),
+        parsedFloorLevel: parseFloorLevelFromAddress(row.address),
       }
     })
     .filter(
@@ -357,28 +387,48 @@ function trimRowsByMetric(
 
 function pickPreferredNonLandedRows(
   rows: CleanedRow[],
-  floorAreaSqm: number
+  floorAreaSqm: number,
+  subjectProjectName?: string | null
 ) {
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
+
   const strictSizeFiltered = rows.filter((row) => {
     const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
-    return sizeDiffRatio <= 0.2
+    return sizeDiffRatio <= 0.15
   })
 
   const mediumSizeFiltered = rows.filter((row) => {
     const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
-    return sizeDiffRatio <= 0.3
+    return sizeDiffRatio <= 0.25
   })
 
-  const candidateRows =
+  const broadSizeFiltered = rows.filter((row) => {
+    const sizeDiffRatio = Math.abs(row.floor_area_sqm - floorAreaSqm) / floorAreaSqm
+    return sizeDiffRatio <= 0.35
+  })
+
+  const baseRows =
     strictSizeFiltered.length >= 3
       ? strictSizeFiltered
       : mediumSizeFiltered.length >= 3
       ? mediumSizeFiltered
+      : broadSizeFiltered.length >= 3
+      ? broadSizeFiltered
       : rows
+
+  if (normalizedSubjectProject) {
+    const sameProjectRows = baseRows.filter(
+      (row) => normalizeText(row.project_name) === normalizedSubjectProject
+    )
+
+    if (sameProjectRows.length >= 2) {
+      return sameProjectRows
+    }
+  }
 
   const projectCounts = new Map<string, number>()
 
-  for (const row of candidateRows) {
+  for (const row of baseRows) {
     const project = normalizeText(row.project_name)
     if (!project) continue
     projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
@@ -395,7 +445,7 @@ function pickPreferredNonLandedRows(
   }
 
   if (bestProject && bestCount >= 3) {
-    const sameProjectRows = candidateRows.filter(
+    const sameProjectRows = baseRows.filter(
       (row) => normalizeText(row.project_name) === bestProject
     )
 
@@ -404,56 +454,54 @@ function pickPreferredNonLandedRows(
     }
   }
 
-  return candidateRows
+  return baseRows
 }
 
 function buildNonLandedCandidate(
   rows: CleanedRow[],
   radius: number,
-  floorAreaSqm: number
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel?: number,
+  subjectProjectName?: string | null
 ): CandidateResult | null {
   if (rows.length === 0) return null
 
-  const preferredRows = pickPreferredNonLandedRows(rows, floorAreaSqm)
+  const preferredRows = pickPreferredNonLandedRows(
+    rows,
+    floorAreaSqm,
+    subjectProjectName
+  )
   const usable = trimRowsByMetric(preferredRows, (row) => row.pricePerSqm)
 
   if (usable.length === 0) return null
 
-  const dominantProject = (() => {
-    const counts = new Map<string, number>()
-
-    for (const row of usable) {
-      const project = normalizeText(row.project_name)
-      if (!project) continue
-      counts.set(project, (counts.get(project) || 0) + 1)
-    }
-
-    let bestProject: string | null = null
-    let bestCount = 0
-
-    for (const [project, count] of counts.entries()) {
-      if (count > bestCount) {
-        bestProject = project
-        bestCount = count
-      }
-    }
-
-    return bestProject
-  })()
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
 
   const values = usable.map((row) => row.pricePerSqm)
   const weights = usable.map((row) => {
     const distanceWeight = 1 / Math.max(row.distanceM, 50)
+
     const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
     const sizeWeight = 1 / Math.max(sizeDiff, 5)
-    const recencyWeight = getRecencyWeight(row.transaction_date, 'condo')
 
-    const projectWeight =
-      dominantProject && normalizeText(row.project_name) === dominantProject
-        ? 1.15
+    const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
+
+    const sameProjectWeight =
+      normalizedSubjectProject &&
+      normalizeText(row.project_name) === normalizedSubjectProject
+        ? 1.35
         : 1
 
-    return distanceWeight * sizeWeight * recencyWeight * projectWeight
+    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
+
+    return (
+      distanceWeight *
+      sizeWeight *
+      recencyWeight *
+      sameProjectWeight *
+      floorWeight
+    )
   })
 
   const avgPsm = weightedAverage(values, weights)
@@ -473,18 +521,45 @@ function buildNonLandedCandidate(
     high: estimated * (1 + spread),
     comparables: usable.length,
     radius,
+    method: normalizedSubjectProject ? 'same_project_or_nearby' : 'nearby'
   }
 }
 
 function buildNonLandedFallback(
   rows: CleanedRow[],
-  floorAreaSqm: number
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel?: number,
+  subjectProjectName?: string | null
 ): CandidateResult | null {
   if (rows.length === 0) return null
 
-  const fallbackRows = [...rows]
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
+
+  let fallbackPool = [...rows]
+
+  if (normalizedSubjectProject) {
+    const sameProjectRows = fallbackPool.filter(
+      (row) => normalizeText(row.project_name) === normalizedSubjectProject
+    )
+
+    if (sameProjectRows.length >= 1) {
+      fallbackPool = sameProjectRows
+    }
+  }
+
+  const similarSizeRows = fallbackPool.filter((row) => {
+    const ratio = row.floor_area_sqm / floorAreaSqm
+    return ratio >= 0.7 && ratio <= 1.4
+  })
+
+  if (similarSizeRows.length >= 2) {
+    fallbackPool = similarSizeRows
+  }
+
+  const fallbackRows = fallbackPool
     .sort((a, b) => a.distanceM - b.distanceM)
-    .slice(0, 5)
+    .slice(0, 6)
 
   if (fallbackRows.length === 0) return null
 
@@ -493,9 +568,23 @@ function buildNonLandedFallback(
     const distanceWeight = 1 / Math.max(row.distanceM, 50)
     const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
     const sizeWeight = 1 / Math.max(sizeDiff, 10)
-    const recencyWeight = getRecencyWeight(row.transaction_date, 'condo')
+    const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
 
-    return distanceWeight * sizeWeight * recencyWeight
+    const sameProjectWeight =
+      normalizedSubjectProject &&
+      normalizeText(row.project_name) === normalizedSubjectProject
+        ? 1.25
+        : 1
+
+    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
+
+    return (
+      distanceWeight *
+      sizeWeight *
+      recencyWeight *
+      sameProjectWeight *
+      floorWeight
+    )
   })
 
   const avgPsm = weightedAverage(values, weights)
@@ -509,6 +598,7 @@ function buildNonLandedFallback(
     high: estimated * 1.15,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
+    method: normalizedSubjectProject ? 'same_project_fallback' : 'broad_fallback'
   }
 }
 
@@ -578,6 +668,7 @@ function buildLandedCandidate(
     high: estimated * (1 + spread),
     comparables: usable.length,
     radius,
+    method: 'landed_nearby'
   }
 }
 
@@ -617,7 +708,7 @@ function buildLandedFallback(
 
   const fallbackRows = fallbackPool
     .sort((a, b) => a.distanceM - b.distanceM)
-    .slice(0, 5)
+    .slice(0, 6)
 
   if (fallbackRows.length === 0) return null
 
@@ -650,6 +741,7 @@ function buildLandedFallback(
     high: estimated * 1.2,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
+    method: 'landed_fallback'
   }
 }
 
@@ -662,6 +754,7 @@ export async function getValuation({
   landSizeSqm,
   builtUpSqm,
   tenure,
+  floorLevel,
 }: ValuationParams) {
   const searchRadius = getSearchRadius(propertyCategory)
   const { data, error } = await fetchBaseRows(propertyType, propertyCategory)
@@ -776,11 +869,41 @@ export async function getValuation({
 
   const valuationPool = sameTypeRows.length >= 3 ? sameTypeRows : cleanedRows
 
+  const detectedProjectName = (() => {
+    const projectCounts = new Map<string, number>()
+
+    for (const row of valuationPool) {
+      const project = normalizeText(row.project_name)
+      if (!project) continue
+      if (row.distanceM > 400) continue
+      projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
+    }
+
+    let bestProject: string | null = null
+    let bestCount = 0
+
+    for (const [project, count] of projectCounts.entries()) {
+      if (count > bestCount) {
+        bestProject = project
+        bestCount = count
+      }
+    }
+
+    return bestProject
+  })()
+
   for (const radius of searchRadius) {
     const nearby = valuationPool.filter((row) => row.distanceM <= radius)
     if (nearby.length < 2) continue
 
-    const candidate = buildNonLandedCandidate(nearby, radius, floorAreaSqm)
+    const candidate = buildNonLandedCandidate(
+      nearby,
+      radius,
+      floorAreaSqm,
+      propertyCategory,
+      floorLevel,
+      detectedProjectName
+    )
 
     if (!candidate) continue
 
@@ -817,7 +940,13 @@ export async function getValuation({
   }
 
   if (!bestCandidate) {
-    const fallback = buildNonLandedFallback(valuationPool, floorAreaSqm)
+    const fallback = buildNonLandedFallback(
+      valuationPool,
+      floorAreaSqm,
+      propertyCategory,
+      floorLevel,
+      detectedProjectName
+    )
     if (fallback) return fallback
     return null
   }
