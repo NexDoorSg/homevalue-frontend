@@ -969,18 +969,18 @@ export default function Home() {
     
           let priority = 999
     
-          if (sameStreet && row._sizeBand === 'same' && row.distance_m <= 500) priority = 1
-          else if (sameStreet && row._sizeBand === 'similar' && row.distance_m <= 500) priority = 2
-          else if (sameCluster && row._sizeBand === 'same' && row.distance_m <= 1000) priority = 3
-          else if (sameCluster && row._sizeBand === 'similar' && row.distance_m <= 1000) priority = 4
-          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 5
-          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 6
-          else if (row.distance_m <= 1000 && row._sizeBand === 'same') priority = 7
-          else if (row.distance_m <= 1000 && row._sizeBand === 'similar') priority = 8
-          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 9
-          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 10
-          else if (row.distance_m <= 3000) priority = 11
-          else if (row.distance_m <= 5000) priority = 12
+          if (sameStreet && row._sizeBand === 'same' && row.distance_m <= 1000) priority = 1
+          else if (sameStreet && row._sizeBand === 'similar' && row.distance_m <= 1000) priority = 2
+          else if (sameCluster && row._sizeBand === 'same' && row.distance_m <= 1500) priority = 3
+          else if (sameCluster && row._sizeBand === 'similar' && row.distance_m <= 1500) priority = 4
+          else if (row.distance_m <= 1000 && row._sizeBand === 'same') priority = 5
+          else if (row.distance_m <= 1000 && row._sizeBand === 'similar') priority = 6
+          else if (row.distance_m <= 2500 && row._sizeBand === 'same') priority = 7
+          else if (row.distance_m <= 2500 && row._sizeBand === 'similar') priority = 8
+          else if (row.distance_m <= 4000 && row._sizeBand === 'same') priority = 9
+          else if (row.distance_m <= 4000 && row._sizeBand === 'similar') priority = 10
+          else if (row.distance_m <= 6000) priority = 11
+          else if (row.distance_m <= 8000) priority = 12
     
           return {
             ...row,
