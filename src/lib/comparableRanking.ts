@@ -1,5 +1,5 @@
 function normalizeText(value: string | null | undefined) {
-  return (value || '').toUpperCase().trim()
+  return (value || '').toUpperCase().replace(/\s+/g, ' ').trim()
 }
 
 function extractHdbBlock(address: string | null | undefined) {
@@ -11,7 +11,42 @@ function extractHdbBlock(address: string | null | undefined) {
 }
 
 function normalizeStreetName(streetName: string | null | undefined) {
-  return normalizeText(streetName)
+  return (streetName || '')
+    .toUpperCase()
+    .replace(/\bBUKIT\b/g, 'BT')
+    .replace(/\bMOUNT\b/g, 'MT')
+    .replace(/\bSAINT\b/g, 'ST')
+    .replace(/\bAVENUE\b/g, 'AVE')
+    .replace(/\bSTREET\b/g, 'ST')
+    .replace(/\bROAD\b/g, 'RD')
+    .replace(/\bDRIVE\b/g, 'DR')
+    .replace(/\bCRESCENT\b/g, 'CRES')
+    .replace(/\bPLACE\b/g, 'PL')
+    .replace(/\bCLOSE\b/g, 'CL')
+    .replace(/\bLANE\b/g, 'LN')
+    .replace(/\bTERRACE\b/g, 'TER')
+    .replace(/\bBOULEVARD\b/g, 'BLVD')
+    .replace(/\bCENTRAL\b/g, 'CTRL')
+    .replace(/\bHEIGHTS\b/g, 'HTS')
+    .replace(/\bGARDENS\b/g, 'GDNS')
+    .replace(/\bNORTH\b/g, 'NTH')
+    .replace(/\bSOUTH\b/g, 'STH')
+    .replace(/\bEAST\b/g, 'EST')
+    .replace(/\bWEST\b/g, 'WEST')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function normalizeProjectName(projectName: string | null | undefined) {
+  return (projectName || '')
+    .toUpperCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\bEXECUTIVE CONDOMINIUM\b/g, 'EC')
+    .replace(/\bCONDOMINIUM\b/g, 'CONDO')
+    .replace(/\bAPARTMENTS\b/g, 'APT')
+    .replace(/\bAPARTMENT\b/g, 'APT')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function isSameHdbBlock(
@@ -40,8 +75,8 @@ function isSameProject(
   subjectProjectName: string | null | undefined,
   rowProjectName: string | null | undefined
 ) {
-  const subject = normalizeText(subjectProjectName)
-  const row = normalizeText(rowProjectName)
+  const subject = normalizeProjectName(subjectProjectName)
+  const row = normalizeProjectName(rowProjectName)
 
   return !!subject && !!row && subject === row
 }
@@ -118,7 +153,9 @@ export function rankComparables(
     }
 
     if (subject.propertyCategory === 'landed') {
-      const sameStreet = normalizeStreetName(subject.street_name) === normalizeStreetName(row.street_name)
+      const sameStreet =
+        normalizeStreetName(subject.street_name) ===
+        normalizeStreetName(row.street_name)
 
       if (sameStreet && sizeBand === 'same') bucket = 1
       else if (sameStreet && sizeBand === 'similar') bucket = 2
@@ -135,10 +172,10 @@ export function rankComparables(
     .flatMap(([, bucketRows]) =>
       bucketRows.sort((a, b) => {
         if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
-  
+
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-  
+
         return dateB - dateA
       })
     )
