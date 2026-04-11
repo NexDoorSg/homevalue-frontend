@@ -881,7 +881,6 @@ export default function Home() {
       _sizeBand: getSizeBand(subjectFloorAreaSqm, row.floor_area_sqm),
     }))
   
-    if (category === 'hdb') {
       if (category === 'hdb') {
         const hdbCandidates = withNormalized
           .filter((row) => row._sizeBand !== 'different')
