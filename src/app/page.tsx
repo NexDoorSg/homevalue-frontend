@@ -27,6 +27,7 @@ type ComparableRow = {
   floor_area_sqm: number | string | null
   latitude: number | string | null
   longitude: number | string | null
+  unit_type?: string | null
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
@@ -627,6 +628,7 @@ export default function Home() {
           floor_area_sqm: floorArea,
           latitude: rowLat,
           longitude: rowLon,
+          unit_type: row.unit_type || null,
           distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
           psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
         }
@@ -641,12 +643,40 @@ export default function Home() {
           Number.isFinite(row.longitude)
       )
 
+        let filtered = cleaned
+    
+    if (category === 'landed') {
+      filtered = cleaned.filter((row) => {
+        const unitType = (row.unit_type || '').toUpperCase()
+    
+        return (
+          unitType.includes('TERRACE') ||
+          unitType.includes('SEMI') ||
+          unitType.includes('DETACHED') ||
+          unitType.includes('BUNGALOW')
+        )
+      })
+    }
+    
+    if (category === 'condo') {
+      filtered = cleaned.filter((row) => {
+        const unitType = (row.unit_type || '').toUpperCase()
+    
+        return (
+          unitType.includes('BEDROOM') ||
+          unitType.includes('PENTHOUSE') ||
+          unitType.includes('CONDOMINIUM') ||
+          unitType.includes('APARTMENT')
+        )
+      })
+    }
+
     const searchRadius =
       category === 'landed'
         ? [500, 1000, 1500, 2000]
         : [200, 400, 600, 800]
     for (const radius of searchRadius) {
-      const withinRadius = cleaned
+      const withinRadius = filtered
         .filter((row) => row.distance_m <= radius)
         .sort((a, b) => {
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
@@ -659,7 +689,7 @@ export default function Home() {
       }
     }
 
-    return cleaned
+    return filtered
       .sort((a, b) => {
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
