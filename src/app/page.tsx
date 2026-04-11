@@ -954,48 +954,62 @@ export default function Home() {
           unitType.includes('BUNGALOW')
         )
       })
-  
+    
       const sameClusterRows = landedOnly.filter(
         (row) => row._cluster && row._cluster === subjectCluster
       )
-  
+    
       const sameClusterRanked = [...sameClusterRows].sort((a, b) => {
         const bucket = (row: (typeof sameClusterRows)[number]) => {
           if (row._sizeBand === 'same') return 1
           if (row._sizeBand === 'similar') return 2
           return 99
         }
-  
+    
         const bucketDiff = bucket(a) - bucket(b)
         if (bucketDiff !== 0) return bucketDiff
-        if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
-  
+    
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        return dateB - dateA
+        if (dateB !== dateA) return dateB - dateA
+    
+        return a.distance_m - b.distance_m
       })
-  
-      const nearbyLimit =
+    
+      let nearbyLimit =
         preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 5000) : 5000
-  
+    
+      if (sameClusterRanked.length < 8) nearbyLimit = Math.max(nearbyLimit, 8000)
+      if (sameClusterRanked.length < 5) nearbyLimit = Math.max(nearbyLimit, 12000)
+      if (sameClusterRanked.length < 3) nearbyLimit = Math.max(nearbyLimit, 15000)
+    
       const nearbyOtherClusters = landedOnly
-        .filter(
-          (row) =>
-            row._cluster !== subjectCluster &&
-            row.distance_m <= nearbyLimit
-        )
+        .filter((row) => row.distance_m <= nearbyLimit)
         .sort((a, b) => {
-          if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
-  
+          const sameClusterA = a._cluster === subjectCluster
+          const sameClusterB = b._cluster === subjectCluster
+    
+          if (sameClusterA !== sameClusterB) return sameClusterA ? -1 : 1
+    
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
           const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-          return dateB - dateA
+          if (dateB !== dateA) return dateB - dateA
+    
+          return a.distance_m - b.distance_m
         })
-  
-      return sortByLatestDateThenDistance([
-        ...sameClusterRanked,
-        ...nearbyOtherClusters,
-      ]).slice(0, 10)
+    
+      const deduped = nearbyOtherClusters.filter((row, index, arr) => {
+        const key = `${row.address}-${row.transaction_date}-${row.transaction_price}`
+        return (
+          index ===
+          arr.findIndex(
+            (item) =>
+              `${item.address}-${item.transaction_date}-${item.transaction_price}` === key
+          )
+        )
+      })
+    
+      return deduped.slice(0, 10)
     }
   
     return []
