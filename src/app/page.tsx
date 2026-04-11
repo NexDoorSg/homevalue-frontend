@@ -784,27 +784,7 @@ export default function Home() {
     }
   
     if (category === 'landed') {
-      const landedVariants = Array.from(
-        new Set([
-          selectedStreetName ? normalizeText(selectedStreetName) : '',
-          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
-          subjectStreet,
-          subjectCluster,
-          normalizedAddress,
-          ...lookupCandidates.map((v) => normalizeText(v)),
-        ].filter(Boolean))
-      )
-  
-      const orParts = [
-        ...landedVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
-        ...landedVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
-      ]
-  
-      if (orParts.length > 0) {
-        query = query.or(orParts.join(','))
-      }
-  
-      query = query.limit(1000)
+      query = query.limit(5000)
     }
   
     const { data, error } = await query
