@@ -899,10 +899,12 @@ export default function Home() {
             else if (sameBlock && row._sizeBand === 'similar') priority = 2
             else if (sameStreet && row._sizeBand === 'same') priority = 3
             else if (sameStreet && row._sizeBand === 'similar') priority = 4
-            else if (row.distance_m <= 300 && row._sizeBand === 'same') priority = 5
-            else if (row.distance_m <= 300 && row._sizeBand === 'similar') priority = 6
+            else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 5
+            else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 6
             else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 7
             else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 8
+            else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 9
+            else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 10
       
             return {
               ...row,
@@ -915,10 +917,10 @@ export default function Home() {
           .sort((a, b) => {
             const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
             const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-    
+      
             if (dateB !== dateA) return dateB - dateA
-            if (a._priority !== b._priority) return a._priority - b._priority
-            return a.distance_m - b.distance_m
+            if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
+            return a._priority - b._priority
           })
           .slice(0, 10)
       }
