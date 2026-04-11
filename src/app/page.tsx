@@ -661,6 +661,33 @@ export default function Home() {
       return match ? match[1] : ''
     }
   
+    function extractStreetFromAddress(value: string | null | undefined) {
+      const text = normalizeText(value)
+      if (!text) return ''
+      return text.replace(/^(\d+[A-Z]?)\s+/, '').trim()
+    }
+  
+    function getEffectiveStreet(
+      streetName: string | null | undefined,
+      addressValue: string | null | undefined
+    ) {
+      const direct = normalizeStreet(streetName)
+      if (direct) return direct
+  
+      const fromAddress = extractStreetFromAddress(addressValue)
+      return normalizeStreet(fromAddress)
+    }
+  
+    function getEffectiveProject(
+      projectName: string | null | undefined,
+      addressValue: string | null | undefined
+    ) {
+      const direct = normalizeProject(projectName)
+      if (direct) return direct
+  
+      return normalizeProject(addressValue)
+    }
+  
     function getSizeBand(subjectSqm: number, rowSqm: number) {
       if (!subjectSqm || !rowSqm) return 'different'
       const diffRatio = Math.abs(rowSqm - subjectSqm) / subjectSqm
@@ -674,8 +701,8 @@ export default function Home() {
         ? Number(sqftToSqm(landSizeSqm || builtUpSqm))
         : Number(sqftToSqm(floorAreaSqm))
   
-    const subjectStreet = normalizeStreet(selectedStreetName)
-    const subjectProject = normalizeProject(selectedProjectName)
+    const subjectStreet = getEffectiveStreet(selectedStreetName, address)
+    const subjectProject = getEffectiveProject(selectedProjectName, address)
     const subjectBlock = extractBlock(address)
   
     let query = supabase
@@ -735,20 +762,20 @@ export default function Home() {
   
     const withNormalized = cleaned.map((row) => ({
       ...row,
-      _normStreet: normalizeStreet(row.street_name || row.address),
-      _normProject: normalizeProject(row.project_name || row.address),
+      _normStreet: getEffectiveStreet(row.street_name, row.address),
+      _normProject: getEffectiveProject(row.project_name, row.address),
       _block: extractBlock(row.address),
       _sizeBand: getSizeBand(subjectFloorAreaSqm, row.floor_area_sqm),
     }))
   
     if (category === 'hdb') {
-      const sameStreet = withNormalized.filter(
+      const sameStreetRows = withNormalized.filter(
         (row) => row._normStreet && row._normStreet === subjectStreet
       )
   
-      const ranked = [...sameStreet].sort((a, b) => {
-        const bucket = (row: (typeof sameStreet)[number]) => {
-          const sameBlock = row._block && subjectBlock && row._block === subjectBlock
+      const ranked = [...sameStreetRows].sort((a, b) => {
+        const bucket = (row: (typeof sameStreetRows)[number]) => {
+          const sameBlock = !!row._block && !!subjectBlock && row._block === subjectBlock
           const sizeBand = row._sizeBand
   
           if (sameBlock && sizeBand === 'same') return 1
@@ -894,7 +921,6 @@ export default function Home() {
   
     return []
   }
-
   const handleUnlockReport = async () => {
     setUnlockMessage('')
 
