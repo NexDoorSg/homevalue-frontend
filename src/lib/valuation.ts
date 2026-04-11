@@ -119,13 +119,8 @@ function isMatchingLandedType(
 
   if (!row) return false
 
-  if (targetGroup === 'terrace') {
-    return row.includes('TERRACE')
-  }
-
-  if (targetGroup === 'semi') {
-    return row.includes('SEMI')
-  }
+  if (targetGroup === 'terrace') return row.includes('TERRACE')
+  if (targetGroup === 'semi') return row.includes('SEMI')
 
   if (targetGroup === 'detached') {
     return (
@@ -136,6 +131,27 @@ function isMatchingLandedType(
   }
 
   return false
+}
+
+function isMatchingNonLandedType(
+  rowUnitType: string | null,
+  requestedPropertyType: string
+) {
+  const row = normalizeText(rowUnitType)
+  const target = normalizeText(requestedPropertyType)
+
+  if (!row || !target) return false
+
+  if (target === 'PENTHOUSE') {
+    return row.includes('PENTHOUSE')
+  }
+
+  if (target.includes('BEDROOM')) {
+    const targetNumber = target.split(' ')[0]
+    return row.includes(targetNumber) && (row.includes('BED') || row.includes('BR'))
+  }
+
+  return row === target
 }
 
 function normalizeTenureBucket(value: string | null | undefined) {
@@ -162,15 +178,8 @@ function getSubjectTenureBucket(value: string | undefined) {
   const tenure = normalizeText(value)
 
   if (!tenure) return 'UNKNOWN'
-
-  if (tenure === 'FREEHOLD' || tenure === '999-YEAR') {
-    return 'FH_999'
-  }
-
-  if (tenure === '99-YEAR') {
-    return 'L99'
-  }
-
+  if (tenure === 'FREEHOLD' || tenure === '999-YEAR') return 'FH_999'
+  if (tenure === '99-YEAR') return 'L99'
   return 'OTHER'
 }
 
@@ -193,7 +202,10 @@ function getDaysOld(transactionDate: string | null) {
   return (Date.now() - txnTime) / (1000 * 60 * 60 * 24)
 }
 
-function getRecencyWeight(transactionDate: string | null, propertyCategory: PropertyCategory) {
+function getRecencyWeight(
+  transactionDate: string | null,
+  propertyCategory: PropertyCategory
+) {
   const daysOld = getDaysOld(transactionDate)
   if (daysOld === null) return 1
 
@@ -201,12 +213,14 @@ function getRecencyWeight(transactionDate: string | null, propertyCategory: Prop
     if (daysOld <= 90) return 1.15
     if (daysOld <= 180) return 1.08
     if (daysOld <= 365) return 1
+    if (daysOld <= 730) return 0.95
     return 0.9
   }
 
   if (daysOld <= 90) return 1.2
   if (daysOld <= 180) return 1.1
   if (daysOld <= 365) return 1
+  if (daysOld <= 730) return 0.95
   return 0.9
 }
 
@@ -228,6 +242,22 @@ async function fetchBaseRows(
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .limit(20000)
+
+    return { data, error }
+  }
+
+  if (propertyCategory === 'condo') {
+    const { data, error } = await supabase
+      .from('property_transactions_v2')
+      .select(
+        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date'
+      )
+      .eq('source', source)
+      .not('transaction_price', 'is', null)
+      .not('floor_area_sqm', 'is', null)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .limit(10000)
 
     return { data, error }
   }
@@ -303,25 +333,19 @@ function trimRowsByMetric(
   rows: CleanedRow[],
   metricGetter: (row: CleanedRow) => number
 ) {
-  if (rows.length < 5) {
-    return rows
-  }
+  if (rows.length < 5) return rows
 
   const metricValues = rows
     .map(metricGetter)
     .filter((value) => Number.isFinite(value) && value > 0)
     .sort((a, b) => a - b)
 
-  if (metricValues.length < 5) {
-    return rows
-  }
+  if (metricValues.length < 5) return rows
 
   const p10 = percentile(metricValues, 0.1)
   const p90 = percentile(metricValues, 0.9)
 
-  if (p10 === null || p90 === null) {
-    return rows
-  }
+  if (p10 === null || p90 === null) return rows
 
   const trimmed = rows.filter((row) => {
     const value = metricGetter(row)
@@ -420,10 +444,8 @@ function buildNonLandedCandidate(
   const values = usable.map((row) => row.pricePerSqm)
   const weights = usable.map((row) => {
     const distanceWeight = 1 / Math.max(row.distanceM, 50)
-
     const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
     const sizeWeight = 1 / Math.max(sizeDiff, 5)
-
     const recencyWeight = getRecencyWeight(row.transaction_date, 'condo')
 
     const projectWeight =
@@ -472,6 +494,7 @@ function buildNonLandedFallback(
     const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
     const sizeWeight = 1 / Math.max(sizeDiff, 10)
     const recencyWeight = getRecencyWeight(row.transaction_date, 'condo')
+
     return distanceWeight * sizeWeight * recencyWeight
   })
 
@@ -525,16 +548,13 @@ function buildLandedCandidate(
 
     const rowTenureBucket = normalizeTenureBucket(row.tenure)
     const tenureWeight = rowTenureBucket === subjectTenureBucket ? 1.2 : 0.9
-
     const recencyWeight = getRecencyWeight(row.transaction_date, 'landed')
 
     return distanceWeight * sizeWeight * tenureWeight * recencyWeight
   })
 
   const avgLandPsf = weightedAverage(values, weights)
-  if (!avgLandPsf || !Number.isFinite(avgLandPsf)) {
-    return null
-  }
+  if (!avgLandPsf || !Number.isFinite(avgLandPsf)) return null
 
   let estimated = avgLandPsf * landSizeSqft
 
@@ -579,6 +599,7 @@ function buildLandedFallback(
   }
 
   const subjectTenureBucket = getSubjectTenureBucket(tenure)
+
   const sameTenureRows = fallbackPool.filter(
     (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
   )
@@ -602,6 +623,7 @@ function buildLandedFallback(
 
   const landSizeSqft = landSizeSqm * 10.7639
   const values = fallbackRows.map((row) => row.pricePerSqft)
+
   const weights = fallbackRows.map((row) => {
     const distanceWeight = 1 / Math.max(row.distanceM, 100)
 
@@ -670,7 +692,6 @@ export async function getValuation({
     const exactTypeRows = cleanedRows.filter((row) =>
       isMatchingLandedType(row.unit_type, propertyType)
     )
-
     if (exactTypeRows.length > 0) {
       cleanedRows = exactTypeRows
     }
@@ -680,7 +701,6 @@ export async function getValuation({
     const sameTenureRows = cleanedRows.filter(
       (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
     )
-
     if (sameTenureRows.length >= 3) {
       cleanedRows = sameTenureRows
     }
@@ -741,9 +761,7 @@ export async function getValuation({
         propertyType,
         tenure
       )
-      if (fallback) {
-        return fallback
-      }
+      if (fallback) return fallback
       return null
     }
 
@@ -752,8 +770,14 @@ export async function getValuation({
 
   let bestCandidate: CandidateResult | null = null
 
+  const sameTypeRows = cleanedRows.filter((row) =>
+    isMatchingNonLandedType(row.unit_type, propertyType)
+  )
+
+  const valuationPool = sameTypeRows.length >= 3 ? sameTypeRows : cleanedRows
+
   for (const radius of searchRadius) {
-    const nearby = cleanedRows.filter((row) => row.distanceM <= radius)
+    const nearby = valuationPool.filter((row) => row.distanceM <= radius)
     if (nearby.length < 2) continue
 
     const candidate = buildNonLandedCandidate(nearby, radius, floorAreaSqm)
@@ -793,10 +817,8 @@ export async function getValuation({
   }
 
   if (!bestCandidate) {
-    const fallback = buildNonLandedFallback(cleanedRows, floorAreaSqm)
-    if (fallback) {
-      return fallback
-    }
+    const fallback = buildNonLandedFallback(valuationPool, floorAreaSqm)
+    if (fallback) return fallback
     return null
   }
 
