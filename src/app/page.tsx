@@ -211,6 +211,8 @@ export default function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedLat, setSelectedLat] = useState<number | null>(null)
   const [selectedLon, setSelectedLon] = useState<number | null>(null)
+  const [selectedStreetName, setSelectedStreetName] = useState<string | null>(null)
+  const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null)
   const [lookupCandidates, setLookupCandidates] = useState<string[]>([])
 
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
@@ -297,6 +299,8 @@ export default function Home() {
     setAddress(value)
     setSelectedLat(null)
     setSelectedLon(null)
+    setSelectedStreetName(null)
+    setSelectedProjectName(null)
     setLookupCandidates([])
     resetResults()
 
@@ -310,15 +314,21 @@ export default function Home() {
   }
 
   const handleSelectAddress = (item: OneMapResult) => {
-  setAddress(item.ADDRESS)
-  setSelectedLat(Number(item.LATITUDE))
-  setSelectedLon(Number(item.LONGITUDE))
-  setLookupCandidates(buildLookupCandidates(item))
-  resetResults()
-
-  setSuggestions([])
-  setShowSuggestions(false)
-}
+    setAddress(item.ADDRESS)
+    setSelectedLat(Number(item.LATITUDE))
+    setSelectedLon(Number(item.LONGITUDE))
+    setSelectedStreetName(item.ROAD_NAME ? item.ROAD_NAME.toUpperCase().trim() : null)
+    setSelectedProjectName(
+      item.BUILDING && item.BUILDING !== 'NIL'
+        ? item.BUILDING.toUpperCase().trim()
+        : null
+    )
+    setLookupCandidates(buildLookupCandidates(item))
+    resetResults()
+  
+    setSuggestions([])
+    setShowSuggestions(false)
+  }
 
   const resolveAddressForGeneration = async () => {
   if (selectedLat && selectedLon) {
@@ -353,6 +363,12 @@ export default function Home() {
 
     setSelectedLat(lat)
     setSelectedLon(lon)
+    setSelectedStreetName(chosen.ROAD_NAME ? chosen.ROAD_NAME.toUpperCase().trim() : null)
+    setSelectedProjectName(
+      chosen.BUILDING && chosen.BUILDING !== 'NIL'
+        ? chosen.BUILDING.toUpperCase().trim()
+        : null
+    )
     setLookupCandidates(buildLookupCandidates(chosen))
     setAddress(chosen.ADDRESS)
 
@@ -681,8 +697,6 @@ export default function Home() {
       })
     }
   
-    const nearestRow = [...filtered].sort((a, b) => a.distance_m - b.distance_m)[0]
-  
     const subjectFloorAreaSqm =
       category === 'landed'
         ? Number(sqftToSqm(landSizeSqm || builtUpSqm))
@@ -690,8 +704,8 @@ export default function Home() {
   
     const ranked = rankComparables(filtered, {
       address,
-      street_name: nearestRow?.street_name || null,
-      project_name: nearestRow?.project_name || null,
+      street_name: selectedStreetName,
+      project_name: selectedProjectName,
       floor_area_sqm: subjectFloorAreaSqm,
       propertyCategory: category,
     })
