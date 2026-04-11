@@ -134,6 +134,18 @@ function formatMoney(value: number | null) {
   return `$${Math.round(value).toLocaleString()}`
 }
 
+function sqftToSqm(value: string) {
+  const num = Number(value)
+  if (!num || num <= 0) return ''
+  return (num / 10.7639).toFixed(2)
+}
+
+function sqmToSqft(value: number | string | null) {
+  const num = Number(value)
+  if (!num || num <= 0) return ''
+  return Math.round(num * 10.7639).toString()
+}
+
 function formatTeaserMoney(value: number | null) {
   if (!value) return '$4XX,XXX'
 
@@ -396,15 +408,15 @@ export default function Home() {
         lon: resolved.lon,
         floorAreaSqm:
           propertyCategory === 'landed'
-            ? Number(builtUpSqm)
-            : Number(floorAreaSqm),
+            ? Number(sqftToSqm(builtUpSqm))
+            : Number(sqftToSqm(floorAreaSqm)),
         landSizeSqm:
           propertyCategory === 'landed'
-            ? Number(landSizeSqm)
+            ? Number(sqftToSqm(landSizeSqm))
             : undefined,
         builtUpSqm:
           propertyCategory === 'landed'
-            ? Number(builtUpSqm)
+            ? Number(sqftToSqm(builtUpSqm))
             : undefined,
         tenure: propertyCategory === 'landed' ? tenure : undefined,
         floorLevel: Number(floorLevel) || undefined,
@@ -918,7 +930,7 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                          Land size (sqm)
+                          Land size (sqft)
                         </label>
                         <input
                           type="number"
@@ -931,7 +943,7 @@ export default function Home() {
 
                       <div>
                         <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                          Built-up size (sqm)
+                          Built-up size (sqft)
                         </label>
                         <input
                           type="number"
@@ -963,7 +975,7 @@ export default function Home() {
                 ) : (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Floor area (sqm)
+                      Floor area (sqft)
                     </label>
                     <input
                       type="number"
@@ -1186,7 +1198,7 @@ export default function Home() {
                         Address
                       </th>
                       <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
-                        Size (sqm)
+                        Size (sqft)
                       </th>
                       <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
                         Price
@@ -1210,7 +1222,7 @@ export default function Home() {
                             {row.address || '-'}
                           </td>
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
-                            {row.floor_area_sqm.toLocaleString()}
+                            {sqmToSqft(row.floor_area_sqm)}
                           </td>
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
                             ${Math.round(row.transaction_price).toLocaleString()}
