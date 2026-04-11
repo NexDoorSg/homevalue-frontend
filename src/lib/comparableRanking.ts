@@ -103,7 +103,7 @@ export function rankComparables(
       else if (sameBlock && sizeBand === 'similar') bucket = 2
       else if (!sameBlock && sizeBand === 'same') bucket = 3
       else if (!sameBlock && sizeBand === 'similar') bucket = 4
-      else continue
+      else bucket = 5
     }
 
     if (subject.propertyCategory === 'condo') {
@@ -124,7 +124,7 @@ export function rankComparables(
       else if (sameStreet && sizeBand === 'similar') bucket = 2
       else if (!sameStreet && sizeBand === 'same') bucket = 3
       else if (!sameStreet && sizeBand === 'similar') bucket = 4
-      else continue
+      else bucket = 5
     }
 
     buckets[bucket].push(row)
@@ -134,11 +134,12 @@ export function rankComparables(
     .sort((a, b) => Number(a[0]) - Number(b[0]))
     .flatMap(([, bucketRows]) =>
       bucketRows.sort((a, b) => {
+        if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
+  
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-
-        if (dateB !== dateA) return dateB - dateA
-        return a.distance_m - b.distance_m
+  
+        return dateB - dateA
       })
     )
 
