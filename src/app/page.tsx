@@ -697,15 +697,71 @@ export default function Home() {
       })
     }
   
+    const dedupedMap = new Map<string, (typeof filtered)[number]>()
+  
+    for (const row of filtered) {
+      const key = [
+        row.address || '',
+        row.project_name || '',
+        row.street_name || '',
+        row.transaction_date || '',
+        Math.round(row.transaction_price),
+        row.floor_area_sqm,
+        row.unit_type || '',
+      ].join('|')
+  
+      if (!dedupedMap.has(key)) {
+        dedupedMap.set(key, row)
+      }
+    }
+  
+    const deduped = Array.from(dedupedMap.values())
+  
     const subjectFloorAreaSqm =
       category === 'landed'
         ? Number(sqftToSqm(landSizeSqm || builtUpSqm))
         : Number(sqftToSqm(floorAreaSqm))
   
-    const ranked = rankComparables(filtered, {
+    let subjectStreetName: string | null = null
+    let subjectProjectName: string | null = null
+  
+    if (category === 'hdb') {
+      const nearbySameType = deduped
+        .filter((row) => row.distance_m <= 1500)
+        .sort((a, b) => a.distance_m - b.distance_m)
+  
+      subjectStreetName =
+        nearbySameType[0]?.street_name ||
+        selectedStreetName ||
+        null
+    }
+  
+    if (category === 'condo') {
+      const nearbyProjects = deduped
+        .filter((row) => row.distance_m <= 500)
+        .sort((a, b) => a.distance_m - b.distance_m)
+  
+      subjectProjectName =
+        nearbyProjects[0]?.project_name ||
+        selectedProjectName ||
+        null
+    }
+  
+    if (category === 'landed') {
+      const nearbyLanded = deduped
+        .filter((row) => row.distance_m <= 1500)
+        .sort((a, b) => a.distance_m - b.distance_m)
+  
+      subjectStreetName =
+        nearbyLanded[0]?.street_name ||
+        selectedStreetName ||
+        null
+    }
+  
+    const ranked = rankComparables(deduped, {
       address,
-      street_name: selectedStreetName,
-      project_name: selectedProjectName,
+      street_name: subjectStreetName,
+      project_name: subjectProjectName,
       floor_area_sqm: subjectFloorAreaSqm,
       propertyCategory: category,
     })
@@ -718,15 +774,15 @@ export default function Home() {
         : category === 'condo'
         ? 1500
         : 1200
-    
+  
     const withinDistance = ranked.filter((row) => row.distance_m <= maxDisplayDistance)
-    
+  
     if (withinDistance.length > 0) {
       return withinDistance.slice(0, 10)
     }
-    
-    return ranked.slice(0, 10)
-    }
+  
+    return []
+  }
 
   const handleUnlockReport = async () => {
     setUnlockMessage('')
