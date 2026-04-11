@@ -490,8 +490,8 @@ export default function Home() {
       floor_area_sqm:
         propertyContextExists
           ? propertyCategory === 'landed'
-            ? Number(builtUpSqm || 0) || null
-            : Number(floorAreaSqm || 0) || null
+            ? Number(sqftToSqm(builtUpSqm)) || null
+            : Number(sqftToSqm(floorAreaSqm)) || null
           : null,
       tenure: propertyContextExists && propertyCategory === 'landed' ? tenure : null,
       plan: extra?.plan ?? null,
