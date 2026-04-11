@@ -710,20 +710,18 @@ export default function Home() {
       propertyCategory: category,
     })
   
-    const withinDistance = ranked.filter((row) => {
-      const maxDisplayDistance =
-        preferredRadius && preferredRadius > 0
-          ? preferredRadius
-          : category === 'landed'
-          ? 3000
-          : category === 'condo'
-          ? 1500
-          : 1200
+    const maxDisplayDistance =
+      preferredRadius && preferredRadius > 0
+        ? preferredRadius
+        : category === 'landed'
+        ? 3000
+        : category === 'condo'
+        ? 1500
+        : 1200
     
-      return row.distance_m <= maxDisplayDistance
-    })
+    const withinDistance = ranked.filter((row) => row.distance_m <= maxDisplayDistance)
     
-    if (withinDistance.length >= 10) {
+    if (withinDistance.length > 0) {
       return withinDistance.slice(0, 10)
     }
     
