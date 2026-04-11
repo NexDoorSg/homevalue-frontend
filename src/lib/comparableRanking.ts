@@ -1,3 +1,61 @@
+function normalizeText(value: string | null | undefined) {
+  return (value || '').toUpperCase().trim()
+}
+
+function extractHdbBlock(address: string | null | undefined) {
+  const text = normalizeText(address)
+  if (!text) return ''
+
+  const match = text.match(/^(\d+[A-Z]?)\b/)
+  return match ? match[1] : ''
+}
+
+function normalizeStreetName(streetName: string | null | undefined) {
+  return normalizeText(streetName)
+}
+
+function isSameHdbBlock(
+  subjectAddress: string | null | undefined,
+  subjectStreetName: string | null | undefined,
+  rowAddress: string | null | undefined,
+  rowStreetName: string | null | undefined
+) {
+  const subjectBlock = extractHdbBlock(subjectAddress)
+  const rowBlock = extractHdbBlock(rowAddress)
+
+  const subjectStreet = normalizeStreetName(subjectStreetName)
+  const rowStreet = normalizeStreetName(rowStreetName)
+
+  return (
+    !!subjectBlock &&
+    !!rowBlock &&
+    !!subjectStreet &&
+    !!rowStreet &&
+    subjectBlock === rowBlock &&
+    subjectStreet === rowStreet
+  )
+}
+
+function isSameProject(
+  subjectProjectName: string | null | undefined,
+  rowProjectName: string | null | undefined
+) {
+  const subject = normalizeText(subjectProjectName)
+  const row = normalizeText(rowProjectName)
+
+  return !!subject && !!row && subject === row
+}
+
+function getSizeBand(subjectSqm: number, rowSqm: number) {
+  if (!subjectSqm || !rowSqm) return 'different'
+
+  const diffRatio = Math.abs(rowSqm - subjectSqm) / subjectSqm
+
+  if (diffRatio <= 0.05) return 'same'
+  if (diffRatio <= 0.15) return 'similar'
+  return 'different'
+}
+
 export function rankComparables(
   rows: Array<{
     address: string | null
@@ -10,6 +68,7 @@ export function rankComparables(
     longitude: number
     unit_type?: string | null
     distance_m: number
+    psf: number
   }>,
   subject: {
     address: string
@@ -30,10 +89,8 @@ export function rankComparables(
 
   for (const row of rows) {
     const sizeBand = getSizeBand(subject.floor_area_sqm, row.floor_area_sqm)
-
     let bucket = 6
 
-    // ===== HDB LOGIC =====
     if (subject.propertyCategory === 'hdb') {
       const sameBlock = isSameHdbBlock(
         subject.address,
@@ -46,10 +103,9 @@ export function rankComparables(
       else if (sameBlock && sizeBand === 'similar') bucket = 2
       else if (!sameBlock && sizeBand === 'same') bucket = 3
       else if (!sameBlock && sizeBand === 'similar') bucket = 4
-      else continue // ignore bad matches
+      else continue
     }
 
-    // ===== CONDO / EC LOGIC =====
     if (subject.propertyCategory === 'condo') {
       const sameProject = isSameProject(subject.project_name, row.project_name)
 
@@ -58,32 +114,33 @@ export function rankComparables(
       else if (sameProject && sizeBand === 'different') bucket = 3
       else if (!sameProject && sizeBand === 'same') bucket = 4
       else if (!sameProject && sizeBand === 'similar') bucket = 5
-      else bucket = 6
+      else if (!sameProject && sizeBand === 'different') bucket = 6
     }
 
-    // landed will be added later
+    if (subject.propertyCategory === 'landed') {
+      const sameStreet = normalizeStreetName(subject.street_name) === normalizeStreetName(row.street_name)
+
+      if (sameStreet && sizeBand === 'same') bucket = 1
+      else if (sameStreet && sizeBand === 'similar') bucket = 2
+      else if (!sameStreet && sizeBand === 'same') bucket = 3
+      else if (!sameStreet && sizeBand === 'similar') bucket = 4
+      else continue
+    }
 
     buckets[bucket].push(row)
   }
 
-  // sort inside each bucket
-  const sortFn = (a: typeof rows[number], b: typeof rows[number]) => {
-    const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-    const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+  const sortedRows = Object.entries(buckets)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .flatMap(([, bucketRows]) =>
+      bucketRows.sort((a, b) => {
+        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
 
-    if (a.distance_m !== b.distance_m) {
-      return a.distance_m - b.distance_m
-    }
+        if (dateB !== dateA) return dateB - dateA
+        return a.distance_m - b.distance_m
+      })
+    )
 
-    return dateB - dateA
-  }
-
-  const result: typeof rows = []
-
-  for (let i = 1; i <= 6; i++) {
-    const sorted = buckets[i].sort(sortFn)
-    result.push(...sorted)
-  }
-
-  return result.slice(0, 10)
+  return sortedRows
 }
