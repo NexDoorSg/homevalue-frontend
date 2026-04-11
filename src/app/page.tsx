@@ -882,51 +882,54 @@ export default function Home() {
     }))
   
     if (category === 'hdb') {
-      const sameStreetRows = withNormalized.filter(
-        (row) => row._normStreet && row._normStreet === subjectStreet
-      )
-    
-      const rankedSameStreet = [...sameStreetRows].sort((a, b) => {
-        const bucket = (row: (typeof sameStreetRows)[number]) => {
-          const sameBlock = !!row._block && !!subjectBlock && row._block === subjectBlock
-          const sizeBand = row._sizeBand
-    
-          if (sameBlock && sizeBand === 'same') return 1
-          if (sameBlock && sizeBand === 'similar') return 2
-          if (!sameBlock && sizeBand === 'same') return 3
-          if (!sameBlock && sizeBand === 'similar') return 4
-          return 99
-        }
-    
-        const bucketDiff = bucket(a) - bucket(b)
-        if (bucketDiff !== 0) return bucketDiff
-    
-        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        if (dateB !== dateA) return dateB - dateA
-    
-        return a.distance_m - b.distance_m
-      })
-    
-      const nearbyFallback = withNormalized
-        .filter(
-          (row) =>
-            row._normStreet !== subjectStreet &&
-            row.distance_m <= 1200 &&
-            row._sizeBand !== 'different'
-        )
-        .sort((a, b) => {
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-          if (dateB !== dateA) return dateB - dateA
-          return a.distance_m - b.distance_m
-        })
-    
-      return sortByLatestDateThenDistance([
-        ...rankedSameStreet.filter((row) => row._sizeBand !== 'different'),
-        ...nearbyFallback,
-      ]).slice(0, 10)
-    }
+      if (category === 'hdb') {
+        const hdbCandidates = withNormalized
+          .filter((row) => row._sizeBand !== 'different')
+          .map((row) => {
+            const sameStreet = row._normStreet && row._normStreet === subjectStreet
+            const sameBlock = !!row._block && !!subjectBlock && row._block === subjectBlock
+      
+            let priority = 999
+      
+            if (sameBlock && row._sizeBand === 'same') priority = 1
+            else if (sameBlock && row._sizeBand === 'similar') priority = 2
+            else if (sameStreet && row._sizeBand === 'same') priority = 3
+            else if (sameStreet && row._sizeBand === 'similar') priority = 4
+            else if (row.distance_m <= 300 && row._sizeBand === 'same') priority = 5
+            else if (row.distance_m <= 300 && row._sizeBand === 'similar') priority = 6
+            else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 7
+            else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 8
+      
+            return {
+              ...row,
+              _priority: priority,
+            }
+          })
+          .filter((row) => row._priority < 999)
+      
+        return [...hdbCandidates]
+          .sort((a, b) => {
+            const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+            const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+      
+            const isStrongA = a._priority <= 2
+            const isStrongB = b._priority <= 2
+      
+            if (isStrongA && isStrongB) {
+              if (dateB !== dateA) return dateB - dateA
+              return a.distance_m - b.distance_m
+            }
+      
+            if (isStrongA !== isStrongB) {
+              return isStrongA ? -1 : 1
+            }
+      
+            if (dateB !== dateA) return dateB - dateA
+            if (a._priority !== b._priority) return a._priority - b._priority
+            return a.distance_m - b.distance_m
+          })
+          .slice(0, 10)
+      }
   
     if (category === 'condo') {
       const sameProjectRows = withNormalized.filter(
