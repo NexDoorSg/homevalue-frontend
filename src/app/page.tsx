@@ -885,31 +885,47 @@ export default function Home() {
       const sameStreetRows = withNormalized.filter(
         (row) => row._normStreet && row._normStreet === subjectStreet
       )
-  
-      const ranked = [...sameStreetRows].sort((a, b) => {
+    
+      const rankedSameStreet = [...sameStreetRows].sort((a, b) => {
         const bucket = (row: (typeof sameStreetRows)[number]) => {
           const sameBlock = !!row._block && !!subjectBlock && row._block === subjectBlock
           const sizeBand = row._sizeBand
-  
+    
           if (sameBlock && sizeBand === 'same') return 1
           if (sameBlock && sizeBand === 'similar') return 2
           if (!sameBlock && sizeBand === 'same') return 3
           if (!sameBlock && sizeBand === 'similar') return 4
           return 99
         }
-  
+    
         const bucketDiff = bucket(a) - bucket(b)
         if (bucketDiff !== 0) return bucketDiff
-        if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
-  
+    
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        return dateB - dateA
+        if (dateB !== dateA) return dateB - dateA
+    
+        return a.distance_m - b.distance_m
       })
-  
-      return sortByLatestDateThenDistance(
-        ranked.filter((row) => row._sizeBand !== 'different')
-      ).slice(0, 10)
+    
+      const nearbyFallback = withNormalized
+        .filter(
+          (row) =>
+            row._normStreet !== subjectStreet &&
+            row.distance_m <= 1200 &&
+            row._sizeBand !== 'different'
+        )
+        .sort((a, b) => {
+          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+          if (dateB !== dateA) return dateB - dateA
+          return a.distance_m - b.distance_m
+        })
+    
+      return sortByLatestDateThenDistance([
+        ...rankedSameStreet.filter((row) => row._sizeBand !== 'different'),
+        ...nearbyFallback,
+      ]).slice(0, 10)
     }
   
     if (category === 'condo') {
@@ -989,14 +1005,13 @@ export default function Home() {
       })
   
       const nearbyLimit =
-        preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 3000) : 3000
+        preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 5000) : 5000
   
       const nearbyOtherClusters = landedOnly
         .filter(
           (row) =>
             row._cluster !== subjectCluster &&
-            row.distance_m <= nearbyLimit &&
-            row._sizeBand !== 'different'
+            row.distance_m <= nearbyLimit
         )
         .sort((a, b) => {
           if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
