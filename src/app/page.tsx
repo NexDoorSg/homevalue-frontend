@@ -673,9 +673,7 @@ export default function Home() {
     ) {
       const direct = normalizeStreet(streetName)
       if (direct) return direct
-  
-      const fromAddress = extractStreetFromAddress(addressValue)
-      return normalizeStreet(fromAddress)
+      return normalizeStreet(extractStreetFromAddress(addressValue))
     }
   
     function getEffectiveProject(
@@ -684,7 +682,6 @@ export default function Home() {
     ) {
       const direct = normalizeProject(projectName)
       if (direct) return direct
-  
       return normalizeProject(addressValue)
     }
   
@@ -696,6 +693,10 @@ export default function Home() {
       return 'different'
     }
   
+    function escapeForOr(value: string) {
+      return value.replace(/,/g, '').trim()
+    }
+  
     const subjectFloorAreaSqm =
       category === 'landed'
         ? Number(sqftToSqm(landSizeSqm || builtUpSqm))
@@ -704,6 +705,7 @@ export default function Home() {
     const subjectStreet = getEffectiveStreet(selectedStreetName, address)
     const subjectProject = getEffectiveProject(selectedProjectName, address)
     const subjectBlock = extractBlock(address)
+    const normalizedAddress = normalizeText(address)
   
     let query = supabase
       .from('property_transactions_v2')
@@ -715,10 +717,81 @@ export default function Home() {
       .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
-      .limit(20000)
   
     if (category === 'hdb') {
       query = query.eq('unit_type', targetPropertyType)
+  
+      const streetVariants = Array.from(
+        new Set([
+          selectedStreetName ? normalizeText(selectedStreetName) : '',
+          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
+          subjectStreet,
+        ].filter(Boolean))
+      )
+  
+      const blockVariants = Array.from(
+        new Set([
+          subjectBlock ? `${subjectBlock}` : '',
+          normalizedAddress,
+          ...lookupCandidates.map((v) => normalizeText(v)),
+        ].filter(Boolean))
+      )
+  
+      const orParts = [
+        ...streetVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
+        ...blockVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
+      ]
+  
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(','))
+      }
+  
+      query = query.limit(1000)
+    }
+  
+    if (category === 'condo') {
+      const projectVariants = Array.from(
+        new Set([
+          selectedProjectName ? normalizeText(selectedProjectName) : '',
+          subjectProject,
+          normalizedAddress,
+          ...lookupCandidates.map((v) => normalizeText(v)),
+        ].filter(Boolean))
+      )
+  
+      const orParts = [
+        ...projectVariants.map((v) => `project_name.ilike.%${escapeForOr(v)}%`),
+        ...projectVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
+      ]
+  
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(','))
+      }
+  
+      query = query.limit(1000)
+    }
+  
+    if (category === 'landed') {
+      const streetVariants = Array.from(
+        new Set([
+          selectedStreetName ? normalizeText(selectedStreetName) : '',
+          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
+          subjectStreet,
+          normalizedAddress,
+          ...lookupCandidates.map((v) => normalizeText(v)),
+        ].filter(Boolean))
+      )
+  
+      const orParts = [
+        ...streetVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
+        ...streetVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
+      ]
+  
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(','))
+      }
+  
+      query = query.limit(1000)
     }
   
     const { data, error } = await query
@@ -787,7 +860,6 @@ export default function Home() {
   
         const bucketDiff = bucket(a) - bucket(b)
         if (bucketDiff !== 0) return bucketDiff
-  
         if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
   
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
@@ -812,17 +884,12 @@ export default function Home() {
   
         const bucketDiff = bucket(a) - bucket(b)
         if (bucketDiff !== 0) return bucketDiff
-  
         if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
   
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
         return dateB - dateA
       })
-  
-      if (sameProjectRanked.length >= 10) {
-        return sameProjectRanked.slice(0, 10)
-      }
   
       const nearbyLimit =
         preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 1500) : 1500
@@ -831,18 +898,10 @@ export default function Home() {
         .filter(
           (row) =>
             row._normProject !== subjectProject &&
-            row.distance_m <= nearbyLimit
+            row.distance_m <= nearbyLimit &&
+            row._sizeBand !== 'different'
         )
         .sort((a, b) => {
-          const bucket = (row: (typeof nearbyOtherProjects)[number]) => {
-            if (row._sizeBand === 'same') return 4
-            if (row._sizeBand === 'similar') return 5
-            return 6
-          }
-  
-          const bucketDiff = bucket(a) - bucket(b)
-          if (bucketDiff !== 0) return bucketDiff
-  
           if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
   
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
@@ -877,17 +936,12 @@ export default function Home() {
   
         const bucketDiff = bucket(a) - bucket(b)
         if (bucketDiff !== 0) return bucketDiff
-  
         if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
   
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
         return dateB - dateA
       })
-  
-      if (sameStreetRanked.length >= 10) {
-        return sameStreetRanked.slice(0, 10)
-      }
   
       const nearbyLimit =
         preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 3000) : 3000
@@ -900,15 +954,6 @@ export default function Home() {
             row._sizeBand !== 'different'
         )
         .sort((a, b) => {
-          const bucket = (row: (typeof nearbyOtherStreets)[number]) => {
-            if (row._sizeBand === 'same') return 3
-            if (row._sizeBand === 'similar') return 4
-            return 99
-          }
-  
-          const bucketDiff = bucket(a) - bucket(b)
-          if (bucketDiff !== 0) return bucketDiff
-  
           if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
   
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
