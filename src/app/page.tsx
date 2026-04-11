@@ -784,6 +784,26 @@ export default function Home() {
     }
   
     if (category === 'landed') {
+      const landedVariants = Array.from(
+        new Set([
+          selectedStreetName ? normalizeText(selectedStreetName) : '',
+          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
+          subjectStreet,
+          subjectCluster,
+          normalizedAddress,
+          ...lookupCandidates.map((v) => normalizeText(v)),
+        ].filter(Boolean))
+      )
+    
+      const orParts = [
+        ...landedVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
+        ...landedVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
+      ]
+    
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(','))
+      }
+    
       query = query.limit(5000)
     }
   
@@ -949,19 +969,23 @@ export default function Home() {
     
           let priority = 999
     
-          // Strongest: same street first, regardless of size
-          if (sameStreet && row.distance_m <= 1200) priority = 1
-          else if (sameCluster && row.distance_m <= 1500) priority = 2
+          // 1) Goldhill / same exact street first
+          if (sameStreet && row.distance_m <= 1500) priority = 1
     
-          // Then near + same/similar size
-          else if (row.distance_m <= 1000 && row._sizeBand === 'same') priority = 3
-          else if (row.distance_m <= 1000 && row._sizeBand === 'similar') priority = 4
-          else if (row.distance_m <= 2500 && row._sizeBand === 'same') priority = 5
-          else if (row.distance_m <= 2500 && row._sizeBand === 'similar') priority = 6
+          // 2) Same Goldhill cluster next
+          else if (sameCluster && row.distance_m <= 2500) priority = 2
     
-          // Then nearby landed regardless of size
-          else if (row.distance_m <= 4000) priority = 7
-          else if (row.distance_m <= 6000) priority = 8
+          // 3) Same cluster but slightly wider
+          else if (sameCluster && row.distance_m <= 5000) priority = 3
+    
+          // 4) Nearby landed with same/similar size
+          else if (row.distance_m <= 1500 && row._sizeBand === 'same') priority = 4
+          else if (row.distance_m <= 1500 && row._sizeBand === 'similar') priority = 5
+          else if (row.distance_m <= 3000 && row._sizeBand === 'same') priority = 6
+          else if (row.distance_m <= 3000 && row._sizeBand === 'similar') priority = 7
+    
+          // 5) Broader nearby fallback
+          else if (row.distance_m <= 5000) priority = 8
           else if (row.distance_m <= 8000) priority = 9
     
           return {
@@ -982,17 +1006,51 @@ export default function Home() {
         )
       })
     
-      return [...deduped]
+      const sameStreetRows = deduped
+        .filter((row) => row._priority === 1)
         .sort((a, b) => {
-          if (a._priority !== b._priority) return a._priority - b._priority
-    
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
           const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
           if (dateB !== dateA) return dateB - dateA
-    
           return a.distance_m - b.distance_m
         })
-        .slice(0, 10)
+    
+      const sameClusterRows = deduped
+        .filter((row) => row._priority === 2 || row._priority === 3)
+        .sort((a, b) => {
+          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+          if (dateB !== dateA) return dateB - dateA
+          return a.distance_m - b.distance_m
+        })
+    
+      const fallbackRows = deduped
+        .filter((row) => row._priority >= 4)
+        .sort((a, b) => {
+          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+          if (dateB !== dateA) return dateB - dateA
+          return a.distance_m - b.distance_m
+        })
+    
+      const mixedRows = [
+        ...sameStreetRows.slice(0, 4),
+        ...sameClusterRows.slice(0, 3),
+        ...fallbackRows.slice(0, 3),
+      ]
+    
+      const finalRows = mixedRows.filter((row, index, arr) => {
+        const key = `${row.address}-${row.transaction_date}-${row.transaction_price}`
+        return (
+          index ===
+          arr.findIndex(
+            (item) =>
+              `${item.address}-${item.transaction_date}-${item.transaction_price}` === key
+          )
+        )
+      })
+    
+      return finalRows.slice(0, 10)
     }
   
     return []
