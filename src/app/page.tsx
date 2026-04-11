@@ -758,33 +758,7 @@ export default function Home() {
       .not('longitude', 'is', null)
   
     if (category === 'hdb') {
-      query = query.eq('unit_type', targetPropertyType)
-  
-      const streetVariants = Array.from(
-        new Set([
-          selectedStreetName ? normalizeText(selectedStreetName) : '',
-          selectedStreetName ? abbreviateRoadWords(normalizeText(selectedStreetName)) : '',
-          subjectStreet,
-        ].filter(Boolean))
-      )
-  
-      const blockVariants = Array.from(
-        new Set([
-          normalizedAddress,
-          ...lookupCandidates.map((v) => normalizeText(v)),
-        ].filter(Boolean))
-      )
-  
-      const orParts = [
-        ...streetVariants.map((v) => `street_name.ilike.%${escapeForOr(v)}%`),
-        ...blockVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
-      ]
-  
-      if (orParts.length > 0) {
-        query = query.or(orParts.join(','))
-      }
-  
-      query = query.limit(1000)
+      query = query.eq('unit_type', targetPropertyType).limit(5000)
     }
   
     if (category === 'condo') {
