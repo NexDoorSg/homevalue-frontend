@@ -675,12 +675,27 @@ export default function Home() {
       category === 'landed'
         ? [500, 1000, 1500, 2000]
         : [200, 400, 600, 800]
+    const maxDisplayDistance =
+      category === 'landed'
+        ? 3000
+        : category === 'condo'
+        ? 1500
+        : 800
     for (const radius of searchRadius) {
       const withinRadius = filtered
         .filter((row) => row.distance_m <= radius)
         .sort((a, b) => {
+          const distanceDiff = a.distance_m - b.distance_m
+        
+          // prioritize distance first
+          if (Math.abs(distanceDiff) > 100) {
+            return distanceDiff
+          }
+        
+          // if distance similar, use recency
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
           const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+        
           return dateB - dateA
         })
 
@@ -689,8 +704,21 @@ export default function Home() {
       }
     }
 
-    return filtered
+    const cappedFiltered = filtered.filter(
+      (row) => row.distance_m <= maxDisplayDistance
+    )
+    
+    if (cappedFiltered.length === 0) {
+      return []
+    }
+    
+    return cappedFiltered
       .sort((a, b) => {
+        const distanceDiff = a.distance_m - b.distance_m
+        if (Math.abs(distanceDiff) > 100) {
+          return distanceDiff
+        }
+    
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
         return dateB - dateA
