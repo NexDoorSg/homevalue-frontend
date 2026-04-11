@@ -22,6 +22,7 @@ type PropertyTypeOption = {
 
 type ComparableRow = {
   address: string | null
+  project_name?: string | null
   transaction_date: string | null
   transaction_price: number | string | null
   floor_area_sqm: number | string | null
@@ -594,7 +595,7 @@ export default function Home() {
     let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type'
+        'address, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
@@ -624,6 +625,7 @@ export default function Home() {
 
         return {
           address: row.address,
+          project_name: row.project_name || null,
           transaction_date: row.transaction_date,
           transaction_price: transactionPrice,
           floor_area_sqm: floorArea,
@@ -644,7 +646,15 @@ export default function Home() {
           Number.isFinite(row.longitude)
       )
 
-        let filtered = cleaned
+    const targetProject =
+      category === 'condo'
+        ? (
+            [...cleaned]
+              .sort((a, b) => a.distance_m - b.distance_m)[0]?.project_name || ''
+          ).toUpperCase()
+        : ''
+    
+    let filtered = cleaned
     
     if (category === 'landed') {
       filtered = cleaned.filter((row) => {
@@ -686,18 +696,32 @@ export default function Home() {
       const withinRadius = filtered
         .filter((row) => row.distance_m <= radius)
         .sort((a, b) => {
-          const distanceDiff = a.distance_m - b.distance_m
+          const getScore = (row: (typeof filtered)[number]) => {
+            let score = 0
         
-          // prioritize distance first
-          if (Math.abs(distanceDiff) > 100) {
-            return distanceDiff
+            const rowProject = (row.project_name || '').toUpperCase()
+            const rowUnitType = (row.unit_type || '').toUpperCase()
+            const targetUnitType = targetPropertyType.toUpperCase()
+        
+            if (category === 'condo' && targetProject && rowProject === targetProject) {
+              score += 100
+            }
+        
+            if (rowUnitType === targetUnitType) {
+              score += 40
+            }
+        
+            score += Math.max(0, 30 - row.distance_m / 50)
+        
+            const dateValue = row.transaction_date
+              ? new Date(row.transaction_date).getTime()
+              : 0
+            score += dateValue / 1e13
+        
+            return score
           }
         
-          // if distance similar, use recency
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        
-          return dateB - dateA
+          return getScore(b) - getScore(a)
         })
 
       if (withinRadius.length >= 5) {
@@ -715,14 +739,32 @@ export default function Home() {
     
     return cappedFiltered
       .sort((a, b) => {
-        const distanceDiff = a.distance_m - b.distance_m
-        if (Math.abs(distanceDiff) > 100) {
-          return distanceDiff
+        const getScore = (row: (typeof cappedFiltered)[number]) => {
+          let score = 0
+    
+          const rowProject = (row.project_name || '').toUpperCase()
+          const rowUnitType = (row.unit_type || '').toUpperCase()
+          const targetUnitType = targetPropertyType.toUpperCase()
+    
+          if (category === 'condo' && targetProject && rowProject === targetProject) {
+            score += 100
+          }
+    
+          if (rowUnitType === targetUnitType) {
+            score += 40
+          }
+    
+          score += Math.max(0, 30 - row.distance_m / 50)
+    
+          const dateValue = row.transaction_date
+            ? new Date(row.transaction_date).getTime()
+            : 0
+          score += dateValue / 1e13
+    
+          return score
         }
     
-        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        return dateB - dateA
+        return getScore(b) - getScore(a)
       })
       .slice(0, 10)
   }
