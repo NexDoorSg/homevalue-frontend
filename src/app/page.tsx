@@ -394,10 +394,20 @@ export default function Home() {
       const result = await getValuation({
         lat: resolved.lat,
         lon: resolved.lon,
-        floorAreaSqm: propertyCategory === 'landed' ? Number(builtUpSqm) : Number(floorAreaSqm),
-        landSizeSqm: propertyCategory === 'landed' ? Number(landSizeSqm) : undefined,
-        builtUpSqm: propertyCategory === 'landed' ? Number(builtUpSqm) : undefined,
+        floorAreaSqm:
+          propertyCategory === 'landed'
+            ? Number(builtUpSqm)
+            : Number(floorAreaSqm),
+        landSizeSqm:
+          propertyCategory === 'landed'
+            ? Number(landSizeSqm)
+            : undefined,
+        builtUpSqm:
+          propertyCategory === 'landed'
+            ? Number(builtUpSqm)
+            : undefined,
         tenure: propertyCategory === 'landed' ? tenure : undefined,
+        floorLevel: Number(floorLevel) || undefined,
         propertyType,
         propertyCategory,
       })
