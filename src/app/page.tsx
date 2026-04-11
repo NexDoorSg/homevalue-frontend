@@ -949,18 +949,20 @@ export default function Home() {
     
           let priority = 999
     
-          if (sameStreet && row._sizeBand === 'same' && row.distance_m <= 1000) priority = 1
-          else if (sameStreet && row._sizeBand === 'similar' && row.distance_m <= 1000) priority = 2
-          else if (sameCluster && row._sizeBand === 'same' && row.distance_m <= 1500) priority = 3
-          else if (sameCluster && row._sizeBand === 'similar' && row.distance_m <= 1500) priority = 4
-          else if (row.distance_m <= 1000 && row._sizeBand === 'same') priority = 5
-          else if (row.distance_m <= 1000 && row._sizeBand === 'similar') priority = 6
-          else if (row.distance_m <= 2500 && row._sizeBand === 'same') priority = 7
-          else if (row.distance_m <= 2500 && row._sizeBand === 'similar') priority = 8
-          else if (row.distance_m <= 4000 && row._sizeBand === 'same') priority = 9
-          else if (row.distance_m <= 4000 && row._sizeBand === 'similar') priority = 10
-          else if (row.distance_m <= 5000) priority = 11
-          else if (row.distance_m <= 7000) priority = 12
+          // Strongest: same street first, regardless of size
+          if (sameStreet && row.distance_m <= 1200) priority = 1
+          else if (sameCluster && row.distance_m <= 1500) priority = 2
+    
+          // Then near + same/similar size
+          else if (row.distance_m <= 1000 && row._sizeBand === 'same') priority = 3
+          else if (row.distance_m <= 1000 && row._sizeBand === 'similar') priority = 4
+          else if (row.distance_m <= 2500 && row._sizeBand === 'same') priority = 5
+          else if (row.distance_m <= 2500 && row._sizeBand === 'similar') priority = 6
+    
+          // Then nearby landed regardless of size
+          else if (row.distance_m <= 4000) priority = 7
+          else if (row.distance_m <= 6000) priority = 8
+          else if (row.distance_m <= 8000) priority = 9
     
           return {
             ...row,
