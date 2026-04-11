@@ -2,17 +2,8 @@ function normalizeText(value: string | null | undefined) {
   return (value || '').toUpperCase().replace(/\s+/g, ' ').trim()
 }
 
-function extractHdbBlock(address: string | null | undefined) {
-  const text = normalizeText(address)
-  if (!text) return ''
-
-  const match = text.match(/^(\d+[A-Z]?)\b/)
-  return match ? match[1] : ''
-}
-
 function normalizeStreetName(streetName: string | null | undefined) {
-  return (streetName || '')
-    .toUpperCase()
+  return normalizeText(streetName)
     .replace(/\bBUKIT\b/g, 'BT')
     .replace(/\bMOUNT\b/g, 'MT')
     .replace(/\bSAINT\b/g, 'ST')
@@ -38,8 +29,7 @@ function normalizeStreetName(streetName: string | null | undefined) {
 }
 
 function normalizeProjectName(projectName: string | null | undefined) {
-  return (projectName || '')
-    .toUpperCase()
+  return normalizeText(projectName)
     .replace(/[^\w\s]/g, ' ')
     .replace(/\bEXECUTIVE CONDOMINIUM\b/g, 'EC')
     .replace(/\bCONDOMINIUM\b/g, 'CONDO')
@@ -47,6 +37,42 @@ function normalizeProjectName(projectName: string | null | undefined) {
     .replace(/\bAPARTMENT\b/g, 'APT')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function extractHdbBlock(address: string | null | undefined) {
+  const text = normalizeText(address)
+  if (!text) return ''
+
+  const match = text.match(/^(\d+[A-Z]?)\b/)
+  return match ? match[1] : ''
+}
+
+function extractStreetFromAddress(address: string | null | undefined) {
+  const text = normalizeText(address)
+  if (!text) return ''
+
+  return text.replace(/^(\d+[A-Z]?)\s+/, '').trim()
+}
+
+function getEffectiveStreet(
+  streetName: string | null | undefined,
+  address: string | null | undefined
+) {
+  const direct = normalizeStreetName(streetName)
+  if (direct) return direct
+
+  const fromAddress = extractStreetFromAddress(address)
+  return normalizeStreetName(fromAddress)
+}
+
+function getEffectiveProject(
+  projectName: string | null | undefined,
+  address: string | null | undefined
+) {
+  const direct = normalizeProjectName(projectName)
+  if (direct) return direct
+
+  return normalizeProjectName(address)
 }
 
 function isSameHdbBlock(
@@ -58,8 +84,8 @@ function isSameHdbBlock(
   const subjectBlock = extractHdbBlock(subjectAddress)
   const rowBlock = extractHdbBlock(rowAddress)
 
-  const subjectStreet = normalizeStreetName(subjectStreetName)
-  const rowStreet = normalizeStreetName(rowStreetName)
+  const subjectStreet = getEffectiveStreet(subjectStreetName, subjectAddress)
+  const rowStreet = getEffectiveStreet(rowStreetName, rowAddress)
 
   return (
     !!subjectBlock &&
@@ -73,12 +99,26 @@ function isSameHdbBlock(
 
 function isSameProject(
   subjectProjectName: string | null | undefined,
-  rowProjectName: string | null | undefined
+  subjectAddress: string | null | undefined,
+  rowProjectName: string | null | undefined,
+  rowAddress: string | null | undefined
 ) {
-  const subject = normalizeProjectName(subjectProjectName)
-  const row = normalizeProjectName(rowProjectName)
+  const subject = getEffectiveProject(subjectProjectName, subjectAddress)
+  const row = getEffectiveProject(rowProjectName, rowAddress)
 
   return !!subject && !!row && subject === row
+}
+
+function isSameLandedStreet(
+  subjectStreetName: string | null | undefined,
+  subjectAddress: string | null | undefined,
+  rowStreetName: string | null | undefined,
+  rowAddress: string | null | undefined
+) {
+  const subjectStreet = getEffectiveStreet(subjectStreetName, subjectAddress)
+  const rowStreet = getEffectiveStreet(rowStreetName, rowAddress)
+
+  return !!subjectStreet && !!rowStreet && subjectStreet === rowStreet
 }
 
 function getSizeBand(subjectSqm: number, rowSqm: number) {
@@ -138,11 +178,16 @@ export function rankComparables(
       else if (sameBlock && sizeBand === 'similar') bucket = 2
       else if (!sameBlock && sizeBand === 'same') bucket = 3
       else if (!sameBlock && sizeBand === 'similar') bucket = 4
-      else bucket = 5
+      else continue
     }
 
     if (subject.propertyCategory === 'condo') {
-      const sameProject = isSameProject(subject.project_name, row.project_name)
+      const sameProject = isSameProject(
+        subject.project_name,
+        subject.address,
+        row.project_name,
+        row.address
+      )
 
       if (sameProject && sizeBand === 'same') bucket = 1
       else if (sameProject && sizeBand === 'similar') bucket = 2
@@ -153,21 +198,24 @@ export function rankComparables(
     }
 
     if (subject.propertyCategory === 'landed') {
-      const sameStreet =
-        normalizeStreetName(subject.street_name) ===
-        normalizeStreetName(row.street_name)
+      const sameStreet = isSameLandedStreet(
+        subject.street_name,
+        subject.address,
+        row.street_name,
+        row.address
+      )
 
       if (sameStreet && sizeBand === 'same') bucket = 1
       else if (sameStreet && sizeBand === 'similar') bucket = 2
       else if (!sameStreet && sizeBand === 'same') bucket = 3
       else if (!sameStreet && sizeBand === 'similar') bucket = 4
-      else bucket = 5
+      else continue
     }
 
     buckets[bucket].push(row)
   }
 
-  const sortedRows = Object.entries(buckets)
+  return Object.entries(buckets)
     .sort((a, b) => Number(a[0]) - Number(b[0]))
     .flatMap(([, bucketRows]) =>
       bucketRows.sort((a, b) => {
@@ -179,6 +227,4 @@ export function rankComparables(
         return dateB - dateA
       })
     )
-
-  return sortedRows
 }
