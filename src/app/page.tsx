@@ -590,7 +590,8 @@ export default function Home() {
     lon: number,
     source: string,
     targetPropertyType: string,
-    category: 'hdb' | 'condo' | 'landed'
+    category: 'hdb' | 'condo' | 'landed',
+    preferredRadius?: number
   ) => {
     let query = supabase
       .from('property_transactions_v2')
@@ -602,7 +603,7 @@ export default function Home() {
       .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
-      .limit(5000)
+      .limit(20000)
     
     if (category === 'hdb') {
       query = query.eq('unit_type', targetPropertyType)
@@ -683,14 +684,18 @@ export default function Home() {
     }
 
     const searchRadius =
-      category === 'landed'
+      preferredRadius && preferredRadius > 0
+        ? [preferredRadius]
+        : category === 'landed'
         ? [1000, 2000, 3000]
         : category === 'condo'
         ? [300, 600, 900, 1200, 1500]
         : [200, 400, 600, 800, 1200]
     
     const maxDisplayDistance =
-      category === 'landed'
+      preferredRadius && preferredRadius > 0
+        ? preferredRadius
+        : category === 'landed'
         ? 3000
         : category === 'condo'
         ? 1500
@@ -842,7 +847,8 @@ export default function Home() {
         selectedLon,
         source,
         propertyType,
-        propertyCategory
+        propertyCategory,
+        radiusUsedM || undefined
       )
 
       setRecentComparables(comparables)
