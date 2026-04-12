@@ -31,6 +31,7 @@ type ComparableRow = {
   longitude: number | string | null
   unit_type?: string | null
   floor_level?: string | null
+  tenure?: string | null
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
@@ -183,6 +184,25 @@ function formatDate(value: string | null) {
   })
 }
 
+function formatTenure(value: string | null | undefined) {
+  if (!value) return '-'
+  const v = value.trim()
+  // Extract lease duration and commencement year
+  const match = v.match(/^(\d+)\s*yrs?\s*lease\s*commencing\s*from\s*(\d{4})/i)
+  if (match) {
+    const yrs = Number(match[1])
+    const from = match[2]
+    if (yrs >= 900) return `999-yr (from ${from})`
+    return `${yrs}-yr (from ${from})`
+  }
+  // No commencement year variants
+  if (/freehold/i.test(v)) return 'Freehold'
+  if (/9999/i.test(v)) return 'Freehold'
+  if (/999\s*years/i.test(v)) return '999-yr'
+  if (/99\s*years/i.test(v)) return '99-yr'
+  return 'Leasehold'
+}
+
 // ─── Haversine-based distance (accurate for Singapore's latitude) ──────────
 function getDistanceMeters(
   lat1: number,
@@ -241,6 +261,7 @@ export default function Home() {
       floor_area_sqm: number
       transaction_price: number
       unit_type?: string | null
+      tenure?: string | null
       psf: number
       distance_m: number
     }>
@@ -790,7 +811,7 @@ export default function Home() {
     let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level'
+        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure'
       )
       .eq('source', source)
       .not('transaction_price', 'is', null)
@@ -854,6 +875,7 @@ export default function Home() {
           longitude: rowLon,
           unit_type: row.unit_type || null,
           floor_level: row.floor_level || null,
+          tenure: (row as ComparableRow & { tenure?: string | null }).tenure || null,
           distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
           psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
         }
@@ -1727,6 +1749,11 @@ export default function Home() {
                       <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
                         PSF
                       </th>
+                      {propertyCategory !== 'hdb' && (
+                        <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
+                          Tenure
+                        </th>
+                      )}
                       <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">
                         Distance
                       </th>
@@ -1773,6 +1800,11 @@ export default function Home() {
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
                             ${Math.round(row.psf).toLocaleString()}
                           </td>
+                          {propertyCategory !== 'hdb' && (
+                            <td className="px-5 py-4 text-sm text-[#2d3135]">
+                              {formatTenure(row.tenure)}
+                            </td>
+                          )}
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
                             {Math.round(row.distance_m)}m
                           </td>
@@ -1781,7 +1813,7 @@ export default function Home() {
                     ) : (
                       <tr>
                         <td
-                          colSpan={showFloorRangeColumn ? 7 : 6}
+                          colSpan={showFloorRangeColumn ? 7 : propertyCategory !== 'hdb' ? 7 : 6}
                           className="px-5 py-8 text-center text-sm text-[#67707a]"
                         >
                           No recent comparables available yet.
