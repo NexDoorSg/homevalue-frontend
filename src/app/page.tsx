@@ -1123,12 +1123,8 @@ export default function Home() {
       //   A Mar 2026 transaction at 857m is more useful than Oct 2025 at 248m.
       //   Distance is used only to break ties within the same month.
       scored.sort((a, b) => {
-        if (a._tierScore !== b._tierScore) return a._tierScore - b._tierScore
-
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-
-        // All tiers: newest first, distance as tiebreaker
         if (dateB !== dateA) return dateB - dateA
         return a.distance_m - b.distance_m
       })
