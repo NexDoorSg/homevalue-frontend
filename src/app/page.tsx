@@ -1030,7 +1030,8 @@ export default function Home() {
 
       // Adaptive filtering: lower bound on size only (no upper bound),
       // with fallback passes if pool is too small.
-      const subjectLandSqm = Number(sqftToSqm(landSizeSqm))
+      const subjectLandSqm = Number(sqftToSqm(landSizeSqm)) || 0
+      console.log('[LANDED DEBUG] subjectLandSqm:', subjectLandSqm, 'from landSizeSqm:', landSizeSqm)
 
       function applyFilter(distanceM: number, lowerRatio: number) {
         return deduped.filter((row) => {
