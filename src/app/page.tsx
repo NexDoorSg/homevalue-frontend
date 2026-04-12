@@ -1115,15 +1115,27 @@ export default function Home() {
         return { ...row, _totalScore: totalScore, _tierScore: tierScore }
       })
 
-      // ── SORT: tier → date desc → distance asc ──
-      // Within each tier group, rows are sorted newest-first.
-      // This produces clean date ordering in the table.
+      // ── SORT: tier-aware ordering ──
+      // Tier 0 (same street) and Tier 100 (same cluster): date desc → distance asc
+      //   Contextually relevant rows — recency is the primary signal.
+      // Tier 200 (nearby): distance asc → date desc
+      //   Generic nearby rows — proximity beats recency, so Barker Rd at 262m
+      //   ranks above Chancery Lane at 857m regardless of transaction dates.
       scored.sort((a, b) => {
         if (a._tierScore !== b._tierScore) return a._tierScore - b._tierScore
+
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        if (dateB !== dateA) return dateB - dateA
-        return a.distance_m - b.distance_m
+
+        if (a._tierScore < 200) {
+          // Tier 0 + 100: newest first, then closer
+          if (dateB !== dateA) return dateB - dateA
+          return a.distance_m - b.distance_m
+        } else {
+          // Tier 200: closer first, then newest
+          if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
+          return dateB - dateA
+        }
       })
 
       // ── Debug: log final ranked results ──
