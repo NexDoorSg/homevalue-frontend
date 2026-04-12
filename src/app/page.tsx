@@ -681,7 +681,10 @@ export default function Home() {
     function extractStreetFromAddress(value: string | null | undefined) {
       const text = normalizeText(value)
       if (!text) return ''
-      return text.replace(/^(\d+[A-Z]?)\s+/, '').trim()
+      return text
+        .replace(/\bSINGAPORE\s+\d{6}\b/g, '')  // strip "SINGAPORE 309073"
+        .replace(/^(\d+[A-Z]?)\s+/, '')
+        .trim()
     }
   
     function getEffectiveStreet(
@@ -1085,9 +1088,23 @@ export default function Home() {
         return dateB - dateA
       })
 
-      // Return top 10. If fewer than 10 within 5km, that's okay — we'd rather
-      // show 6 good comps than pad with irrelevant ones from across the island.
-      return scored.slice(0, 10)
+      // ── Debug logging (check browser DevTools → Console) ──
+      console.log('[LANDED COMPS] subject:', { subjectStreet, subjectCluster, subjectFloorAreaSqm })
+      console.log('[LANDED COMPS] pool:', { fetched: landedOnly.length, deduped: deduped.length, inRange: withinRange.length })
+      scored.slice(0, 15).forEach((r, i) => {
+        console.log(
+          `[LANDED COMP ${i + 1}]`,
+          r.address || r._normStreet,
+          '| tier:', r._tierScore,
+          '| score:', r._totalScore,
+          '| dist:', Math.round(r.distance_m) + 'm',
+          '| cluster:', r._cluster,
+          '| date:', r.transaction_date
+        )
+      })
+
+      // Return top 15 — enough to show cluster matches AND nearby transactions
+      return scored.slice(0, 15)
     }
   
     return []
