@@ -803,25 +803,16 @@ export default function Home() {
     }
   
     if (category === 'condo') {
-      const projectVariants = Array.from(
-        new Set([
-          selectedProjectName ? normalizeText(selectedProjectName) : '',
-          subjectProject,
-          normalizedAddress,
-          ...lookupCandidates.map((v) => normalizeText(v)),
-        ].filter(Boolean))
-      )
-  
-      const orParts = [
-        ...projectVariants.map((v) => `project_name.ilike.%${escapeForOr(v)}%`),
-        ...projectVariants.map((v) => `address.ilike.%${escapeForOr(v)}%`),
-      ]
-  
-      if (orParts.length > 0) {
-        query = query.or(orParts.join(','))
-      }
-  
-      query = query.limit(1000)
+      // Fetch all condo/apartment rows within a geographic bounding box (~1.5km)
+      // This gives us both same-project and nearby project rows in one query.
+      const LAT_DELTA = 0.014  // ~1.5km in latitude degrees
+      const LON_DELTA = 0.014  // ~1.5km in longitude degrees
+      query = query
+        .gte('latitude', lat - LAT_DELTA)
+        .lte('latitude', lat + LAT_DELTA)
+        .gte('longitude', lon - LON_DELTA)
+        .lte('longitude', lon + LON_DELTA)
+        .limit(3000)
     }
   
     if (category === 'landed') {
