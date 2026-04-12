@@ -1741,6 +1741,16 @@ export default function Home() {
                           </td>
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
                             {(() => {
+                              if (propertyCategory === 'condo') {
+                                const displayName = row.project_name || row.address || '-'
+                                const rowProject = (row.project_name || '').toUpperCase().trim()
+                                const subjProject = (selectedProjectName || '').toUpperCase().trim()
+                                const isMatch = rowProject && subjProject && rowProject === subjProject
+                                return isMatch
+                                  ? <span className="font-semibold">{displayName}</span>
+                                  : displayName
+                              }
+                              // HDB and landed: use address, bold on street match
                               const rowStreet = (row.street_name || '').toUpperCase().trim()
                               const subjStreet = (selectedStreetName || '').toUpperCase().trim()
                               const isMatch = rowStreet && subjStreet && rowStreet === subjStreet
