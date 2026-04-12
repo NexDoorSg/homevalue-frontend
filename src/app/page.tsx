@@ -943,58 +943,49 @@ export default function Home() {
     }
   
     if (category === 'condo') {
-      const sameProjectRows = withNormalized.filter(
-        (row) => row._normProject && row._normProject === subjectProject
-      )
+      const subjectCondoSqm = Number(sqftToSqm(floorAreaSqm)) || 0
 
-      // Same project: always show, sorted by date desc then distance
-      const sameProjectRanked = [...sameProjectRows].sort((a, b) => {
+      function condoFilter(distanceM: number, lowerRatio: number) {
+        return withNormalized.filter((row) => {
+          if (row.distance_m > distanceM) return false
+          if (subjectCondoSqm > 0 && row.floor_area_sqm > 0) {
+            if (row.floor_area_sqm < subjectCondoSqm * lowerRatio) return false
+          }
+          return true
+        })
+      }
+
+      // Pass 1: 1500m, lower bound 50%
+      let pool = condoFilter(1500, 0.5)
+
+      // Pass 2: 1500m, lower bound 25%
+      if (pool.length < 10) {
+        pool = condoFilter(1500, 0.25)
+      }
+
+      // Pass 3: 2500m, lower bound 25%
+      if (pool.length < 10) {
+        pool = condoFilter(2500, 0.25)
+      }
+
+      // Deduplicate
+      const seen = new Set<string>()
+      const deduped = pool.filter((row) => {
+        const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      // Sort: date desc, distance as tiebreaker
+      deduped.sort((a, b) => {
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
         if (dateB !== dateA) return dateB - dateA
         return a.distance_m - b.distance_m
       })
 
-      const nearbyLimit =
-        preferredRadius && preferredRadius > 0 ? Math.max(preferredRadius, 1500) : 1500
-
-      // Nearby other projects: size filter ±50%, sorted by date desc
-      const subjectCondoSqm = Number(sqftToSqm(floorAreaSqm)) || 0
-
-      function condoNearbyFilter(lowerRatio: number, upperRatio: number) {
-        return withNormalized
-          .filter((row) => {
-            if (row._normProject === subjectProject) return false
-            if (row.distance_m > nearbyLimit) return false
-            // Size filter on nearby projects only
-            if (subjectCondoSqm > 0 && row.floor_area_sqm > 0) {
-              const ratio = row.floor_area_sqm / subjectCondoSqm
-              if (ratio < lowerRatio || ratio > upperRatio) return false
-            }
-            return true
-          })
-          .sort((a, b) => {
-            const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-            const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-            if (dateB !== dateA) return dateB - dateA
-            return a.distance_m - b.distance_m
-          })
-      }
-
-      // How many slots remain after same-project rows
-      const slotsRemaining = Math.max(0, 10 - sameProjectRanked.length)
-
-      let nearbyOtherProjects = condoNearbyFilter(0.5, 1.5)
-
-      // Adaptive fallback if not enough nearby rows to fill remaining slots
-      if (nearbyOtherProjects.length < slotsRemaining) {
-        nearbyOtherProjects = condoNearbyFilter(0.25, 2.0)
-      }
-
-      return [
-        ...sameProjectRanked,
-        ...nearbyOtherProjects,
-      ].slice(0, 10)
+      return deduped.slice(0, 10)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
