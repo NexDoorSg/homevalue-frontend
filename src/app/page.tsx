@@ -1028,18 +1028,32 @@ export default function Home() {
         return true
       })
 
-      // Hard distance cap + land size filter (±50% of subject land size)
-      const MAX_DISTANCE_M = 1500
+      // Adaptive filtering: lower bound on size only (no upper bound),
+      // with fallback passes if pool is too small.
       const subjectLandSqm = Number(sqftToSqm(landSizeSqm))
-      const withinRange = deduped.filter((row) => {
-        if (row.distance_m > MAX_DISTANCE_M) return false
-        // If subject land size is known, filter to ±50% band
-        if (subjectLandSqm > 0 && row.floor_area_sqm > 0) {
-          const ratio = row.floor_area_sqm / subjectLandSqm
-          if (ratio < 0.5 || ratio > 1.5) return false
-        }
-        return true
-      })
+
+      function applyFilter(distanceM: number, lowerRatio: number) {
+        return deduped.filter((row) => {
+          if (row.distance_m > distanceM) return false
+          if (subjectLandSqm > 0 && row.floor_area_sqm > 0) {
+            if (row.floor_area_sqm < subjectLandSqm * lowerRatio) return false
+          }
+          return true
+        })
+      }
+
+      // Pass 1: 1500m, lower bound 50%
+      let withinRange = applyFilter(1500, 0.5)
+
+      // Pass 2: 1500m, lower bound 25%
+      if (withinRange.length < 8) {
+        withinRange = applyFilter(1500, 0.25)
+      }
+
+      // Pass 3: 2500m, lower bound 25%
+      if (withinRange.length < 8) {
+        withinRange = applyFilter(2500, 0.25)
+      }
 
       console.log('[LANDED DEBUG] withinRange count:', withinRange.length)
 
