@@ -986,9 +986,21 @@ export default function Home() {
         return a.distance_m - b.distance_m
       })
 
-      return deduped.slice(0, 10)
-    }
+      // Cap at 2 rows per project for a diverse mix
+      const projectCounts: Record<string, number> = {}
+      const result = []
+      for (const row of deduped) {
+        const proj = (row._normProject || '').toUpperCase()
+        const count = projectCounts[proj] || 0
+        if (count < 2) {
+          result.push(row)
+          projectCounts[proj] = count + 1
+        }
+        if (result.length >= 10) break
+      }
 
+      return result
+    }
     // ═══════════════════════════════════════════════════════════════════════════
     // LANDED: Redesigned 2-stage scoring system
     // ═══════════════════════════════════════════════════════════════════════════
