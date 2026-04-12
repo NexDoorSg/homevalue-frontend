@@ -1029,7 +1029,7 @@ export default function Home() {
       })
 
       // Hard distance cap
-      const MAX_DISTANCE_M = 2000
+      const MAX_DISTANCE_M = 1500
       const withinRange = deduped.filter((row) => row.distance_m <= MAX_DISTANCE_M)
 
       console.log('[LANDED DEBUG] withinRange count:', withinRange.length)
