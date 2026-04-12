@@ -1028,9 +1028,18 @@ export default function Home() {
         return true
       })
 
-      // Hard distance cap
+      // Hard distance cap + land size filter (±50% of subject land size)
       const MAX_DISTANCE_M = 1500
-      const withinRange = deduped.filter((row) => row.distance_m <= MAX_DISTANCE_M)
+      const subjectLandSqm = Number(sqftToSqm(landSizeSqm))
+      const withinRange = deduped.filter((row) => {
+        if (row.distance_m > MAX_DISTANCE_M) return false
+        // If subject land size is known, filter to ±50% band
+        if (subjectLandSqm > 0 && row.floor_area_sqm > 0) {
+          const ratio = row.floor_area_sqm / subjectLandSqm
+          if (ratio < 0.5 || ratio > 1.5) return false
+        }
+        return true
+      })
 
       console.log('[LANDED DEBUG] withinRange count:', withinRange.length)
 
