@@ -1719,7 +1719,14 @@ export default function Home() {
                             {formatDate(row.transaction_date)}
                           </td>
                           <td className="px-5 py-4 text-sm text-[#2d3135]">
-                            {row.address || '-'}
+                            {(() => {
+                              const rowStreet = (row.street_name || '').toUpperCase().trim()
+                              const subjStreet = (selectedStreetName || '').toUpperCase().trim()
+                              const isMatch = rowStreet && subjStreet && rowStreet === subjStreet
+                              return isMatch
+                                ? <span className="font-semibold">{row.address || '-'}</span>
+                                : row.address || '-'
+                            })()}
                           </td>
                           {showFloorRangeColumn && (
                             <td className="px-5 py-4 text-sm text-[#2d3135]">
