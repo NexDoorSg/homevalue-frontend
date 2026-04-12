@@ -183,13 +183,24 @@ function formatDate(value: string | null) {
   })
 }
 
+// ─── Haversine-based distance (accurate for Singapore's latitude) ──────────
 function getDistanceMeters(
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
 ) {
-  return Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lon2 - lon1, 2)) * 111000
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const R = 6371000 // Earth radius in metres
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
 type EmailResult = {
@@ -691,10 +702,20 @@ export default function Home() {
       return normalizeProject(addressValue)
     }
 
-    // ─── FIXED getLandedCluster ────────────────────────────────────────────────
-    // Guards against short/ambiguous first words (e.g. "ST", "MT") accidentally
-    // grouping unrelated streets. Only forms a two-word cluster when the second
-    // word is a clear geographic qualifier AND the first word is 4+ characters.
+    // ─── REDESIGNED getLandedCluster ───────────────────────────────────────────
+    // Extracts the geographic "family name" from a street, stripping road-type
+    // suffixes (AVE, RD, DR, etc.) and directional words (NTH, STH, etc.).
+    // 
+    // Examples after normalizeStreet:
+    //   "GOLDHILL AVE"    → "GOLDHILL"
+    //   "GOLDHILL RISE"   → "GOLDHILL"   (RISE is a suffix)
+    //   "GOLDHILL VIEW"   → "GOLDHILL"   (VIEW is a suffix)
+    //   "CHANCERY LN"     → "CHANCERY"
+    //   "CHANCERY HILL DR"→ "CHANCERY HILL"
+    //   "MT SINAI DR"     → "MT SINAI"
+    //   "JALAN LIMAU"     → "JALAN LIMAU" (no suffix to strip)
+    //
+    // This is generic — no hardcoded street names. Works for any landed area.
     function getLandedCluster(
       streetName: string | null | undefined,
       addressValue: string | null | undefined
@@ -702,23 +723,30 @@ export default function Home() {
       const street = getEffectiveStreet(streetName, addressValue)
       if (!street) return ''
 
+      // Road-type and directional suffixes to strip (applied AFTER normalizeStreet)
+      const SUFFIXES = new Set([
+        'AVE', 'ST', 'RD', 'DR', 'CRES', 'PL', 'CL', 'LN', 'TER', 'BLVD',
+        'CTRL', 'HTS', 'GDNS', 'NTH', 'STH', 'EAST', 'WEST',
+        // Additional common Singapore road suffixes
+        'RISE', 'VIEW', 'WALK', 'GROVE', 'PARK', 'HILL', 'VALE', 'GREEN',
+        'GARDEN', 'LINK', 'WAY', 'LOOP', 'RING', 'TURN', 'MOUNT',
+        // Numbering suffixes (e.g. "LORONG 1" → "LORONG")
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+        '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
+      ])
+
       const parts = street.split(' ')
-      if (parts.length === 0) return ''
 
-      const first = parts[0]
-
-      // Form two-word cluster only when the qualifier is unambiguous
-      // and the base word is long enough to be distinctive
-      if (
-        parts.length >= 2 &&
-        first.length >= 4 &&
-        ['HILL', 'VIEW', 'PARK', 'GARDEN', 'RISE', 'GROVE', 'DRIVE', 'WALK'].includes(parts[1])
-      ) {
-        return `${first} ${parts[1]}`
+      // Strip suffixes from the end, but keep at least the first word
+      let endIndex = parts.length
+      while (endIndex > 1 && SUFFIXES.has(parts[endIndex - 1])) {
+        endIndex--
       }
 
-      // Fall back to first word only if it's meaningful (4+ chars)
-      return first.length >= 4 ? first : ''
+      const cluster = parts.slice(0, endIndex).join(' ')
+
+      // Only return meaningful clusters (3+ chars avoids "MT", "ST", "BT" alone)
+      return cluster.length >= 3 ? cluster : ''
     }
   
     function getSizeBand(subjectSqm: number, rowSqm: number) {
@@ -943,11 +971,33 @@ export default function Home() {
       ]).slice(0, 10)
     }
 
-    // ─── LANDED: unified scoring system ───────────────────────────────────────
-    // Instead of assembling manual bucket slices (which caused jumping date order),
-    // every row receives a single composite score. Lower score = more relevant.
-    // One sort determines the final order — no concatenation of partial arrays.
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LANDED: Redesigned 2-stage scoring system
+    // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // Design principles:
+    //   1. Same street is the DOMINANT signal — always appears first
+    //   2. Same cluster (e.g. GOLDHILL AVE / GOLDHILL RISE) is the second signal
+    //   3. Distance matters but does NOT overpower street/cluster
+    //   4. Size is a tiebreaker only — nothing is excluded by size
+    //   5. Recency is a tiebreaker — recent is better, but not at the cost of
+    //      pulling in a random far-away street over a nearby cluster match
+    //   6. Hard cap at 5km — anything further is not a comparable
+    //   7. ONE sort produces the final order — no manual array concatenation
+    //
+    // Score breakdown (lower = more relevant):
+    //   Tier (0-300):     same-street=0, same-cluster=100, other=200
+    //   Distance (0-50):  continuous, capped at 5km
+    //   Size (0-6):       same=0, similar=3, different=6
+    //   Recency (0-15):   0.3 per month old, capped at 15
+    //
+    // The tier gap (100 points) is deliberately large so that a same-street row
+    // 3km away (score ~0+30+6+10 = 46) always beats a non-cluster row 200m away
+    // (score ~200+2+0+0 = 202). This matches how a real agent thinks.
+    // ═══════════════════════════════════════════════════════════════════════════
+
     if (category === 'landed') {
+      // Stage 1: Filter to landed unit types only
       const landedOnly = withNormalized.filter((row) => {
         const unitType = normalizeText(row.unit_type)
         return (
@@ -958,68 +1008,76 @@ export default function Home() {
         )
       })
 
-      // Deduplicate before scoring
-      const deduped = landedOnly.filter((row, index, arr) => {
-        const key = `${row.address}-${row.transaction_date}-${row.transaction_price}`
-        return (
-          index ===
-          arr.findIndex(
-            (item) =>
-              `${item.address}-${item.transaction_date}-${item.transaction_price}` === key
-          )
-        )
+      // Deduplicate (same address + date + price = same transaction)
+      const seen = new Set<string>()
+      const deduped = landedOnly.filter((row) => {
+        const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
       })
+
+      // Hard distance cap — nothing beyond 5km is a meaningful landed comp
+      const MAX_DISTANCE_M = 5000
+      const withinRange = deduped.filter((row) => row.distance_m <= MAX_DISTANCE_M)
 
       const now = Date.now()
 
-      const scored = deduped.map((row) => {
-        // ── Street score (0 = same street, 20 = different street) ──
+      const scored = withinRange.map((row) => {
+        // ── TIER: The primary grouping signal ──
+        // Same street is always the best match. Same cluster is next.
+        // Everything else is a generic nearby landed transaction.
         const sameStreet =
-          !!row._normStreet && !!subjectStreet && row._normStreet === subjectStreet
-        const streetScore = sameStreet ? 0 : 20
+          !!row._normStreet &&
+          !!subjectStreet &&
+          row._normStreet === subjectStreet
 
-        // ── Cluster score (bonus applied only when streets differ) ──
-        // Subtracts 5 from total so cluster neighbours rank above random nearby rows
-        // but below same-street rows. Guard: cluster must be 4+ chars to be meaningful.
         const sameCluster =
           !sameStreet &&
           !!row._cluster &&
           !!subjectCluster &&
-          row._cluster === subjectCluster &&
-          row._cluster.length >= 4
-        const clusterBonus = sameCluster ? -5 : 0
+          row._cluster.length >= 3 &&
+          subjectCluster.length >= 3 &&
+          row._cluster === subjectCluster
 
-        // ── Distance band score (0 = closest, 40 = furthest) ──
-        let distanceScore: number
-        if (row.distance_m <= 500) distanceScore = 0
-        else if (row.distance_m <= 1000) distanceScore = 8
-        else if (row.distance_m <= 2000) distanceScore = 16
-        else if (row.distance_m <= 3500) distanceScore = 24
-        else if (row.distance_m <= 5000) distanceScore = 32
-        else distanceScore = 40
+        let tierScore: number
+        if (sameStreet) tierScore = 0
+        else if (sameCluster) tierScore = 100
+        else tierScore = 200
 
-        // ── Size band score (0 = same, 10 = different) ──
-        // Size is a tiebreaker only — nothing is excluded by size
+        // ── DISTANCE: Continuous score, 10 points per km, capped at 50 ──
+        // This gives fine-grained ordering within each tier without
+        // letting a slightly closer row on a random street jump tiers.
+        const distanceScore = Math.min(
+          Math.round((row.distance_m / 1000) * 10),
+          50
+        )
+
+        // ── SIZE: Tiebreaker only (0-6 point range) ──
+        // A same-street row with different size (score +6) still beats
+        // a different-street row with same size (score +200).
         const sizeScore =
-          row._sizeBand === 'same' ? 0 : row._sizeBand === 'similar' ? 5 : 10
+          row._sizeBand === 'same' ? 0 : row._sizeBand === 'similar' ? 3 : 6
 
-        // ── Recency score (0 = most recent, capped at 20) ──
-        const txDate = row.transaction_date
+        // ── RECENCY: Tiebreaker only (0-15 point range) ──
+        // 0.3 points per month old. A transaction from 4 years ago only
+        // gets +15 points — still nowhere near enough to change tiers.
+        const txTime = row.transaction_date
           ? new Date(row.transaction_date).getTime()
           : 0
         const monthsAgo =
-          txDate > 0 ? (now - txDate) / (1000 * 60 * 60 * 24 * 30) : 999
-        const recencyScore = Math.min(Math.round(monthsAgo * 0.5), 20)
+          txTime > 0 ? (now - txTime) / (1000 * 60 * 60 * 24 * 30) : 50
+        const recencyScore = Math.min(Math.round(monthsAgo * 0.3), 15)
 
-        const totalScore =
-          streetScore + clusterBonus + distanceScore + sizeScore + recencyScore
+        const totalScore = tierScore + distanceScore + sizeScore + recencyScore
 
-        return { ...row, _totalScore: totalScore }
+        return { ...row, _totalScore: totalScore, _tierScore: tierScore }
       })
 
-      // Single unified sort — score asc, then distance asc, then date desc
-      // This is why date order is now predictable: no manual bucket concatenation
-      const sorted = scored.sort((a, b) => {
+      // Single unified sort: score → distance → date
+      // Because the score already encodes tier + distance + size + recency,
+      // the secondary sorts only matter for exact ties.
+      scored.sort((a, b) => {
         if (a._totalScore !== b._totalScore) return a._totalScore - b._totalScore
         if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
@@ -1027,7 +1085,9 @@ export default function Home() {
         return dateB - dateA
       })
 
-      return sorted.slice(0, 10)
+      // Return top 10. If fewer than 10 within 5km, that's okay — we'd rather
+      // show 6 good comps than pad with irrelevant ones from across the island.
+      return scored.slice(0, 10)
     }
   
     return []
