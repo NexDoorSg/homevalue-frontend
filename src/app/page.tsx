@@ -1083,7 +1083,7 @@ export default function Home() {
       if (result.reachedLimit) {
         setUnlockMessage(
           result.message ||
-            'You've reached the free full-report limit for the past 30 days. Please contact us directly and we'll be happy to help.'
+            "You've reached the free full-report limit for the past 30 days. Please contact us directly and we'll be happy to help."
         )
         return
       }
@@ -1163,7 +1163,7 @@ export default function Home() {
             </h1>
 
             <p className="mt-5 max-w-2xl text-base leading-7 text-[#616971] md:text-lg">
-              Instantly estimate your property's value using real nearby transactions.
+              Instantly estimate your property&apos;s value using real nearby transactions.
             </p>
 
             <div className="mt-8 grid gap-3">
@@ -1456,7 +1456,7 @@ export default function Home() {
                   See Your Exact Valuation and Nearby Comparables
                 </h3>
                 <p className="mt-2 text-sm text-[#67707a]">
-                  Get your exact valuation range, nearby comparable transactions, and a clearer picture of where your property stands in today's market.
+                  Get your exact valuation range, nearby comparable transactions, and a clearer picture of where your property stands in today&apos;s market.
                 </p>
                 <div className="mt-5 grid gap-4">
                   <div>
@@ -1646,7 +1646,7 @@ export default function Home() {
               Why use HomeValue
             </p>
             <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
-              A clearer way to understand your property's value
+              A clearer way to understand your property&apos;s value
             </h3>
             <p className="mt-4 text-base leading-7 text-[#646c74]">
               Designed to help homeowners and buyers get a more informed view of the market using
@@ -1692,7 +1692,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
           <div className="max-w-2xl">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
-              What you'll see
+              What you&apos;ll see
             </p>
             <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
               Your report brings together the numbers that matter
@@ -1733,7 +1733,7 @@ export default function Home() {
                   Free Consultation
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[#67707a]">
-                  Leave your details and we'll contact you shortly.
+                  Leave your details and we&apos;ll contact you shortly.
                 </p>
               </div>
 
@@ -1788,7 +1788,7 @@ export default function Home() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                  What's your plan?
+                  What&apos;s your plan?
                 </label>
                 <textarea
                   value={consultPlan}
