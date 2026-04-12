@@ -690,25 +690,35 @@ export default function Home() {
       if (direct) return direct
       return normalizeProject(addressValue)
     }
-  
+
+    // ─── FIXED getLandedCluster ────────────────────────────────────────────────
+    // Guards against short/ambiguous first words (e.g. "ST", "MT") accidentally
+    // grouping unrelated streets. Only forms a two-word cluster when the second
+    // word is a clear geographic qualifier AND the first word is 4+ characters.
     function getLandedCluster(
       streetName: string | null | undefined,
       addressValue: string | null | undefined
     ) {
       const street = getEffectiveStreet(streetName, addressValue)
       if (!street) return ''
-  
+
       const parts = street.split(' ')
       if (parts.length === 0) return ''
-  
+
+      const first = parts[0]
+
+      // Form two-word cluster only when the qualifier is unambiguous
+      // and the base word is long enough to be distinctive
       if (
         parts.length >= 2 &&
-        ['HILL', 'VIEW', 'PARK', 'GARDEN'].includes(parts[1])
+        first.length >= 4 &&
+        ['HILL', 'VIEW', 'PARK', 'GARDEN', 'RISE', 'GROVE', 'DRIVE', 'WALK'].includes(parts[1])
       ) {
-        return `${parts[0]} ${parts[1]}`
+        return `${first} ${parts[1]}`
       }
-  
-      return parts[0]
+
+      // Fall back to first word only if it's meaningful (4+ chars)
+      return first.length >= 4 ? first : ''
     }
   
     function getSizeBand(subjectSqm: number, rowSqm: number) {
@@ -845,48 +855,48 @@ export default function Home() {
       _sizeBand: getSizeBand(subjectFloorAreaSqm, row.floor_area_sqm),
     }))
   
-      if (category === 'hdb') {
-        const hdbCandidates = withNormalized
-          .filter((row) => row._sizeBand !== 'different')
-          .map((row) => {
-            const sameStreet = !!row._normStreet && row._normStreet === subjectStreet
-            const sameBlock =
-              sameStreet &&
-              !!row._block &&
-              !!subjectBlock &&
-              row._block === subjectBlock
-      
-            let priority = 999
-      
-            if (sameBlock && row._sizeBand === 'same') priority = 1
-            else if (sameBlock && row._sizeBand === 'similar') priority = 2
-            else if (sameStreet && row._sizeBand === 'same') priority = 3
-            else if (sameStreet && row._sizeBand === 'similar') priority = 4
-            else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 5
-            else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 6
-            else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 7
-            else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 8
-            else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 9
-            else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 10
-      
-            return {
-              ...row,
-              _priority: priority,
-            }
-          })
-          .filter((row) => row._priority < 999)
-      
-        return [...hdbCandidates]
-          .sort((a, b) => {
-            const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-            const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-      
-            if (dateB !== dateA) return dateB - dateA
-            if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
-            return a._priority - b._priority
-          })
-          .slice(0, 10)
-      }
+    if (category === 'hdb') {
+      const hdbCandidates = withNormalized
+        .filter((row) => row._sizeBand !== 'different')
+        .map((row) => {
+          const sameStreet = !!row._normStreet && row._normStreet === subjectStreet
+          const sameBlock =
+            sameStreet &&
+            !!row._block &&
+            !!subjectBlock &&
+            row._block === subjectBlock
+    
+          let priority = 999
+    
+          if (sameBlock && row._sizeBand === 'same') priority = 1
+          else if (sameBlock && row._sizeBand === 'similar') priority = 2
+          else if (sameStreet && row._sizeBand === 'same') priority = 3
+          else if (sameStreet && row._sizeBand === 'similar') priority = 4
+          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 5
+          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 6
+          else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 7
+          else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 8
+          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 9
+          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 10
+    
+          return {
+            ...row,
+            _priority: priority,
+          }
+        })
+        .filter((row) => row._priority < 999)
+    
+      return [...hdbCandidates]
+        .sort((a, b) => {
+          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+    
+          if (dateB !== dateA) return dateB - dateA
+          if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
+          return a._priority - b._priority
+        })
+        .slice(0, 10)
+    }
   
     if (category === 'condo') {
       const sameProjectRows = withNormalized.filter(
@@ -932,7 +942,11 @@ export default function Home() {
         ...nearbyOtherProjects,
       ]).slice(0, 10)
     }
-  
+
+    // ─── LANDED: unified scoring system ───────────────────────────────────────
+    // Instead of assembling manual bucket slices (which caused jumping date order),
+    // every row receives a single composite score. Lower score = more relevant.
+    // One sort determines the final order — no concatenation of partial arrays.
     if (category === 'landed') {
       const landedOnly = withNormalized.filter((row) => {
         const unitType = normalizeText(row.unit_type)
@@ -943,45 +957,9 @@ export default function Home() {
           unitType.includes('BUNGALOW')
         )
       })
-    
-      const landedCandidates = landedOnly
-        .map((row) => {
-          const sameStreet =
-            !!row._normStreet &&
-            !!subjectStreet &&
-            row._normStreet === subjectStreet
-    
-          const sameCluster =
-            !!row._cluster &&
-            !!subjectCluster &&
-            row._cluster === subjectCluster
-    
-          let bucket = 999
-    
-          // Goldhill / same exact street
-          if (sameStreet) bucket = 1
-    
-          // Same area cluster like GOLDHILL VIEW / DRIVE / RISE
-          else if (sameCluster) bucket = 2
-    
-          // Nearby landed with similar size
-          else if (row.distance_m <= 1500 && row._sizeBand === 'same') bucket = 3
-          else if (row.distance_m <= 1500 && row._sizeBand === 'similar') bucket = 4
-          else if (row.distance_m <= 3000 && row._sizeBand === 'same') bucket = 5
-          else if (row.distance_m <= 3000 && row._sizeBand === 'similar') bucket = 6
-    
-          // Nearby fallback regardless of size
-          else if (row.distance_m <= 5000) bucket = 7
-          else if (row.distance_m <= 8000) bucket = 8
-    
-          return {
-            ...row,
-            _bucket: bucket,
-          }
-        })
-        .filter((row) => row._bucket < 999)
-    
-      const deduped = landedCandidates.filter((row, index, arr) => {
+
+      // Deduplicate before scoring
+      const deduped = landedOnly.filter((row, index, arr) => {
         const key = `${row.address}-${row.transaction_date}-${row.transaction_price}`
         return (
           index ===
@@ -991,55 +969,70 @@ export default function Home() {
           )
         )
       })
-    
-      const sortRows = <T extends { transaction_date: string | null; distance_m: number }>(
-        rows: T[]
-      ) => {
-        return [...rows].sort((a, b) => {
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-    
-          if (dateB !== dateA) return dateB - dateA
-          return a.distance_m - b.distance_m
-        })
-      }
-    
-      const sameStreetRows = sortRows(deduped.filter((row) => row._bucket === 1))
-      const sameClusterRows = sortRows(deduped.filter((row) => row._bucket === 2))
-      const nearSameRows = sortRows(
-        deduped.filter((row) => row._bucket === 3 || row._bucket === 4)
-      )
-      const nearSimilarRows = sortRows(
-        deduped.filter((row) => row._bucket === 5 || row._bucket === 6)
-      )
-      const fallbackRows = sortRows(
-        deduped.filter((row) => row._bucket === 7 || row._bucket === 8)
-      )
-    
-      const mixedRows = [
-        ...sameStreetRows.slice(0, 3),
-        ...sameClusterRows.slice(0, 3),
-        ...nearSameRows.slice(0, 2),
-        ...nearSimilarRows.slice(0, 1),
-        ...fallbackRows.slice(0, 3),
-      ]
-    
-      const finalRows = mixedRows.filter((row, index, arr) => {
-        const key = `${row.address}-${row.transaction_date}-${row.transaction_price}`
-        return (
-          index ===
-          arr.findIndex(
-            (item) =>
-              `${item.address}-${item.transaction_date}-${item.transaction_price}` === key
-          )
-        )
+
+      const now = Date.now()
+
+      const scored = deduped.map((row) => {
+        // ── Street score (0 = same street, 20 = different street) ──
+        const sameStreet =
+          !!row._normStreet && !!subjectStreet && row._normStreet === subjectStreet
+        const streetScore = sameStreet ? 0 : 20
+
+        // ── Cluster score (bonus applied only when streets differ) ──
+        // Subtracts 5 from total so cluster neighbours rank above random nearby rows
+        // but below same-street rows. Guard: cluster must be 4+ chars to be meaningful.
+        const sameCluster =
+          !sameStreet &&
+          !!row._cluster &&
+          !!subjectCluster &&
+          row._cluster === subjectCluster &&
+          row._cluster.length >= 4
+        const clusterBonus = sameCluster ? -5 : 0
+
+        // ── Distance band score (0 = closest, 40 = furthest) ──
+        let distanceScore: number
+        if (row.distance_m <= 500) distanceScore = 0
+        else if (row.distance_m <= 1000) distanceScore = 8
+        else if (row.distance_m <= 2000) distanceScore = 16
+        else if (row.distance_m <= 3500) distanceScore = 24
+        else if (row.distance_m <= 5000) distanceScore = 32
+        else distanceScore = 40
+
+        // ── Size band score (0 = same, 10 = different) ──
+        // Size is a tiebreaker only — nothing is excluded by size
+        const sizeScore =
+          row._sizeBand === 'same' ? 0 : row._sizeBand === 'similar' ? 5 : 10
+
+        // ── Recency score (0 = most recent, capped at 20) ──
+        const txDate = row.transaction_date
+          ? new Date(row.transaction_date).getTime()
+          : 0
+        const monthsAgo =
+          txDate > 0 ? (now - txDate) / (1000 * 60 * 60 * 24 * 30) : 999
+        const recencyScore = Math.min(Math.round(monthsAgo * 0.5), 20)
+
+        const totalScore =
+          streetScore + clusterBonus + distanceScore + sizeScore + recencyScore
+
+        return { ...row, _totalScore: totalScore }
       })
-    
-      return finalRows.slice(0, 10)
+
+      // Single unified sort — score asc, then distance asc, then date desc
+      // This is why date order is now predictable: no manual bucket concatenation
+      const sorted = scored.sort((a, b) => {
+        if (a._totalScore !== b._totalScore) return a._totalScore - b._totalScore
+        if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
+        const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+        const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+        return dateB - dateA
+      })
+
+      return sorted.slice(0, 10)
     }
   
     return []
   }
+
   const handleUnlockReport = async () => {
     setUnlockMessage('')
 
@@ -1090,7 +1083,7 @@ export default function Home() {
       if (result.reachedLimit) {
         setUnlockMessage(
           result.message ||
-            'You’ve reached the free full-report limit for the past 30 days. Please contact us directly and we’ll be happy to help.'
+            'You've reached the free full-report limit for the past 30 days. Please contact us directly and we'll be happy to help.'
         )
         return
       }
@@ -1170,7 +1163,7 @@ export default function Home() {
             </h1>
 
             <p className="mt-5 max-w-2xl text-base leading-7 text-[#616971] md:text-lg">
-              Instantly estimate your property’s value using real nearby transactions.
+              Instantly estimate your property's value using real nearby transactions.
             </p>
 
             <div className="mt-8 grid gap-3">
@@ -1463,7 +1456,7 @@ export default function Home() {
                   See Your Exact Valuation and Nearby Comparables
                 </h3>
                 <p className="mt-2 text-sm text-[#67707a]">
-                  Get your exact valuation range, nearby comparable transactions, and a clearer picture of where your property stands in today’s market.
+                  Get your exact valuation range, nearby comparable transactions, and a clearer picture of where your property stands in today's market.
                 </p>
                 <div className="mt-5 grid gap-4">
                   <div>
@@ -1653,7 +1646,7 @@ export default function Home() {
               Why use HomeValue
             </p>
             <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
-              A clearer way to understand your property’s value
+              A clearer way to understand your property's value
             </h3>
             <p className="mt-4 text-base leading-7 text-[#646c74]">
               Designed to help homeowners and buyers get a more informed view of the market using
@@ -1699,7 +1692,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
           <div className="max-w-2xl">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
-              What you’ll see
+              What you'll see
             </p>
             <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
               Your report brings together the numbers that matter
@@ -1740,7 +1733,7 @@ export default function Home() {
                   Free Consultation
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[#67707a]">
-                  Leave your details and we’ll contact you shortly.
+                  Leave your details and we'll contact you shortly.
                 </p>
               </div>
 
@@ -1795,7 +1788,7 @@ export default function Home() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                  What’s your plan?
+                  What's your plan?
                 </label>
                 <textarea
                   value={consultPlan}
