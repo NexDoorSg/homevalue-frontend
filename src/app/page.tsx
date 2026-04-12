@@ -1000,6 +1000,12 @@ export default function Home() {
     // ═══════════════════════════════════════════════════════════════════════════
 
     if (category === 'landed') {
+      // ── Debug: log subject values to verify in browser console ──
+      console.log('[LANDED DEBUG] selectedStreetName:', selectedStreetName)
+      console.log('[LANDED DEBUG] address:', address)
+      console.log('[LANDED DEBUG] subjectStreet:', subjectStreet)
+      console.log('[LANDED DEBUG] subjectCluster:', subjectCluster)
+
       // Stage 1: Filter to landed unit types only
       const landedOnly = withNormalized.filter((row) => {
         const unitType = normalizeText(row.unit_type)
@@ -1011,6 +1017,8 @@ export default function Home() {
         )
       })
 
+      console.log('[LANDED DEBUG] landedOnly count:', landedOnly.length)
+
       // Deduplicate (same address + date + price = same transaction)
       const seen = new Set<string>()
       const deduped = landedOnly.filter((row) => {
@@ -1020,22 +1028,45 @@ export default function Home() {
         return true
       })
 
-      // Hard distance cap — nothing beyond 5km is a meaningful landed comp
+      // Hard distance cap
       const MAX_DISTANCE_M = 5000
       const withinRange = deduped.filter((row) => row.distance_m <= MAX_DISTANCE_M)
 
+      console.log('[LANDED DEBUG] withinRange count:', withinRange.length)
+
+      // ── Debug: check for Goldhill rows specifically ──
+      const goldhillCheck = withinRange.filter(
+        (r) =>
+          (r._normStreet || '').includes('GOLDHILL') ||
+          (r.address || '').toUpperCase().includes('GOLDHILL')
+      )
+      console.log('[LANDED DEBUG] Goldhill rows in range:', goldhillCheck.length)
+      goldhillCheck.forEach((r) => {
+        console.log(
+          '[LANDED DEBUG] Goldhill row:',
+          r._normStreet,
+          '| row cluster:', r._cluster,
+          '| subject cluster:', subjectCluster,
+          '| cluster match:', r._cluster === subjectCluster,
+          '| dist:', Math.round(r.distance_m) + 'm'
+        )
+      })
+
       const now = Date.now()
+
+      // Extract subject first word for fallback cluster matching
+      // e.g. "GOLDHILL" from "GOLDHILL AVE"
+      const subjectFirstWord = (subjectStreet || '').split(' ')[0] || ''
 
       const scored = withinRange.map((row) => {
         // ── TIER: The primary grouping signal ──
-        // Same street is always the best match. Same cluster is next.
-        // Everything else is a generic nearby landed transaction.
         const sameStreet =
           !!row._normStreet &&
           !!subjectStreet &&
           row._normStreet === subjectStreet
 
-        const sameCluster =
+        // Primary cluster match (via getLandedCluster suffix-stripping)
+        const clusterMatch =
           !sameStreet &&
           !!row._cluster &&
           !!subjectCluster &&
@@ -1043,28 +1074,35 @@ export default function Home() {
           subjectCluster.length >= 3 &&
           row._cluster === subjectCluster
 
+        // Fallback cluster match: compare first word of street name
+        // Catches cases where suffix stripping produces different results
+        // e.g. "GOLDHILL" from "GOLDHILL AVE" matches "GOLDHILL" from "GOLDHILL VIEW"
+        const rowFirstWord = (row._normStreet || '').split(' ')[0] || ''
+        const firstWordMatch =
+          !sameStreet &&
+          !clusterMatch &&
+          rowFirstWord.length >= 4 &&
+          subjectFirstWord.length >= 4 &&
+          rowFirstWord === subjectFirstWord
+
+        const sameCluster = clusterMatch || firstWordMatch
+
         let tierScore: number
         if (sameStreet) tierScore = 0
         else if (sameCluster) tierScore = 100
         else tierScore = 200
 
-        // ── DISTANCE: Continuous score, 10 points per km, capped at 50 ──
-        // This gives fine-grained ordering within each tier without
-        // letting a slightly closer row on a random street jump tiers.
+        // ── DISTANCE: 10 points per km, capped at 50 ──
         const distanceScore = Math.min(
           Math.round((row.distance_m / 1000) * 10),
           50
         )
 
-        // ── SIZE: Tiebreaker only (0-6 point range) ──
-        // A same-street row with different size (score +6) still beats
-        // a different-street row with same size (score +200).
+        // ── SIZE: Tiebreaker only (0-6 points) ──
         const sizeScore =
           row._sizeBand === 'same' ? 0 : row._sizeBand === 'similar' ? 3 : 6
 
-        // ── RECENCY: Tiebreaker only (0-15 point range) ──
-        // 0.3 points per month old. A transaction from 4 years ago only
-        // gets +15 points — still nowhere near enough to change tiers.
+        // ── RECENCY: Tiebreaker only (0-15 points) ──
         const txTime = row.transaction_date
           ? new Date(row.transaction_date).getTime()
           : 0
@@ -1077,20 +1115,18 @@ export default function Home() {
         return { ...row, _totalScore: totalScore, _tierScore: tierScore }
       })
 
-      // Single unified sort: score → distance → date
-      // Because the score already encodes tier + distance + size + recency,
-      // the secondary sorts only matter for exact ties.
+      // ── SORT: tier → date desc → distance asc ──
+      // Within each tier group, rows are sorted newest-first.
+      // This produces clean date ordering in the table.
       scored.sort((a, b) => {
-        if (a._totalScore !== b._totalScore) return a._totalScore - b._totalScore
-        if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
+        if (a._tierScore !== b._tierScore) return a._tierScore - b._tierScore
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-        return dateB - dateA
+        if (dateB !== dateA) return dateB - dateA
+        return a.distance_m - b.distance_m
       })
 
-      // ── Debug logging (check browser DevTools → Console) ──
-      console.log('[LANDED COMPS] subject:', { subjectStreet, subjectCluster, subjectFloorAreaSqm })
-      console.log('[LANDED COMPS] pool:', { fetched: landedOnly.length, deduped: deduped.length, inRange: withinRange.length })
+      // ── Debug: log final ranked results ──
       scored.slice(0, 15).forEach((r, i) => {
         console.log(
           `[LANDED COMP ${i + 1}]`,
@@ -1103,7 +1139,6 @@ export default function Home() {
         )
       })
 
-      // Return top 15 — enough to show cluster matches AND nearby transactions
       return scored.slice(0, 15)
     }
   
