@@ -945,27 +945,28 @@ export default function Home() {
     if (category === 'condo') {
       const subjectCondoSqm = Number(sqftToSqm(floorAreaSqm)) || 0
 
-      function condoFilter(distanceM: number, lowerRatio: number) {
+      function condoFilter(distanceM: number, lowerRatio: number, upperRatio: number) {
         return withNormalized.filter((row) => {
           if (row.distance_m > distanceM) return false
           if (subjectCondoSqm > 0 && row.floor_area_sqm > 0) {
             if (row.floor_area_sqm < subjectCondoSqm * lowerRatio) return false
+            if (row.floor_area_sqm > subjectCondoSqm * upperRatio) return false
           }
           return true
         })
       }
 
-      // Pass 1: 1500m, lower bound 50%
-      let pool = condoFilter(1500, 0.5)
+      // Pass 1: 1500m, ±50%
+      let pool = condoFilter(1500, 0.5, 1.5)
 
-      // Pass 2: 1500m, lower bound 25%
+      // Pass 2: 1500m, ±75%
       if (pool.length < 10) {
-        pool = condoFilter(1500, 0.25)
+        pool = condoFilter(1500, 0.25, 2.0)
       }
 
-      // Pass 3: 2500m, lower bound 25%
+      // Pass 3: 2500m, ±75%
       if (pool.length < 10) {
-        pool = condoFilter(2500, 0.25)
+        pool = condoFilter(2500, 0.25, 2.0)
       }
 
       // Deduplicate
