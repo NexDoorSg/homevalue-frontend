@@ -1118,24 +1118,19 @@ export default function Home() {
       // ── SORT: tier-aware ordering ──
       // Tier 0 (same street) and Tier 100 (same cluster): date desc → distance asc
       //   Contextually relevant rows — recency is the primary signal.
-      // Tier 200 (nearby): distance asc → date desc
-      //   Generic nearby rows — proximity beats recency, so Barker Rd at 262m
-      //   ranks above Chancery Lane at 857m regardless of transaction dates.
+      // Tier 200 (nearby): date desc → distance asc as tiebreaker
+      //   Homeowner wants to see what the market is doing RIGHT NOW.
+      //   A Mar 2026 transaction at 857m is more useful than Oct 2025 at 248m.
+      //   Distance is used only to break ties within the same month.
       scored.sort((a, b) => {
         if (a._tierScore !== b._tierScore) return a._tierScore - b._tierScore
 
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
 
-        if (a._tierScore < 200) {
-          // Tier 0 + 100: newest first, then closer
-          if (dateB !== dateA) return dateB - dateA
-          return a.distance_m - b.distance_m
-        } else {
-          // Tier 200: closer first, then newest
-          if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
-          return dateB - dateA
-        }
+        // All tiers: newest first, distance as tiebreaker
+        if (dateB !== dateA) return dateB - dateA
+        return a.distance_m - b.distance_m
       })
 
       // ── Debug: log final ranked results ──
