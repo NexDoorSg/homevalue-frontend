@@ -2173,12 +2173,16 @@ export default function Home() {
                       ? propertyCategory === 'condo' || propertyCategory === 'ec'
                         ? sameProjectComparables.length > 0
                           ? sameProjectComparables
-                          : recentComparables
+                          : []
                         : propertyCategory === 'hdb'
-                          ? sameBlockComparables.length > 0
-                            ? sameBlockComparables
-                            : recentComparables
-                          : recentComparables
+                        ? sameBlockComparables.length > 0
+                          ? sameBlockComparables
+                          : []
+                        : recentComparables
+                      : propertyCategory === 'condo' || propertyCategory === 'ec'
+                      ? nearbyCondoComparables
+                      : propertyCategory === 'hdb'
+                      ? nearbyHdbComparables
                       : recentComparables
                     ).map((row, i) => (
                       <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
