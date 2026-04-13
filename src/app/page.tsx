@@ -855,9 +855,8 @@ export default function Home() {
         estimated_price: result.estimated,
         estimated_low: result.low,
         estimated_high: result.high,
-        comparables_count: result.comparables,
+        num_of_comps: result.comparables,
         radius_used_m: result.radius,
-        source: 'valuation',
       }
       
       const { data: insertedLead, error: leadInsertError } = await supabase
@@ -1071,9 +1070,8 @@ export default function Home() {
       estimated_price: estimatedPrice,
       estimated_low: estimatedLow,
       estimated_high: estimatedHigh,
-      comparables_count: numOfComps,
+      num_of_comps: numOfComps,
       radius_used_m: radiusUsedM,
-      source: 'valuation',
     }
 
     const { error } = await supabase.from('leads').insert([leadPayload])
