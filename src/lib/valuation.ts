@@ -12,6 +12,9 @@ type ValuationParams = {
   builtUpSqm?: number
   tenure?: string
   floorLevel?: number
+  subjectProjectName?: string | null
+  subjectCompletionYear?: number | null
+  subjectIsStrata?: boolean | null
 }
 
 type TransactionRow = {
