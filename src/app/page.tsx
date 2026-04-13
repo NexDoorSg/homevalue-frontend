@@ -1614,6 +1614,26 @@ export default function Home() {
                   </p>
                 )}
                 
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                    Property type
+                  </label>
+                  <select
+                    value={propertyType}
+                    onChange={(e) => setPropertyType(e.target.value)}
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  >
+                    <option value="" disabled>
+                      e.g. Select property type
+                    </option>
+                    {PROPERTY_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
                 {propertyCategory !== 'landed' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -1642,17 +1662,6 @@ export default function Home() {
                     </div>
                   </div>
                 )}
-                    <option value="" disabled>
-                      e.g. Select property type
-                    </option>
-                    
-                    {PROPERTY_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
                 {propertyCategory === 'landed' ? (
                   <>
