@@ -313,16 +313,28 @@ export default function Home() {
       (row) => row.floor_level && row.floor_level.trim() !== ''
     )
 
+  const resolvedCondoProject = (() => {
+    if (selectedProjectName) return selectedProjectName.toUpperCase().trim()
+    // Fallback: extract project name from address (e.g. "33 BALMORAL ROAD BALMORAL GATE")
+    const upper = address.toUpperCase().trim()
+    const withoutPostal = upper.replace(/\bSINGAPORE\s+\d{6}\b/g, '').trim()
+    // Strip the leading number and street to get the building name
+    const parts = withoutPostal.split(' ')
+    const streetIndex = parts.findIndex((p, i) => i > 0 && /^(ROAD|RD|STREET|ST|AVENUE|AVE|DRIVE|DR|CRESCENT|CRES|LANE|LN|PLACE|PL|CLOSE|CL|WALK|RISE|VIEW|PARK|HILL|WAY|LINK|LOOP)$/.test(p))
+    if (streetIndex > 0 && streetIndex < parts.length - 1) {
+      return parts.slice(streetIndex + 1).join(' ').trim()
+    }
+    return ''
+  })()
+
   const sameProjectComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
-    const subjProject = (selectedProjectName || '').toUpperCase().trim()
-    return rowProject && subjProject && rowProject === subjProject
+    return rowProject && resolvedCondoProject && rowProject === resolvedCondoProject
   })
 
   const nearbyCondoComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
-    const subjProject = (selectedProjectName || '').toUpperCase().trim()
-    return !(rowProject && subjProject && rowProject === subjProject)
+    return !(rowProject && resolvedCondoProject && rowProject === resolvedCondoProject)
   })
 
   const sameBlockComparables = recentComparables.filter((row) => {
