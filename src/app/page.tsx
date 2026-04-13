@@ -313,19 +313,7 @@ export default function Home() {
       (row) => row.floor_level && row.floor_level.trim() !== ''
     )
 
-  const resolvedCondoProject = (() => {
-    if (selectedProjectName) return selectedProjectName.toUpperCase().trim()
-    // Fallback: extract project name from address (e.g. "33 BALMORAL ROAD BALMORAL GATE")
-    const upper = address.toUpperCase().trim()
-    const withoutPostal = upper.replace(/\bSINGAPORE\s+\d{6}\b/g, '').trim()
-    // Strip the leading number and street to get the building name
-    const parts = withoutPostal.split(' ')
-    const streetIndex = parts.findIndex((p, i) => i > 0 && /^(ROAD|RD|STREET|ST|AVENUE|AVE|DRIVE|DR|CRESCENT|CRES|LANE|LN|PLACE|PL|CLOSE|CL|WALK|RISE|VIEW|PARK|HILL|WAY|LINK|LOOP)$/.test(p))
-    if (streetIndex > 0 && streetIndex < parts.length - 1) {
-      return parts.slice(streetIndex + 1).join(' ').trim()
-    }
-    return ''
-  })()
+  const resolvedCondoProject = (selectedProjectName || '').toUpperCase().trim()
 
   const sameProjectComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
@@ -895,8 +883,8 @@ export default function Home() {
     if (category === 'condo') {
       // Fetch all condo/apartment rows within a geographic bounding box (~1.5km)
       // This gives us both same-project and nearby project rows in one query.
-      const LAT_DELTA = 0.014  // ~1.5km in latitude degrees
-      const LON_DELTA = 0.014  // ~1.5km in longitude degrees
+      const LAT_DELTA = 0.027  // ~3km in latitude degrees
+      const LON_DELTA = 0.027  // ~3km in longitude degrees
       query = query
         .gte('latitude', lat - LAT_DELTA)
         .lte('latitude', lat + LAT_DELTA)
