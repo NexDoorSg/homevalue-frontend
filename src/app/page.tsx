@@ -859,17 +859,15 @@ export default function Home() {
         radius_used_m: result.radius,
       }
       
-      const { data: insertedLead, error: leadInsertError } = await supabase
+      const { error: leadInsertError } = await supabase
         .from('leads')
         .insert([leadPayload])
-        .select()
-        .single()
       
       if (leadInsertError) {
         console.error('Valuation lead save error:', leadInsertError)
         setFormMessage(`Lead save failed: ${leadInsertError.message}`)
       } else {
-        console.log('Lead saved successfully:', insertedLead)
+        console.log('Lead saved successfully')
       
         const emailResult = await sendLeadEmail(leadPayload)
         if (!emailResult.ok) {
