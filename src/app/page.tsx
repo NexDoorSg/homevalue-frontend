@@ -1535,7 +1535,7 @@ export default function Home() {
         <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
 
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-14 px-6 py-12 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:py-20">
-          <div className="order-2 pt-4 lg:order-1">
+          <div className="order-1 pt-4 lg:order-1">
             <div className="inline-flex rounded-full border border-[#dcc8b5] bg-white px-4 py-2 text-sm font-medium text-[#8b6b52] shadow-sm">
               HomeValue by NexDoor
             </div>
@@ -1561,7 +1561,7 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="order-1 relative lg:order-2">
+          <div className="order-2 relative lg:order-2">
             <div className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold text-[#2d3135]">
@@ -1754,7 +1754,7 @@ export default function Home() {
             <div ref={resultRef} className="mt-4 space-y-4">
   
               {/* Mobile Tabs */}
-              <div className="flex gap-2 overflow-x-auto">
+              <div className="flex gap-2 overflow-x-auto lg:hidden">
                 {[
                   { key: 'summary', label: 'Summary' },
                   { key: 'comparables', label: 'Comparables' },
@@ -1776,7 +1776,7 @@ export default function Home() {
             
               {/* Summary Tab */}
               {activeMobileResultTab === 'summary' && (
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
                   <p className="text-sm text-[#8b6b52]">Estimated Value</p>
                   <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
                     {hasTeaserResult
@@ -1802,7 +1802,7 @@ export default function Home() {
             
               {/* Comparables Tab */}
               {activeMobileResultTab === 'comparables' && (
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
                   <p className="text-sm text-[#8b6b52] mb-3">Recent Comparables</p>
             
                   {previewComparables.length === 0 ? (
@@ -1829,7 +1829,7 @@ export default function Home() {
             
               {/* Insights Tab */}
               {activeMobileResultTab === 'insights' && (
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
                   <p className="text-sm text-[#8b6b52]">Market Insight</p>
                   <p className="mt-2 text-sm text-[#6a727a]">
                     Based on {numOfComps || 0} nearby transactions within {radiusUsedM || 0}m radius.
@@ -1932,221 +1932,215 @@ export default function Home() {
                     </p>
                   </div>
                 )}
+
+                <div className="mt-6 hidden rounded-3xl border border-[#e8ddd2] bg-white p-6 shadow-sm lg:block">
+                  <div className="max-w-3xl">
+                    <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
+                      Full report
+                    </p>
+                    <h3 className="mt-3 text-2xl font-semibold text-[#2d3135] md:text-3xl">
+                      Real Nearby Transactions Around Your Unit
+                    </h3>
+                    <p className="mt-4 text-sm leading-7 text-[#646c74] md:text-base">
+                      These are the most recent comparable transactions near your selected property.
+                    </p>
+                  </div>
+
+                  {propertyCategory === 'landed' ? (
+                    <>
+                      <div className="mt-6 rounded-3xl border border-[#e5dbcf] bg-[#faf8f4] p-6">
+                        <p className="text-base leading-7 text-[#646c74]">
+                          This valuation is estimated based on recent land transactions in the area. Landed properties are highly unique so for a more accurate assessment, we recommend speaking with one of our agents directly.
+                        </p>
+                      </div>
+
+                      <div className="mt-4 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-[#efe7dd]">
+                            <thead className="bg-[#faf8f4]">
+                              <tr>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Date</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Address</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Size (sqft)</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Price</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">PSF</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Tenure</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Distance</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#f3ede5]">
+                              {recentComparables.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="px-5 py-8 text-center text-sm text-[#67707a]">
+                                    No recent comparables available yet.
+                                  </td>
+                                </tr>
+                              ) : (
+                                recentComparables.map((row, index) => (
+                                  <tr key={`${row.address}-${row.transaction_date}-${index}`}>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">{formatDate(row.transaction_date)}</td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">{row.address || '-'}</td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">{sqmToSqft(row.floor_area_sqm)}</td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.transaction_price).toLocaleString()}</td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.psf).toLocaleString()}</td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">{formatTenure(row.tenure)}</td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">{Math.round(row.distance_m)}m</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mt-6 flex gap-3">
+                        {(propertyCategory === 'condo' || propertyCategory === 'ec') && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setActiveCondoTab('same_project')}
+                              className={`rounded-full px-5 py-2 text-sm font-medium transition ${
+                                activeCondoTab === 'same_project'
+                                  ? 'bg-[#2f3438] text-white'
+                                  : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
+                              }`}
+                            >
+                              Same Project
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveCondoTab('nearby')}
+                              className={`rounded-full px-5 py-2 text-sm font-medium transition ${
+                                activeCondoTab === 'nearby'
+                                  ? 'bg-[#2f3438] text-white'
+                                  : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
+                              }`}
+                            >
+                              Nearby
+                            </button>
+                          </>
+                        )}
+
+                        {propertyCategory === 'hdb' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setActiveHdbTab('same_block')}
+                              className={`rounded-full px-5 py-2 text-sm font-medium transition ${
+                                activeHdbTab === 'same_block'
+                                  ? 'bg-[#2f3438] text-white'
+                                  : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
+                              }`}
+                            >
+                              Same Block
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveHdbTab('nearby')}
+                              className={`rounded-full px-5 py-2 text-sm font-medium transition ${
+                                activeHdbTab === 'nearby'
+                                  ? 'bg-[#2f3438] text-white'
+                                  : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
+                              }`}
+                            >
+                              Nearby
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="mt-4 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-[#efe7dd]">
+                            <thead className="bg-[#faf8f4]">
+                              <tr>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Date</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Address</th>
+                                {showFloorRangeColumn && propertyCategory === 'hdb' && (
+                                  <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Floor Level</th>
+                                )}
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Size (sqft)</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Price</th>
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">PSF</th>
+                                {propertyCategory !== 'hdb' && (
+                                  <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Tenure</th>
+                                )}
+                                <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Distance</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#f3ede5]">
+                              {(() => {
+                                const activeRows =
+                                  propertyCategory === 'condo' || propertyCategory === 'ec'
+                                    ? activeCondoTab === 'same_project'
+                                      ? sameProjectComparables
+                                      : nearbyCondoComparables
+                                    : activeHdbTab === 'same_block'
+                                    ? sameBlockComparables
+                                    : nearbyHdbComparables
+
+                                if (activeRows.length === 0) {
+                                  return (
+                                    <tr>
+                                      <td
+                                        colSpan={7}
+                                        className="px-5 py-8 text-center text-sm text-[#67707a]"
+                                      >
+                                        No recent comparables available yet.
+                                      </td>
+                                    </tr>
+                                  )
+                                }
+
+                                return activeRows.map((row, index) => (
+                                  <tr key={`${row.address}-${row.transaction_date}-${index}`}>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                      {formatDate(row.transaction_date)}
+                                    </td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                      {propertyCategory === 'condo' || propertyCategory === 'ec'
+                                        ? row.project_name || row.address || '-'
+                                        : row.address || '-'}
+                                    </td>
+                                    {showFloorRangeColumn && propertyCategory === 'hdb' && (
+                                      <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                        {row.floor_level || '-'}
+                                      </td>
+                                    )}
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                      {sqmToSqft(row.floor_area_sqm)}
+                                    </td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                      ${Math.round(row.transaction_price).toLocaleString()}
+                                    </td>
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                      ${Math.round(row.psf).toLocaleString()}
+                                    </td>
+                                    {propertyCategory !== 'hdb' && (
+                                      <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                        {formatTenure(row.tenure)}
+                                      </td>
+                                    )}
+                                    <td className="px-5 py-4 text-sm text-[#2d3135]">
+                                      {Math.round(row.distance_m)}m
+                                    </td>
+                                  </tr>
+                                ))
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>
         </div>
       </section>
-
-      {hasUnlockedReport && (
-        <section className="border-t border-[#e8ddd2] bg-white">
-          <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
-            <div className="max-w-3xl">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
-                Full report
-              </p>
-              <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
-                Recent nearby transactions
-              </h3>
-              <p className="mt-4 text-base leading-7 text-[#646c74]">
-                These are the most recent comparable transactions near your selected property.
-              </p>
-            </div>
-
-            {propertyCategory === 'landed' ? (
-              <>
-                <div className="mt-8 rounded-3xl border border-[#e5dbcf] bg-[#faf8f4] p-6">
-                  <p className="text-base leading-7 text-[#646c74]">
-                    This valuation is estimated based on recent land transactions in the area. Landed properties are highly unique so for a more accurate assessment, we recommend speaking with one of our agents directly.
-                  </p>
-                </div>
-
-                <div className="mt-4 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-[#efe7dd]">
-                      <thead className="bg-[#faf8f4]">
-                        <tr>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Date</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Address</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Size (sqft)</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Price</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">PSF</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Tenure</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Distance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#f3ede5]">
-                        {recentComparables.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="px-5 py-8 text-center text-sm text-[#67707a]">
-                              No recent comparables available yet.
-                            </td>
-                          </tr>
-                        ) : (
-                          recentComparables.map((row, index) => (
-                            <tr key={`${row.address}-${row.transaction_date}-${index}`}>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">{formatDate(row.transaction_date)}</td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">{row.address || '-'}</td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">{sqmToSqft(row.floor_area_sqm)}</td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.transaction_price).toLocaleString()}</td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.psf).toLocaleString()}</td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">{formatTenure(row.tenure)}</td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">{Math.round(row.distance_m)}m</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Tab buttons */}
-                <div className="mt-8 flex gap-3">
-                  {(propertyCategory === 'condo' || propertyCategory === 'ec') && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActiveCondoTab('same_project')}
-                        className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                          activeCondoTab === 'same_project'
-                            ? 'bg-[#2f3438] text-white'
-                            : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                        }`}
-                      >
-                        Same Project
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveCondoTab('nearby')}
-                        className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                          activeCondoTab === 'nearby'
-                            ? 'bg-[#2f3438] text-white'
-                            : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                        }`}
-                      >
-                        Nearby
-                      </button>
-                    </>
-                  )}
-
-                  {propertyCategory === 'hdb' && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActiveHdbTab('same_block')}
-                        className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                          activeHdbTab === 'same_block'
-                            ? 'bg-[#2f3438] text-white'
-                            : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                        }`}
-                      >
-                        Same Block
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveHdbTab('nearby')}
-                        className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                          activeHdbTab === 'nearby'
-                            ? 'bg-[#2f3438] text-white'
-                            : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                        }`}
-                      >
-                        Nearby
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Table */}
-                <div className="mt-4 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-[#efe7dd]">
-                      <thead className="bg-[#faf8f4]">
-                        <tr>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Date</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Address</th>
-                          {showFloorRangeColumn && propertyCategory === 'hdb' && (
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Floor Level</th>
-                          )}
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Size (sqft)</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Price</th>
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">PSF</th>
-                          {propertyCategory !== 'hdb' && (
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Tenure</th>
-                          )}
-                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Distance</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#f3ede5]">
-                        {(() => {
-                          const activeRows =
-                            propertyCategory === 'condo' || propertyCategory === 'ec'
-                              ? activeCondoTab === 'same_project'
-                                ? sameProjectComparables
-                                : nearbyCondoComparables
-                              : activeHdbTab === 'same_block'
-                              ? sameBlockComparables
-                              : nearbyHdbComparables
-
-                          if (activeRows.length === 0) {
-                            return (
-                              <tr>
-                                <td
-                                  colSpan={7}
-                                  className="px-5 py-8 text-center text-sm text-[#67707a]"
-                                >
-                                  No recent comparables available yet.
-                                </td>
-                              </tr>
-                            )
-                          }
-
-                          return activeRows.map((row, index) => (
-                            <tr key={`${row.address}-${row.transaction_date}-${index}`}>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                {formatDate(row.transaction_date)}
-                              </td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                {propertyCategory === 'condo' || propertyCategory === 'ec'
-                                  ? row.project_name || row.address || '-'
-                                  : row.address || '-'}
-                              </td>
-                              {showFloorRangeColumn && propertyCategory === 'hdb' && (
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  {row.floor_level || '-'}
-                                </td>
-                              )}
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                {sqmToSqft(row.floor_area_sqm)}
-                              </td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                ${Math.round(row.transaction_price).toLocaleString()}
-                              </td>
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                ${Math.round(row.psf).toLocaleString()}
-                              </td>
-                              {propertyCategory !== 'hdb' && (
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  {formatTenure(row.tenure)}
-                                </td>
-                              )}
-                              <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                {Math.round(row.distance_m)}m
-                              </td>
-                            </tr>
-                          ))
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-      )}
 
       <section className="border-t border-[#e8ddd2] bg-white">
         <div className="mx-auto max-w-7xl px-6 py-12 md:px-10">
