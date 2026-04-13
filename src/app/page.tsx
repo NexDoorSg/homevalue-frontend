@@ -909,6 +909,7 @@ export default function Home() {
         .lte('latitude', lat + LAT_DELTA)
         .gte('longitude', lon - LON_DELTA)
         .lte('longitude', lon + LON_DELTA)
+        .order('transaction_date', { ascending: false })
         .limit(5000)
     }
   
