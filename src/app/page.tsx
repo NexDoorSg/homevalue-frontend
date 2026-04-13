@@ -1254,31 +1254,21 @@ export default function Home() {
         (row) => row._normStreet && subjectStreet && row._normStreet === subjectStreet
       )
 
-      function applyFilter(distanceM: number, lowerRatio: number) {
+      function applyFilter(distanceM: number) {
         return deduped.filter((row) => {
-          // Same-street rows bypass size filter
-          if (row._normStreet && subjectStreet && row._normStreet === subjectStreet) return true
           if (row.distance_m > distanceM) return false
-          if (subjectLandSqm > 0 && row.floor_area_sqm > 0) {
-            if (row.floor_area_sqm < subjectLandSqm * lowerRatio) return false
-          }
           return true
         })
       }
 
-      // Pass 1: 1500m, lower bound 50%
-      let withinRange = applyFilter(1500, 0.5)
+      // Pass 1: 1500m
+      let withinRange = applyFilter(1500)
 
-      // Pass 2: 1500m, lower bound 25%
+      // Pass 2: 2500m
       if (withinRange.length < 8) {
-        withinRange = applyFilter(1500, 0.25)
+        withinRange = applyFilter(2500)
       }
-
-      // Pass 3: 2500m, lower bound 25%
-      if (withinRange.length < 8) {
-        withinRange = applyFilter(2500, 0.25)
-      }
-
+      
       // Ensure same-street rows are always in the pool
       const withinRangeKeys = new Set(withinRange.map(r => `${r.address}|${r.transaction_date}|${r.transaction_price}`))
       for (const row of sameStreetRows) {
