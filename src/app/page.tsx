@@ -723,33 +723,33 @@ export default function Home() {
   const handleGenerateReport = async () => {
     setFormMessage('')
     setRecentComparables([])
-
+  
     if (!address.trim()) {
       setFormMessage('Please enter an address first.')
       return
     }
-
+  
     if (!propertyType) {
       setFormMessage('Please choose a property type first.')
       return
     }
-
+  
     if (propertyCategory !== 'landed' && !stackNumber.trim()) {
       setFormMessage('Please enter your stack number.')
       return
     }
-
+  
     if (propertyCategory === 'landed') {
       if (!landSizeSqm || Number(landSizeSqm) <= 0) {
         setFormMessage('Please enter a valid land size first.')
         return
       }
-
+  
       if (!builtUpSqm || Number(builtUpSqm) <= 0) {
         setFormMessage('Please enter a valid built-up size first.')
         return
       }
-
+  
       if (!tenure) {
         setFormMessage('Please choose the tenure first.')
         return
@@ -760,6 +760,127 @@ export default function Home() {
         return
       }
     }
+  
+    if (!leadName.trim()) {
+      setFormMessage('Please enter your name.')
+      return
+    }
+  
+    if (!leadPhone.trim()) {
+      setFormMessage('Please enter your phone number.')
+      return
+    }
+  
+    if (!isValidPhone(leadPhone)) {
+      setFormMessage('Please enter a valid phone number.')
+      return
+    }
+  
+    if (!leadEmail.trim()) {
+      setFormMessage('Please enter your email.')
+      return
+    }
+  
+    if (!isValidEmail(leadEmail)) {
+      setFormMessage('Please enter a valid email address.')
+      return
+    }
+  
+    setIsGenerating(true)
+  
+    try {
+      const resolved = await resolveAddressForGeneration()
+  
+      if (!resolved) {
+        setFormMessage('Could not match this address. Please choose an address from the dropdown.')
+        return
+      }
+  
+      let resolvedProjectName = resolved.projectName || null
+      let subjectCompletionYear: number | null = null
+      let subjectIsStrata: boolean | null = null
+  
+      if (
+        propertyCategory === 'condo' ||
+        propertyCategory === 'ec' ||
+        propertyCategory === 'landed'
+      ) {
+        const canonical = await resolveCanonicalProjectName({
+          lat: resolved.lat,
+          lon: resolved.lon,
+          address: resolved.address,
+          streetName: resolved.streetName,
+          rawProjectName: resolved.projectName,
+          category: propertyCategory,
+        })
+  
+        resolvedProjectName = canonical.canonicalProjectName || resolvedProjectName
+        subjectCompletionYear = canonical.completionYear
+        subjectIsStrata = canonical.isStrata
+      }
+  
+      const result = await getValuation({
+        lat: resolved.lat,
+        lon: resolved.lon,
+        floorAreaSqm:
+          propertyCategory === 'landed'
+            ? Number(sqftToSqm(builtUpSqm))
+            : Number(sqftToSqm(floorAreaSqm)),
+        landSizeSqm:
+          propertyCategory === 'landed'
+            ? Number(sqftToSqm(landSizeSqm))
+            : undefined,
+        builtUpSqm:
+          propertyCategory === 'landed'
+            ? Number(sqftToSqm(builtUpSqm))
+            : undefined,
+        tenure: propertyCategory === 'landed' ? tenure : undefined,
+        floorLevel: Number(floorLevel) || undefined,
+        propertyType,
+        propertyCategory,
+        subjectProjectName: resolvedProjectName,
+        subjectCompletionYear: subjectCompletionYear,
+        subjectIsStrata: subjectIsStrata,
+      })
+  
+      if (!result) {
+        setEstimatedPrice(null)
+        setEstimatedLow(null)
+        setEstimatedHigh(null)
+        setNumOfComps(null)
+        setRadiusUsedM(null)
+        setFormMessage('Not enough comparable transactions found for this property yet.')
+        setHasReport(false)
+        return
+      }
+  
+      setEstimatedPrice(result.estimated)
+      setEstimatedLow(result.low)
+      setEstimatedHigh(result.high)
+      setNumOfComps(result.comparables)
+      setRadiusUsedM(result.radius)
+      setHasReport(true)
+  
+      const comparables = await fetchRecentComparables(
+        resolved.lat,
+        resolved.lon,
+        propertyType,
+        propertyCategory,
+        result.radius
+      )
+  
+      setRecentComparables(comparables)
+  
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 200)
+    } catch (err) {
+      console.error(err)
+      setFormMessage('Error generating valuation.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
     setIsGenerating(true)
 
@@ -1963,7 +2084,7 @@ export default function Home() {
                           className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                         />
                       </div>
-
+                
                       <div>
                         <label className="mb-2 block text-sm font-medium text-[#4d555d]">
                           Built-up size (sqft)
@@ -1977,7 +2098,7 @@ export default function Home() {
                         />
                       </div>
                     </div>
-
+                
                     <div>
                       <label className="mb-2 block text-sm font-medium text-[#4d555d]">
                         Tenure
@@ -2009,7 +2130,48 @@ export default function Home() {
                     />
                   </div>
                 )}
-
+                
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={leadName}
+                      onChange={(e) => setLeadName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+                
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Phone number
+                    </label>
+                    <input
+                      type="text"
+                      value={leadPhone}
+                      onChange={(e) => setLeadPhone(e.target.value)}
+                      placeholder="Your phone number"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+                
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={leadEmail}
+                      onChange={(e) => setLeadEmail(e.target.value)}
+                      placeholder="Your email"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
+                </div>
+                
                 <button
                   type="button"
                   onClick={handleGenerateReport}
@@ -2062,53 +2224,6 @@ export default function Home() {
                     Based on {numOfComps || 0} nearby transactions
                     {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
                   </p>
-                </div>
-
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                    Unlock full report
-                  </p>
-                  <p className="mt-2 text-sm text-[#6a727a]">
-                    Leave your details and we’ll contact you with a fuller valuation review.
-                  </p>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <input
-                      type="text"
-                      value={leadName}
-                      onChange={(e) => setLeadName(e.target.value)}
-                      placeholder="Your name"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                    <input
-                      type="text"
-                      value={leadPhone}
-                      onChange={(e) => setLeadPhone(e.target.value)}
-                      placeholder="Your phone number"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                    <input
-                      type="email"
-                      value={leadEmail}
-                      onChange={(e) => setLeadEmail(e.target.value)}
-                      placeholder="Your email"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleLeadSubmit}
-                    className="mt-4 rounded-2xl bg-[#2f3438] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#24292d]"
-                  >
-                    Submit Details
-                  </button>
-
-                  {leadFormMessage && (
-                    <p className="mt-3 text-sm text-[#8b6b52]">
-                      {leadFormMessage}
-                    </p>
-                  )}
                 </div>
 
                 <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
