@@ -473,21 +473,26 @@ function buildNonLandedCandidate(
 
   const estimated = avgPsm * floorAreaSqm
 
-  const spread =
-    usable.length >= 6 ? 0.05 :
-    usable.length >= 4 ? 0.07 :
-    usable.length >= 2 ? 0.1 :
-    0.12
+  // Apply +4% upward bias (seller-facing tool)
+  const biasedEstimate = estimated * 1.04
+
+  // Use std dev of comparable PSFs for range, capped by property type
+  const psfValues = usable.map((row) => row.pricePerSqm)
+  const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
+  const stdDev = Math.sqrt(psfValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / psfValues.length)
+  const stdDevPct = stdDev / mean
+
+  const maxSpread = propertyCategory === 'hdb' ? 0.06 : 0.08
+  const halfSpread = Math.min(stdDevPct, maxSpread)
 
   return {
-    estimated,
-    low: estimated * (1 - spread),
-    high: estimated * (1 + spread),
+    estimated: biasedEstimate,
+    low: biasedEstimate * (1 - halfSpread * 0.5),
+    high: biasedEstimate * (1 + halfSpread),
     comparables: usable.length,
     radius,
     method: normalizedSubjectProject ? 'same_project_or_nearby' : 'nearby'
   }
-}
 
 function buildNonLandedFallback(
   rows: CleanedRow[],
@@ -549,10 +554,12 @@ function buildNonLandedFallback(
 
   const estimated = avgPsm * floorAreaSqm
 
+  const biasedEstimate = estimated * 1.04
+
   return {
-    estimated,
-    low: estimated * 0.88,
-    high: estimated * 1.12,
+    estimated: biasedEstimate,
+    low: biasedEstimate * 0.94,
+    high: biasedEstimate * 1.08,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
     method: normalizedSubjectProject ? 'same_project_fallback' : 'broad_fallback'
@@ -619,16 +626,18 @@ function buildLandedCandidate(
 
   estimated = estimated * (1 + cappedAdjustment)
 
-  const spread =
-    usable.length >= 5 ? 0.08 :
-    usable.length >= 3 ? 0.1 :
-    usable.length >= 2 ? 0.14 :
-    0.18
+  const biasedEstimate = estimated * 1.04
+
+  const psfValues = usable.map((row) => row.pricePerSqft)
+  const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
+  const stdDev = Math.sqrt(psfValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / psfValues.length)
+  const stdDevPct = stdDev / mean
+  const halfSpread = Math.min(stdDevPct, 0.12)
 
   return {
-    estimated,
-    low: estimated * (1 - spread),
-    high: estimated * (1 + spread),
+    estimated: biasedEstimate,
+    low: biasedEstimate * (1 - halfSpread * 0.5),
+    high: biasedEstimate * (1 + halfSpread),
     comparables: usable.length,
     radius,
     method: 'landed_nearby'
@@ -698,10 +707,12 @@ function buildLandedFallback(
 
   const estimated = avgLandPsf * landSizeSqft
 
+  const biasedEstimate = estimated * 1.04
+
   return {
-    estimated,
-    low: estimated * 0.82,
-    high: estimated * 1.18,
+    estimated: biasedEstimate,
+    low: biasedEstimate * 0.92,
+    high: biasedEstimate * 1.10,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
     method: 'landed_fallback'
