@@ -395,6 +395,353 @@ function trimRowsByMetric(
   return trimmed.length >= 3 ? trimmed : rows
 }
 
+function filterByAreaRatio(
+  rows: CleanedRow[],
+  subjectAreaSqm: number,
+  minRatio: number,
+  maxRatio: number
+) {
+  return rows.filter((row) => {
+    const ratio = row.floor_area_sqm / subjectAreaSqm
+    return ratio >= minRatio && ratio <= maxRatio
+  })
+}
+
+function trimCondoEcOutliers(rows: CleanedRow[]) {
+  if (rows.length < 5) return rows
+
+  const psmValues = rows
+    .map((row) => row.pricePerSqm)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+
+  if (psmValues.length < 5) return rows
+
+  const p15 = percentile(psmValues, 0.15)
+  const p85 = percentile(psmValues, 0.85)
+
+  if (p15 === null || p85 === null) return rows
+
+  const trimmed = rows.filter((row) => {
+    return row.pricePerSqm >= p15 && row.pricePerSqm <= p85
+  })
+
+  return trimmed.length >= 3 ? trimmed : rows
+}
+
+function getCondoEcProjectWeight(
+  row: CleanedRow,
+  subjectProjectName?: string | null
+) {
+  const subject = normalizeText(subjectProjectName)
+  const rowProject = normalizeText(row.project_name)
+
+  if (!subject || !rowProject) return 1
+  if (rowProject === subject) return 5.5
+
+  return 1
+}
+
+function getCondoEcAgeWeight(
+  row: CleanedRow,
+  subjectCompletionYear?: number | null
+) {
+  if (!subjectCompletionYear || !row.completion_year) return 1
+
+  const diff = Math.abs(row.completion_year - subjectCompletionYear)
+
+  if (diff <= 3) return 1.2
+  if (diff <= 5) return 1.12
+  if (diff <= 10) return 1
+  if (diff <= 15) return 0.85
+  return 0.65
+}
+
+function getCondoEcTenureWeight(
+  row: CleanedRow,
+  subjectTenureBucket?: string
+) {
+  if (!subjectTenureBucket || subjectTenureBucket === 'UNKNOWN') return 1
+
+  const rowBucket = normalizeTenureBucket(row.tenure)
+
+  if (rowBucket === subjectTenureBucket) return 1.08
+  if (rowBucket === 'UNKNOWN') return 0.96
+  return 0.82
+}
+
+function selectCondoEcComparablePool(
+  rows: CleanedRow[],
+  floorAreaSqm: number,
+  subjectProjectName?: string | null,
+  subjectCompletionYear?: number | null,
+  subjectTenureBucket?: string
+) {
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
+
+  const sameProjectRows = normalizedSubjectProject
+    ? rows.filter(
+        (row) => normalizeText(row.project_name) === normalizedSubjectProject
+      )
+    : []
+
+  // 1) If we have enough same-project data, stay within same project only
+  if (sameProjectRows.length >= 2) {
+    const sameProjectTight = filterByAreaRatio(
+      sameProjectRows,
+      floorAreaSqm,
+      0.85,
+      1.15
+    )
+    if (sameProjectTight.length >= 2) return sameProjectTight
+
+    const sameProjectMedium = filterByAreaRatio(
+      sameProjectRows,
+      floorAreaSqm,
+      0.75,
+      1.25
+    )
+    if (sameProjectMedium.length >= 2) return sameProjectMedium
+
+    return sameProjectRows
+  }
+
+  // 2) Otherwise build an age/tenure-compatible pool and keep same-project rows inside it
+  let pool = [...rows]
+
+  if (subjectCompletionYear) {
+    const ageFiltered = pool.filter((row) => {
+      if (!row.completion_year) return false
+      return Math.abs(row.completion_year - subjectCompletionYear) <= 10
+    })
+
+    if (ageFiltered.length >= 3) {
+      pool = ageFiltered
+    } else {
+      const broaderAgeFiltered = pool.filter((row) => {
+        if (!row.completion_year) return false
+        return Math.abs(row.completion_year - subjectCompletionYear) <= 15
+      })
+
+      if (broaderAgeFiltered.length >= 3) {
+        pool = broaderAgeFiltered
+      } else {
+        // Last protection against brand-new launches distorting old resale projects
+        const antiNewLaunch = pool.filter((row) => {
+          if (!subjectCompletionYear) return true
+          if (!row.completion_year) return true
+          return row.completion_year <= subjectCompletionYear + 8
+        })
+
+        if (antiNewLaunch.length >= 3) {
+          pool = antiNewLaunch
+        }
+      }
+    }
+  }
+
+  if (subjectTenureBucket && subjectTenureBucket !== 'UNKNOWN') {
+    const sameTenureRows = pool.filter(
+      (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
+    )
+
+    if (sameTenureRows.length >= 3) {
+      pool = sameTenureRows
+    }
+  }
+
+  const tight = filterByAreaRatio(pool, floorAreaSqm, 0.85, 1.15)
+  if (tight.length >= 3) {
+    pool = tight
+  } else {
+    const medium = filterByAreaRatio(pool, floorAreaSqm, 0.75, 1.25)
+    if (medium.length >= 3) {
+      pool = medium
+    } else {
+      const broad = filterByAreaRatio(pool, floorAreaSqm, 0.65, 1.35)
+      if (broad.length >= 3) {
+        pool = broad
+      }
+    }
+  }
+
+  // If same-project rows exist, prepend them so they survive later trimming/weighting
+  if (sameProjectRows.length > 0) {
+    const sameProjectKeys = new Set(
+      sameProjectRows.map(
+        (row) =>
+          `${row.address}|${row.transaction_date}|${row.transaction_price}`
+      )
+    )
+
+    const others = pool.filter((row) => {
+      const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
+      return !sameProjectKeys.has(key)
+    })
+
+    return [...sameProjectRows, ...others]
+  }
+
+  return pool
+}
+
+function buildCondoEcCandidate(
+  rows: CleanedRow[],
+  radius: number,
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel?: number,
+  subjectProjectName?: string | null,
+  subjectCompletionYear?: number | null,
+  subjectTenureBucket?: string
+): CandidateResult | null {
+  if (rows.length === 0) return null
+
+  const selectedPool = selectCondoEcComparablePool(
+    rows,
+    floorAreaSqm,
+    subjectProjectName,
+    subjectCompletionYear,
+    subjectTenureBucket
+  )
+
+  const usable = trimCondoEcOutliers(selectedPool)
+  if (usable.length === 0) return null
+
+  const values = usable.map((row) => row.pricePerSqm)
+  const weights = usable.map((row) => {
+    const distanceWeight = 1 / Math.max(row.distanceM, 80)
+
+    const areaRatio = row.floor_area_sqm / floorAreaSqm
+    const sizeWeight =
+      areaRatio >= 0.9 && areaRatio <= 1.1
+        ? 1.2
+        : areaRatio >= 0.8 && areaRatio <= 1.2
+        ? 1.08
+        : 0.92
+
+    const projectWeight = getCondoEcProjectWeight(row, subjectProjectName)
+    const ageWeight = getCondoEcAgeWeight(row, subjectCompletionYear)
+    const tenureWeight = getCondoEcTenureWeight(row, subjectTenureBucket)
+    const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
+    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
+
+    return (
+      distanceWeight *
+      sizeWeight *
+      projectWeight *
+      ageWeight *
+      tenureWeight *
+      recencyWeight *
+      floorWeight
+    )
+  })
+
+  const avgPsm = weightedAverage(values, weights)
+  if (!avgPsm || !Number.isFinite(avgPsm)) return null
+
+  const estimated = avgPsm * floorAreaSqm
+  const biasedEstimate = estimated * 1.02
+
+  const sortedPsm = usable
+    .map((row) => row.pricePerSqm)
+    .filter((v) => Number.isFinite(v) && v > 0)
+    .sort((a, b) => a - b)
+
+  const lowPsm = percentile(sortedPsm, 0.25)
+  const highPsm = percentile(sortedPsm, 0.75)
+
+  const fallbackSpread = 0.08
+
+  const low =
+    lowPsm && Number.isFinite(lowPsm)
+      ? lowPsm * floorAreaSqm
+      : biasedEstimate * (1 - fallbackSpread)
+  const high =
+    highPsm && Number.isFinite(highPsm)
+      ? highPsm * floorAreaSqm
+      : biasedEstimate * (1 + fallbackSpread)
+
+  return {
+    estimated: biasedEstimate,
+    low,
+    high,
+    comparables: usable.length,
+    radius,
+    method: 'condo_ec_hybrid',
+  }
+}
+
+function buildCondoEcFallback(
+  rows: CleanedRow[],
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel?: number,
+  subjectProjectName?: string | null,
+  subjectCompletionYear?: number | null,
+  subjectTenureBucket?: string
+): CandidateResult | null {
+  if (rows.length === 0) return null
+
+  const pool = selectCondoEcComparablePool(
+    rows,
+    floorAreaSqm,
+    subjectProjectName,
+    subjectCompletionYear,
+    subjectTenureBucket
+  )
+
+  const usable = trimCondoEcOutliers(pool)
+    .sort((a, b) => a.distanceM - b.distanceM)
+    .slice(0, 8)
+
+  if (usable.length === 0) return null
+
+  const values = usable.map((row) => row.pricePerSqm)
+  const weights = usable.map((row) => {
+    const distanceWeight = 1 / Math.max(row.distanceM, 80)
+
+    const areaRatio = row.floor_area_sqm / floorAreaSqm
+    const sizeWeight =
+      areaRatio >= 0.85 && areaRatio <= 1.15
+        ? 1.15
+        : areaRatio >= 0.75 && areaRatio <= 1.25
+        ? 1.05
+        : 0.9
+
+    const projectWeight = getCondoEcProjectWeight(row, subjectProjectName)
+    const ageWeight = getCondoEcAgeWeight(row, subjectCompletionYear)
+    const tenureWeight = getCondoEcTenureWeight(row, subjectTenureBucket)
+    const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
+    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
+
+    return (
+      distanceWeight *
+      sizeWeight *
+      projectWeight *
+      ageWeight *
+      tenureWeight *
+      recencyWeight *
+      floorWeight
+    )
+  })
+
+  const avgPsm = weightedAverage(values, weights)
+  if (!avgPsm || !Number.isFinite(avgPsm)) return null
+
+  const estimated = avgPsm * floorAreaSqm
+  const biasedEstimate = estimated * 1.02
+
+  return {
+    estimated: biasedEstimate,
+    low: biasedEstimate * 0.94,
+    high: biasedEstimate * 1.08,
+    comparables: usable.length,
+    radius: Math.round(usable[usable.length - 1].distanceM),
+    method: 'condo_ec_fallback',
+  }
+}
+
 function pickPreferredNonLandedRows(
   rows: CleanedRow[],
   floorAreaSqm: number,
@@ -951,9 +1298,11 @@ export async function getValuation({
     const cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
     if (cleanedRows.length === 0) continue
 
-    let valuationPool = cleanedRows
+    let candidate: CandidateResult | null = null
 
     if (propertyCategory === 'condo' || propertyCategory === 'ec') {
+      let valuationPool = cleanedRows
+    
       const sameTypeRows = cleanedRows.filter((row) =>
         isMatchingNonLandedType(row.unit_type, propertyType)
       )
@@ -961,23 +1310,32 @@ export async function getValuation({
         valuationPool = sameTypeRows
       }
     
-      // Apply tiering to exclude new launches and use age-appropriate comparables
-      valuationPool = tierComparableRows(
+      const subjectTenureBucket = getSubjectTenureBucket(tenure)
+    
+      candidate = buildCondoEcCandidate(
         valuationPool,
+        radius,
+        floorAreaSqm,
+        propertyCategory,
+        floorLevel,
         subjectProjectName,
         subjectCompletionYear,
-        propertyCategory
+        subjectTenureBucket
       )
-    }
+    } else {
+      let valuationPool = cleanedRows
     
-    const candidate = buildNonLandedCandidate(
-      valuationPool,
-      radius,
-      floorAreaSqm,
-      propertyCategory,
-      floorLevel,
-      subjectProjectName
-    )
+      const candidateResult = buildNonLandedCandidate(
+        valuationPool,
+        radius,
+        floorAreaSqm,
+        propertyCategory,
+        floorLevel,
+        subjectProjectName
+      )
+    
+      candidate = candidateResult
+    }
 
     if (!candidate) continue
 
@@ -1037,11 +1395,16 @@ export async function getValuation({
       fallbackRows = sameTypeRows
     }
   
-    fallbackRows = tierComparableRows(
+    const subjectTenureBucket = getSubjectTenureBucket(tenure)
+  
+    return buildCondoEcFallback(
       fallbackRows,
+      floorAreaSqm,
+      propertyCategory,
+      floorLevel,
       subjectProjectName,
       subjectCompletionYear,
-      propertyCategory
+      subjectTenureBucket
     )
   }
   
