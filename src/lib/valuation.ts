@@ -493,6 +493,7 @@ function buildNonLandedCandidate(
     radius,
     method: normalizedSubjectProject ? 'same_project_or_nearby' : 'nearby'
   }
+}
 
 function buildNonLandedFallback(
   rows: CleanedRow[],
