@@ -503,6 +503,11 @@ export default function Home() {
       return
     }
 
+    if (propertyCategory !== 'landed' && !stackNumber.trim()) {
+      setFormMessage('Please enter your stack number.')
+      return
+    }
+
     if (propertyCategory === 'landed') {
       if (!landSizeSqm || Number(landSizeSqm) <= 0) {
         setFormMessage('Please enter a valid land size first.')
@@ -1609,7 +1614,7 @@ export default function Home() {
                   </p>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${propertyCategory !== 'landed' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[#4d555d]">
                       Floor level
@@ -1622,19 +1627,21 @@ export default function Home() {
                       className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                     />
                   </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Stack number
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 389"
-                      value={stackNumber}
-                      onChange={(e) => setStackNumber(e.target.value)}
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
+                
+                  {propertyCategory !== 'landed' && (
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                        Stack number
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 389"
+                        value={stackNumber}
+                        onChange={(e) => setStackNumber(e.target.value)}
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
