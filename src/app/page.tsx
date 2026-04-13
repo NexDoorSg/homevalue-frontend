@@ -2097,7 +2097,7 @@ export default function Home() {
       </section>
 
       {hasReport && (
-        <section className="bg-[#f7f4ef]">
+        <section className="bg-[#f7f4ef] -mt-20 md:-mt-28">
           <div
             ref={resultRef}
             className="mx-auto max-w-7xl px-6 py-12 md:px-10"
