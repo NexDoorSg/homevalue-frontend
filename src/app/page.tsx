@@ -881,10 +881,8 @@ export default function Home() {
     }
   
     if (category === 'condo') {
-      // Fetch all condo/apartment rows within a geographic bounding box (~1.5km)
-      // This gives us both same-project and nearby project rows in one query.
-      const LAT_DELTA = 0.027  // ~3km in latitude degrees
-      const LON_DELTA = 0.027  // ~3km in longitude degrees
+      const LAT_DELTA = 0.014  // ~1.5km in latitude degrees
+      const LON_DELTA = 0.014  // ~1.5km in longitude degrees
       query = query
         .gte('latitude', lat - LAT_DELTA)
         .lte('latitude', lat + LAT_DELTA)
@@ -1008,6 +1006,60 @@ export default function Home() {
     if (category === 'condo') {
       const subjectCondoSqm = Number(sqftToSqm(floorAreaSqm)) || 0
 
+      // Fetch same-project rows separately with no distance/size filter
+      const sameProjectName = (selectedProjectName || '').toUpperCase().trim()
+      let sameProjectQuery = supabase
+        .from('property_transactions_v2')
+        .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure')
+        .eq('source', source)
+        .not('transaction_price', 'is', null)
+        .not('floor_area_sqm', 'is', null)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .order('transaction_date', { ascending: false })
+        .limit(20)
+
+      if (sameProjectName) {
+        sameProjectQuery = sameProjectQuery.ilike('project_name', sameProjectName)
+      }
+
+      const { data: sameProjectData } = sameProjectName
+        ? await sameProjectQuery
+        : { data: [] }
+
+      const sameProjectRows = ((sameProjectData || []) as ComparableRow[])
+        .map((row) => {
+          const transactionPrice = Number(row.transaction_price)
+          const floorArea = Number(row.floor_area_sqm)
+          const rowLat = Number(row.latitude)
+          const rowLon = Number(row.longitude)
+          const floorAreaSqft = floorArea * 10.7639
+          return {
+            address: row.address,
+            street_name: row.street_name || null,
+            project_name: row.project_name || null,
+            transaction_date: row.transaction_date,
+            transaction_price: transactionPrice,
+            floor_area_sqm: floorArea,
+            latitude: rowLat,
+            longitude: rowLon,
+            unit_type: row.unit_type || null,
+            floor_level: row.floor_level || null,
+            tenure: (row as ComparableRow & { tenure?: string | null }).tenure || null,
+            distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
+            psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
+          }
+        })
+        .filter(
+          (row) =>
+            Number.isFinite(row.transaction_price) &&
+            row.transaction_price > 0 &&
+            Number.isFinite(row.floor_area_sqm) &&
+            row.floor_area_sqm > 0
+        )
+        .slice(0, 10)
+
+      // Nearby: use the bounding-box pool, exclude same project, cap at 2 per project
       function condoFilter(distanceM: number, lowerRatio: number, upperRatio: number) {
         return withNormalized.filter((row) => {
           if (row.distance_m > distanceM) return false
@@ -1019,29 +1071,18 @@ export default function Home() {
         })
       }
 
-      // Pass 1: 1500m, ±50%
-      let pool = condoFilter(1500, 0.5, 1.5)
+      let nearbyPool = condoFilter(1500, 0.5, 1.5)
+      if (nearbyPool.length < 10) nearbyPool = condoFilter(1500, 0.25, 2.0)
+      if (nearbyPool.length < 10) nearbyPool = condoFilter(2500, 0.25, 2.0)
 
-      // Pass 2: 1500m, ±75%
-      if (pool.length < 10) {
-        pool = condoFilter(1500, 0.25, 2.0)
-      }
-
-      // Pass 3: 2500m, ±75%
-      if (pool.length < 10) {
-        pool = condoFilter(2500, 0.25, 2.0)
-      }
-
-      // Deduplicate
       const seen = new Set<string>()
-      const deduped = pool.filter((row) => {
+      const deduped = nearbyPool.filter((row) => {
         const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
         if (seen.has(key)) return false
         seen.add(key)
         return true
       })
 
-      // Sort: date desc, distance as tiebreaker
       deduped.sort((a, b) => {
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
@@ -1049,29 +1090,18 @@ export default function Home() {
         return a.distance_m - b.distance_m
       })
 
-      // Keep all deduped rows — same project rows will go to Same Project tab,
-      // nearby rows will go to Nearby tab, each capped at 10 in the UI
-      const sameProjectRows = deduped.filter((row) => {
-        const rowProject = (row.project_name || '').toUpperCase().trim()
-        const subjProject = (selectedProjectName || '').toUpperCase().trim()
-        return rowProject && subjProject && rowProject === subjProject
-      }).slice(0, 10)
-
-      const nearbyRows = (() => {
-        const projectCounts: Record<string, number> = {}
-        const result = []
-        for (const row of deduped) {
-          if (row._normProject === subjectProject) continue
-          const proj = row._normProject || ''
-          const count = projectCounts[proj] || 0
-          if (count < 2) {
-            result.push(row)
-            projectCounts[proj] = count + 1
-          }
-          if (result.length >= 10) break
+      const projectCounts: Record<string, number> = {}
+      const nearbyRows = []
+      for (const row of deduped) {
+        if (sameProjectName && (row.project_name || '').toUpperCase().trim() === sameProjectName) continue
+        const proj = row._normProject || ''
+        const count = projectCounts[proj] || 0
+        if (count < 2) {
+          nearbyRows.push(row)
+          projectCounts[proj] = count + 1
         }
-        return result
-      })()
+        if (nearbyRows.length >= 10) break
+      }
 
       return [...sameProjectRows, ...nearbyRows]
     }
