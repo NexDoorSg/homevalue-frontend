@@ -313,9 +313,6 @@ export default function Home() {
 
   const [activeCondoTab, setActiveCondoTab] = useState<'same_project' | 'nearby'>('same_project')
   const [activeHdbTab, setActiveHdbTab] = useState<'same_block' | 'nearby'>('same_block')
-  const [activeMobileResultTab, setActiveMobileResultTab] = useState<
-    'summary' | 'comparables' | 'insights'
-  >('summary')
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
@@ -1750,94 +1747,7 @@ export default function Home() {
                 </p>
               </div>
             </div>
-
-            <div ref={resultRef} className="mt-4 space-y-4">
-  
-              {/* Mobile Tabs */}
-              <div className="flex gap-2 overflow-x-auto lg:hidden">
-                {[
-                  { key: 'summary', label: 'Summary' },
-                  { key: 'comparables', label: 'Comparables' },
-                  { key: 'insights', label: 'Insights' },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveMobileResultTab(tab.key as any)}
-                    className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
-                      activeMobileResultTab === tab.key
-                        ? 'bg-[#2f3438] text-white'
-                        : 'border border-[#e5dbcf] bg-white text-[#67707a]'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
             
-              {/* Summary Tab */}
-              {activeMobileResultTab === 'summary' && (
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
-                  <p className="text-sm text-[#8b6b52]">Estimated Value</p>
-                  <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
-                    {hasTeaserResult
-                      ? hasUnlockedReport
-                        ? formatMoney(estimatedPrice)
-                        : formatTeaserMoney(estimatedPrice)
-                      : '$---,---'}
-                  </p>
-              
-                  {hasUnlockedReport && (estimatedLow || estimatedHigh) && (
-                    <p className="mt-2 text-sm text-[#6a727a]">
-                      Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
-                    </p>
-                  )}
-              
-                  <p className="mt-2 text-sm text-[#6a727a]">
-                    {hasUnlockedReport
-                      ? `Based on ${numOfComps || 0} nearby transactions`
-                      : 'Unlock the full report to see the exact valuation range'}
-                  </p>
-                </div>
-              )}
-            
-              {/* Comparables Tab */}
-              {activeMobileResultTab === 'comparables' && (
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
-                  <p className="text-sm text-[#8b6b52] mb-3">Recent Comparables</p>
-            
-                  {previewComparables.length === 0 ? (
-                    <p className="text-sm text-[#67707a]">No data yet</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {previewComparables.map((row, index) => (
-                        <div key={index} className="border-b pb-3 last:border-none">
-                          <p className="text-sm font-medium text-[#2d3135]">
-                            {row.project_name || row.address || '-'}
-                          </p>
-                          <p className="text-xs text-[#6a727a]">
-                            {formatDate(row.transaction_date)} • {sqmToSqft(row.floor_area_sqm)} sqft
-                          </p>
-                          <p className="text-sm font-semibold text-[#2d3135]">
-                            ${Math.round(row.transaction_price).toLocaleString()}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            
-              {/* Insights Tab */}
-              {activeMobileResultTab === 'insights' && (
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
-                  <p className="text-sm text-[#8b6b52]">Market Insight</p>
-                  <p className="mt-2 text-sm text-[#6a727a]">
-                    Based on {numOfComps || 0} nearby transactions within {radiusUsedM || 0}m radius.
-                  </p>
-                </div>
-              )}
-            </div>
-
             {hasTeaserResult && !hasUnlockedReport && (
               <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                 <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
@@ -1910,29 +1820,25 @@ export default function Home() {
             )}
 
             {hasUnlockedReport && (
-              <>
-                <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                  <p className="text-sm text-[#8b6b52]">Full Estimated Value</p>
-                  <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
-                    {formatMoney(estimatedPrice)}
-                  </p>
-                  <p className="mt-2 text-sm text-[#6a727a]">
-                    Based on nearby transaction evidence
-                  </p>
-                </div>
-
+              <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
+                  Valuation Summary
+                </p>
+                <p className="mt-3 text-3xl font-semibold text-[#2d3135]">
+                  {formatMoney(estimatedPrice)}
+                </p>
+            
                 {(estimatedLow || estimatedHigh) && (
-                  <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                    <p className="text-sm text-[#8b6b52]">Indicative Range</p>
-                    <p className="mt-2 text-lg font-semibold text-[#2d3135]">
-                      {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
-                    </p>
-                    <p className="mt-2 text-sm text-[#6a727a]">
-                      Based on {numOfComps || 0} nearby transactions within {radiusUsedM || 0}m
-                    </p>
-                  </div>
+                  <p className="mt-2 text-sm text-[#6a727a]">
+                    Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                  </p>
                 )}
-              </>
+            
+                <p className="mt-2 text-sm text-[#6a727a]">
+                  Based on {numOfComps || 0} nearby transactions
+                  {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
+                </p>
+              </div>
             )}
 
             {hasUnlockedReport && (
@@ -1974,16 +1880,117 @@ export default function Home() {
                     )}
                   </div>
                 ) : (
-                  <div className="mt-4 space-y-3">
-                    {(() => {
-                      const activeRows =
-                        propertyCategory === 'condo' || propertyCategory === 'ec'
-                          ? activeCondoTab === 'same_project'
-                            ? sameProjectComparables
-                            : nearbyCondoComparables
-                          : activeHdbTab === 'same_block'
-                          ? sameBlockComparables
-                          : nearbyHdbComparables
+                  <>
+                    <div className="mt-4 flex gap-2 overflow-x-auto">
+                      {(propertyCategory === 'condo' || propertyCategory === 'ec') && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setActiveCondoTab('same_project')}
+                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
+                              activeCondoTab === 'same_project'
+                                ? 'bg-[#2f3438] text-white'
+                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
+                            }`}
+                          >
+                            Same Project
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveCondoTab('nearby')}
+                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
+                              activeCondoTab === 'nearby'
+                                ? 'bg-[#2f3438] text-white'
+                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
+                            }`}
+                          >
+                            Nearby
+                          </button>
+                        </>
+                      )}
+                
+                      {propertyCategory === 'hdb' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setActiveHdbTab('same_block')}
+                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
+                              activeHdbTab === 'same_block'
+                                ? 'bg-[#2f3438] text-white'
+                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
+                            }`}
+                          >
+                            Same Block
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveHdbTab('nearby')}
+                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
+                              activeHdbTab === 'nearby'
+                                ? 'bg-[#2f3438] text-white'
+                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
+                            }`}
+                          >
+                            Nearby
+                          </button>
+                        </>
+                      )}
+                    </div>
+                
+                    <div className="mt-4 space-y-3">
+                      {(() => {
+                        const activeRows =
+                          propertyCategory === 'condo' || propertyCategory === 'ec'
+                            ? activeCondoTab === 'same_project'
+                              ? sameProjectComparables
+                              : nearbyCondoComparables
+                            : activeHdbTab === 'same_block'
+                            ? sameBlockComparables
+                            : nearbyHdbComparables
+                
+                        if (activeRows.length === 0) {
+                          return (
+                            <p className="text-sm text-[#67707a]">
+                              No recent comparables available yet.
+                            </p>
+                          )
+                        }
+                
+                        return activeRows.map((row, index) => (
+                          <div
+                            key={`${row.address}-${row.transaction_date}-${index}`}
+                            className="rounded-2xl border border-[#eee4d8] bg-[#fcfbf9] p-4"
+                          >
+                            <p className="text-sm font-medium text-[#2d3135]">
+                              {propertyCategory === 'condo' || propertyCategory === 'ec'
+                                ? row.project_name || row.address || '-'
+                                : row.address || '-'}
+                            </p>
+                            <p className="mt-1 text-xs text-[#6a727a]">
+                              {formatDate(row.transaction_date)}
+                              {showFloorRangeColumn && propertyCategory === 'hdb' && row.floor_level
+                                ? ` • ${row.floor_level}`
+                                : ''}
+                              {' • '}
+                              {sqmToSqft(row.floor_area_sqm)} sqft
+                              {' • '}
+                              {Math.round(row.distance_m)}m
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-[#2d3135]">
+                              ${Math.round(row.transaction_price).toLocaleString()}
+                            </p>
+                            <p className="mt-1 text-xs text-[#6a727a]">
+                              ${Math.round(row.psf).toLocaleString()} psf
+                              {propertyCategory !== 'hdb' && row.tenure
+                                ? ` • ${formatTenure(row.tenure)}`
+                                : ''}
+                            </p>
+                          </div>
+                        ))
+                      })()}
+                    </div>
+                  </>
+                )
 
                       if (activeRows.length === 0) {
                         return (
