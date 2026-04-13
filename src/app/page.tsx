@@ -448,7 +448,8 @@ export default function Home() {
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [formMessage, setFormMessage] = useState('')
-  
+
+  const [leadFormMessage, setLeadFormMessage] = useState('')
   const [hasReport, setHasReport] = useState(false)
 
   const [leadName, setLeadName] = useState('')
@@ -834,6 +835,17 @@ export default function Home() {
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
       setHasReport(true)
+
+      const comparables = await fetchRecentComparables(
+        resolved.lat,
+        resolved.lon,
+        propertyType,
+        propertyCategory,
+        result.radius
+      )
+
+      setRecentComparables(comparables)
+
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 200)
@@ -982,6 +994,65 @@ export default function Home() {
     setConsultPhone('')
     setConsultEmail('')
     setConsultPlan('')
+  }
+
+  const handleLeadSubmit = async () => {
+    setLeadFormMessage('')
+
+    if (!leadName.trim()) {
+      setLeadFormMessage('Please enter your name.')
+      return
+    }
+
+    if (!leadPhone.trim()) {
+      setLeadFormMessage('Please enter your phone number.')
+      return
+    }
+
+    if (!isValidPhone(leadPhone)) {
+      setLeadFormMessage('Please enter a valid phone number.')
+      return
+    }
+
+    if (!leadEmail.trim()) {
+      setLeadFormMessage('Please enter your email.')
+      return
+    }
+
+    if (!isValidEmail(leadEmail)) {
+      setLeadFormMessage('Please enter a valid email address.')
+      return
+    }
+
+    const leadPayload = {
+      ...buildLeadPayload(leadName, leadPhone, leadEmail),
+      estimated_price: estimatedPrice,
+      estimated_low: estimatedLow,
+      estimated_high: estimatedHigh,
+      comparables_count: numOfComps,
+      radius_used_m: radiusUsedM,
+      source: 'valuation',
+    }
+
+    const { error } = await supabase.from('leads').insert([leadPayload])
+
+    if (error) {
+      console.error('Valuation lead save error:', error)
+      setLeadFormMessage('Could not save your details right now. Please try again.')
+      return
+    }
+
+    const emailResult = await sendLeadEmail(leadPayload)
+
+    if (!emailResult.ok) {
+      setLeadFormMessage('Details saved, but email notification failed. Check Vercel logs.')
+      return
+    }
+
+    setLeadFormMessage('Thanks — we will contact you shortly.')
+    setLeadName('')
+    setLeadPhone('')
+    setLeadEmail('')
   }
 
   const fetchRecentComparables = async (
@@ -1992,31 +2063,129 @@ export default function Home() {
                     {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
                   </p>
                 </div>
-              </div>
-            )}{hasReport && (
-              <div
-                ref={resultRef}
-                className="mt-4 space-y-4"
-              >
+
                 <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                    Valuation Summary
+                    Unlock full report
+                  </p>
+                  <p className="mt-2 text-sm text-[#6a727a]">
+                    Leave your details and we’ll contact you with a fuller valuation review.
                   </p>
 
-                  <p className="mt-3 text-3xl font-semibold text-[#2d3135] md:text-4xl">
-                    {formatMoney(estimatedPrice)}
-                  </p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <input
+                      type="text"
+                      value={leadName}
+                      onChange={(e) => setLeadName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                    <input
+                      type="text"
+                      value={leadPhone}
+                      onChange={(e) => setLeadPhone(e.target.value)}
+                      placeholder="Your phone number"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                    <input
+                      type="email"
+                      value={leadEmail}
+                      onChange={(e) => setLeadEmail(e.target.value)}
+                      placeholder="Your email"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+                  </div>
 
-                  {(estimatedLow || estimatedHigh) && (
-                    <p className="mt-2 text-sm text-[#6a727a]">
-                      Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                  <button
+                    type="button"
+                    onClick={handleLeadSubmit}
+                    className="mt-4 rounded-2xl bg-[#2f3438] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#24292d]"
+                  >
+                    Submit Details
+                  </button>
+
+                  {leadFormMessage && (
+                    <p className="mt-3 text-sm text-[#8b6b52]">
+                      {leadFormMessage}
                     </p>
                   )}
+                </div>
 
-                  <p className="mt-2 text-sm text-[#6a727a]">
-                    Based on {numOfComps || 0} nearby transactions
-                    {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
-                  </p>
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
+                        Recent comparables
+                      </p>
+                      <p className="mt-1 text-sm text-[#6a727a]">
+                        Nearby transactions used as reference.
+                      </p>
+                    </div>
+                  </div>
+
+                  {recentComparables.length > 0 ? (
+                    <div className="mt-4 overflow-x-auto">
+                      <table className="min-w-full border-separate border-spacing-0 text-sm">
+                        <thead>
+                          <tr className="text-left text-[#6a727a]">
+                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
+                              Address / Project
+                            </th>
+                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
+                              Date
+                            </th>
+                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
+                              Price
+                            </th>
+                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
+                              Size
+                            </th>
+                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
+                              PSF
+                            </th>
+                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
+                              Distance
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentComparables.map((row, index) => (
+                            <tr key={`${row.address}-${row.transaction_date}-${row.transaction_price}-${index}`}>
+                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top">
+                                <div className="font-medium text-[#2d3135]">
+                                  {row.project_name || row.address || '-'}
+                                </div>
+                                {row.project_name && row.address && (
+                                  <div className="mt-1 text-xs text-[#7a8289]">
+                                    {row.address}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
+                                {formatDate(row.transaction_date)}
+                              </td>
+                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
+                                {formatMoney(row.transaction_price)}
+                              </td>
+                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
+                                {sqmToSqft(row.floor_area_sqm)} sqft
+                              </td>
+                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
+                                ${Math.round(row.psf).toLocaleString()}
+                              </td>
+                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
+                                {Math.round(row.distance_m)}m
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-[#6a727a]">
+                      No comparable transactions available yet.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
