@@ -551,7 +551,7 @@ export default function Home() {
           .ilike('project_name', selectedProjectName)
           .not('completion_year', 'is', null)
           .limit(1)
-          .single()
+          .maybeSingle()
       
         if (projectData) {
           const yr = Number(projectData.completion_year)
