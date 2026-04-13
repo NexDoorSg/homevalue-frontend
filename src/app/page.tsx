@@ -1844,11 +1844,52 @@ export default function Home() {
             </div>
 
             {propertyCategory === 'landed' ? (
-              <div className="mt-8 rounded-3xl border border-[#e5dbcf] bg-[#faf8f4] p-8">
-                <p className="text-base leading-7 text-[#646c74]">
-                  This estimate is based on an average of what has been sold in the area based on land size. For actual valuation, please contact us directly.
-                </p>
-              </div>
+              <>
+                <div className="mt-8 rounded-3xl border border-[#e5dbcf] bg-[#faf8f4] p-6">
+                  <p className="text-base leading-7 text-[#646c74]">
+                    This estimate is based on an average of what has been sold in the area based on land size. For actual valuation, please contact us directly.
+                  </p>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-[#efe7dd]">
+                      <thead className="bg-[#faf8f4]">
+                        <tr>
+                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Date</th>
+                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Address</th>
+                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Size (sqft)</th>
+                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Price</th>
+                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">PSF</th>
+                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Tenure</th>
+                          <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Distance</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#f3ede5]">
+                        {recentComparables.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-5 py-8 text-center text-sm text-[#67707a]">
+                              No recent comparables available yet.
+                            </td>
+                          </tr>
+                        ) : (
+                          recentComparables.map((row, index) => (
+                            <tr key={`${row.address}-${row.transaction_date}-${index}`}>
+                              <td className="px-5 py-4 text-sm text-[#2d3135]">{formatDate(row.transaction_date)}</td>
+                              <td className="px-5 py-4 text-sm text-[#2d3135]">{row.address || '-'}</td>
+                              <td className="px-5 py-4 text-sm text-[#2d3135]">{sqmToSqft(row.floor_area_sqm)}</td>
+                              <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.transaction_price).toLocaleString()}</td>
+                              <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.psf).toLocaleString()}</td>
+                              <td className="px-5 py-4 text-sm text-[#2d3135]">{formatTenure(row.tenure)}</td>
+                              <td className="px-5 py-4 text-sm text-[#2d3135]">{Math.round(row.distance_m)}m</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             ) : (
               <>
                 {/* Tab buttons */}
