@@ -439,6 +439,59 @@ function pickPreferredNonLandedRows(
   return baseRows
 }
 
+function tierComparableRows(
+  rows: CleanedRow[],
+  subjectProjectName: string | null | undefined,
+  subjectCompletionYear: number | null | undefined,
+  propertyCategory: PropertyCategory
+): CleanedRow[] {
+  if (propertyCategory !== 'condo' && propertyCategory !== 'ec') return rows
+
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
+
+  // Tier 1: Same project — always most reliable
+  if (normalizedSubjectProject) {
+    const tier1 = rows.filter(
+      (row) => normalizeText(row.project_name) === normalizedSubjectProject
+    )
+    if (tier1.length >= 3) return tier1
+  }
+
+  // Tier 2: Similar age projects (within 10 years) with valid completion year
+  if (subjectCompletionYear) {
+    const tier2 = rows.filter((row) => {
+      if (!row.completion_year) return false
+      return Math.abs(row.completion_year - subjectCompletionYear) <= 10
+    })
+    if (tier2.length >= 3) {
+      // If we also have same-project rows, prepend them
+      if (normalizedSubjectProject) {
+        const sameProject = rows.filter(
+          (row) => normalizeText(row.project_name) === normalizedSubjectProject
+        )
+        const others = tier2.filter(
+          (row) => normalizeText(row.project_name) !== normalizedSubjectProject
+        )
+        return [...sameProject, ...others]
+      }
+      return tier2
+    }
+  }
+
+  // Tier 3: Fall back to all rows but exclude projects that are clearly
+  // new launches (completion year more than 15 years newer than subject)
+  if (subjectCompletionYear) {
+    const tier3 = rows.filter((row) => {
+      if (!row.completion_year) return true // keep unknowns
+      return row.completion_year <= subjectCompletionYear + 15
+    })
+    if (tier3.length >= 3) return tier3
+  }
+
+  // Last resort: return everything
+  return rows
+}
+
 function buildNonLandedCandidate(
   rows: CleanedRow[],
   radius: number,
@@ -661,7 +714,8 @@ function buildLandedFallback(
   rows: CleanedRow[],
   landSizeSqm: number,
   propertyType: string,
-  tenure?: string
+  tenure?: string,
+  isStrata?: boolean | null
 ): CandidateResult | null {
   if (rows.length === 0) return null
 
@@ -673,15 +727,24 @@ function buildLandedFallback(
   if (exactTypeRows.length >= 2) {
     fallbackPool = exactTypeRows
   }
-
-  const subjectTenureBucket = getSubjectTenureBucket(tenure)
-
-  const sameTenureRows = fallbackPool.filter(
-    (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
-  )
-  if (sameTenureRows.length >= 2) {
-    fallbackPool = sameTenureRows
+  
+  // Filter by strata vs non-strata
+  if (isStrata !== null && isStrata !== undefined) {
+    const sameStrataRows = fallbackPool.filter(
+      (row) => row.is_strata === isStrata
+    )
+    if (sameStrataRows.length >= 2) {
+      fallbackPool = sameStrataRows
+    }
   }
+
+const subjectTenureBucket = getSubjectTenureBucket(tenure)
+const sameTenureRows = fallbackPool.filter(
+  (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
+)
+if (sameTenureRows.length >= 2) {
+  fallbackPool = sameTenureRows
+}
 
   const similarSizeRows = fallbackPool.filter((row) => {
     const ratio = row.floor_area_sqm / landSizeSqm
@@ -742,6 +805,9 @@ export async function getValuation({
   builtUpSqm,
   tenure,
   floorLevel,
+  subjectProjectName,
+  subjectCompletionYear,
+  subjectIsStrata,
 }: ValuationParams) {
   const searchRadius = getSearchRadius(propertyCategory)
 
@@ -771,21 +837,38 @@ export async function getValuation({
 
       let cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
       if (cleanedRows.length === 0) continue
-
+      
+      // Filter by landed type (terrace/semi-D/detached)
       const exactTypeRows = cleanedRows.filter((row) =>
         isMatchingLandedType(row.unit_type, propertyType)
       )
       if (exactTypeRows.length > 0) {
         cleanedRows = exactTypeRows
       }
-
+      
+      // Filter by strata vs non-strata — these are fundamentally different markets
+      if (subjectIsStrata !== null) {
+        const sameStrataRows = cleanedRows.filter(
+          (row) => row.is_strata === subjectIsStrata
+        )
+        if (sameStrataRows.length >= 2) {
+          cleanedRows = sameStrataRows
+        }
+      }
+      
+      // Hard filter by tenure — only fall back to mixed tenure if pool is too small
       const subjectTenureBucket = getSubjectTenureBucket(tenure)
-
       const sameTenureRows = cleanedRows.filter(
         (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
       )
-      if (sameTenureRows.length >= 2) {
+      if (sameTenureRows.length >= 3) {
         cleanedRows = sameTenureRows
+      } else if (sameTenureRows.length >= 1) {
+        // Partial match — use same tenure rows but supplement with others
+        const otherRows = cleanedRows.filter(
+          (row) => normalizeTenureBucket(row.tenure) !== subjectTenureBucket
+        )
+        cleanedRows = [...sameTenureRows, ...otherRows]
       }
 
       const candidate = buildLandedCandidate(
@@ -844,7 +927,7 @@ export async function getValuation({
     if (error || !data || data.length === 0) return null
 
     const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
-    return buildLandedFallback(fallbackRows, landSizeSqm, propertyType, tenure)
+    return buildLandedFallback(fallbackRows, landSizeSqm, propertyType, tenure, subjectIsStrata)
   }
 
   let bestCandidate: CandidateResult | null = null
@@ -877,38 +960,23 @@ export async function getValuation({
       if (sameTypeRows.length >= 2) {
         valuationPool = sameTypeRows
       }
+    
+      // Apply tiering to exclude new launches and use age-appropriate comparables
+      valuationPool = tierComparableRows(
+        valuationPool,
+        subjectProjectName,
+        subjectCompletionYear,
+        propertyCategory
+      )
     }
-
-    const detectedProjectName = (() => {
-      const projectCounts = new Map<string, number>()
-
-      for (const row of valuationPool) {
-        const project = normalizeText(row.project_name)
-        if (!project) continue
-        if (row.distanceM > Math.min(radius, 400)) continue
-        projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
-      }
-
-      let bestProject: string | null = null
-      let bestCount = 0
-
-      for (const [project, count] of projectCounts.entries()) {
-        if (count > bestCount) {
-          bestProject = project
-          bestCount = count
-        }
-      }
-
-      return bestProject
-    })()
-
+    
     const candidate = buildNonLandedCandidate(
       valuationPool,
       radius,
       floorAreaSqm,
       propertyCategory,
       floorLevel,
-      detectedProjectName
+      subjectProjectName
     )
 
     if (!candidate) continue
@@ -960,7 +1028,7 @@ export async function getValuation({
 
   let fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
   if (fallbackRows.length === 0) return null
-
+  
   if (propertyCategory === 'condo' || propertyCategory === 'ec') {
     const sameTypeRows = fallbackRows.filter((row) =>
       isMatchingNonLandedType(row.unit_type, propertyType)
@@ -968,36 +1036,20 @@ export async function getValuation({
     if (sameTypeRows.length >= 2) {
       fallbackRows = sameTypeRows
     }
+  
+    fallbackRows = tierComparableRows(
+      fallbackRows,
+      subjectProjectName,
+      subjectCompletionYear,
+      propertyCategory
+    )
   }
-
-  const detectedProjectName = (() => {
-    const projectCounts = new Map<string, number>()
-
-    for (const row of fallbackRows) {
-      const project = normalizeText(row.project_name)
-      if (!project) continue
-      if (row.distanceM > 400) continue
-      projectCounts.set(project, (projectCounts.get(project) || 0) + 1)
-    }
-
-    let bestProject: string | null = null
-    let bestCount = 0
-
-    for (const [project, count] of projectCounts.entries()) {
-      if (count > bestCount) {
-        bestProject = project
-        bestCount = count
-      }
-    }
-
-    return bestProject
-  })()
-
+  
   return buildNonLandedFallback(
     fallbackRows,
     floorAreaSqm,
     propertyCategory,
     floorLevel,
-    detectedProjectName
+    subjectProjectName
   )
 }
