@@ -427,7 +427,7 @@ export default function Home() {
     setSelectedLon(Number(item.LONGITUDE))
     setSelectedStreetName(item.ROAD_NAME ? item.ROAD_NAME.toUpperCase().trim() : null)
     setSelectedProjectName(
-    console.log('[DEBUG] selectedProjectName from OneMap:', item.BUILDING)
+      console.log('[DEBUG] selectedProjectName from OneMap:', item.BUILDING)
       item.BUILDING && item.BUILDING !== 'NIL'
         ? item.BUILDING.toUpperCase().trim()
         : null
