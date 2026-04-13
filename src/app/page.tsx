@@ -444,6 +444,10 @@ export default function Home() {
     return {
       lat: selectedLat,
       lon: selectedLon,
+      address: address,
+      streetName: selectedStreetName,
+      projectName: selectedProjectName,
+      lookupCandidates,
     }
   }
 
@@ -470,18 +474,28 @@ export default function Home() {
     const lat = Number(chosen.LATITUDE)
     const lon = Number(chosen.LONGITUDE)
 
-    setSelectedLat(lat)
-    setSelectedLon(lon)
-    setSelectedStreetName(chosen.ROAD_NAME ? chosen.ROAD_NAME.toUpperCase().trim() : null)
-    setSelectedProjectName(
+    const resolvedStreetName = chosen.ROAD_NAME ? chosen.ROAD_NAME.toUpperCase().trim() : null
+    const resolvedProjectName =
       chosen.BUILDING && chosen.BUILDING !== 'NIL'
         ? chosen.BUILDING.toUpperCase().trim()
         : null
-    )
-    setLookupCandidates(buildLookupCandidates(chosen))
+    const resolvedLookupCandidates = buildLookupCandidates(chosen)
+    
+    setSelectedLat(lat)
+    setSelectedLon(lon)
+    setSelectedStreetName(resolvedStreetName)
+    setSelectedProjectName(resolvedProjectName)
+    setLookupCandidates(resolvedLookupCandidates)
     setAddress(chosen.ADDRESS)
-
-    return { lat, lon }
+    
+    return {
+      lat,
+      lon,
+      address: chosen.ADDRESS,
+      streetName: resolvedStreetName,
+      projectName: resolvedProjectName,
+      lookupCandidates: resolvedLookupCandidates,
+    }
   } catch (error) {
     console.error('Failed to resolve address for generation:', error)
     return null
@@ -541,15 +555,17 @@ export default function Home() {
         return
       }
       
+      const resolvedProjectName = resolved.projectName || null
+      
       // Look up completion year and is_strata for condo/EC/landed
       let subjectCompletionYear: number | null = null
       let subjectIsStrata: boolean | null = null
       
-      if (selectedProjectName && (propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed')) {
+      if (resolvedProjectName && (propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed')) {
         const { data: projectData } = await supabase
           .from('property_transactions_v2')
           .select('completion_year, is_strata')
-          .ilike('project_name', selectedProjectName)
+          .ilike('project_name', resolvedProjectName)
           .not('completion_year', 'is', null)
           .limit(1)
           .maybeSingle()
@@ -580,7 +596,7 @@ export default function Home() {
         floorLevel: Number(floorLevel) || undefined,
         propertyType,
         propertyCategory,
-        subjectProjectName: selectedProjectName,
+        subjectProjectName: resolvedProjectName,
         subjectCompletionYear: subjectCompletionYear,
         subjectIsStrata: subjectIsStrata,
       })
