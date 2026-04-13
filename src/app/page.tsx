@@ -860,11 +860,18 @@ export default function Home() {
         source: 'valuation',
       }
       
-      const { error: leadInsertError } = await supabase.from('leads').insert([leadPayload])
+      const { data: insertedLead, error: leadInsertError } = await supabase
+        .from('leads')
+        .insert([leadPayload])
+        .select()
+        .single()
       
       if (leadInsertError) {
         console.error('Valuation lead save error:', leadInsertError)
+        setFormMessage(`Lead save failed: ${leadInsertError.message}`)
       } else {
+        console.log('Lead saved successfully:', insertedLead)
+      
         const emailResult = await sendLeadEmail(leadPayload)
         if (!emailResult.ok) {
           console.error('Lead saved but email notification failed:', emailResult.error)
