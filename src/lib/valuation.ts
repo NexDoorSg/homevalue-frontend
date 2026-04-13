@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-type PropertyCategory = 'hdb' | 'condo' | 'landed'
+type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
 
 type ValuationParams = {
   lat: number
@@ -96,7 +96,7 @@ function getSearchRadius(propertyCategory: PropertyCategory) {
     return [1000, 2000, 3000, 5000, 8000]
   }
 
-  if (propertyCategory === 'condo') {
+  if (propertyCategory === 'condo' || propertyCategory === 'ec') {
     return [300, 600, 900, 1200, 1500, 2000, 3000]
   }
 
@@ -273,7 +273,6 @@ async function fetchRowsForRadius(
   propertyType: string,
   propertyCategory: PropertyCategory
 ) {
-  const source = propertyCategory === 'hdb' ? 'data_gov_hdb' : 'ura_private'
   const box = getBoundingBox(lat, lon, radiusM)
 
   let query = supabase
@@ -281,7 +280,6 @@ async function fetchRowsForRadius(
     .select(
       'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
     )
-    .eq('source', source)
     .gte('latitude', box.minLat)
     .lte('latitude', box.maxLat)
     .gte('longitude', box.minLon)
@@ -293,13 +291,17 @@ async function fetchRowsForRadius(
     .order('transaction_date', { ascending: false })
 
   if (propertyCategory === 'hdb') {
-    query = query.eq('unit_type', normalizeText(propertyType)).limit(1000)
+    query = query
+      .eq('property_group', 'hdb')
+      .eq('unit_type', normalizeText(propertyType))
+      .limit(1000)
   } else if (propertyCategory === 'condo') {
-    query = query.limit(2000)
+    query = query.eq('property_subtype', 'condo').limit(2000)
+  } else if (propertyCategory === 'ec') {
+    query = query.eq('property_subtype', 'ec').limit(2000)
   } else {
-    query = query.limit(3000)
+    query = query.in('property_subtype', ['landed_strata', 'landed_non_strata']).limit(3000)
   }
-
   const { data, error } = await query
   return { data, error }
 }
@@ -844,7 +846,7 @@ export async function getValuation({
 
     let valuationPool = cleanedRows
 
-    if (propertyCategory === 'condo') {
+    if (propertyCategory === 'condo' || propertyCategory === 'ec') {
       const sameTypeRows = cleanedRows.filter((row) =>
         isMatchingNonLandedType(row.unit_type, propertyType)
       )
@@ -935,7 +937,7 @@ export async function getValuation({
   let fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
   if (fallbackRows.length === 0) return null
 
-  if (propertyCategory === 'condo') {
+  if (propertyCategory === 'condo' || propertyCategory === 'ec') {
     const sameTypeRows = fallbackRows.filter((row) =>
       isMatchingNonLandedType(row.unit_type, propertyType)
     )
