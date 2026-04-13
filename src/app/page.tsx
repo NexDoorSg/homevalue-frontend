@@ -323,16 +323,89 @@ export default function Home() {
       (row) => row.floor_level && row.floor_level.trim() !== ''
     )
 
-  const resolvedProjectName = (selectedProjectName || '').toUpperCase().trim()
+  const selectedProjectKey = (selectedProjectName || '').toUpperCase().trim()
 
-    const sameProjectComparables = recentComparables.filter((row) => {
+  const inferredSameProjectName =
+    propertyCategory === 'condo' || propertyCategory === 'ec'
+      ? (() => {
+          const subjectStreet = abbreviateRoadWords(
+            (selectedStreetName || '').toUpperCase().trim()
+          )
+          const subjectBlock =
+            (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
+  
+          const sameBlockRows = recentComparables.filter((row) => {
+            const rowProject = (row.project_name || '').toUpperCase().trim()
+            const rowStreet = abbreviateRoadWords(
+              (row.street_name || '').toUpperCase().trim()
+            )
+            const rowBlock =
+              (row.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
+  
+            return (
+              rowProject &&
+              rowStreet &&
+              subjectStreet &&
+              rowStreet === subjectStreet &&
+              rowBlock &&
+              subjectBlock &&
+              rowBlock === subjectBlock
+            )
+          })
+  
+          const countProjects = (rows: typeof recentComparables) => {
+            const counts = new Map<string, number>()
+            for (const row of rows) {
+              const project = (row.project_name || '').toUpperCase().trim()
+              if (!project) continue
+              counts.set(project, (counts.get(project) || 0) + 1)
+            }
+  
+            let bestProject = ''
+            let bestCount = 0
+            for (const [project, count] of counts.entries()) {
+              if (count > bestCount) {
+                bestProject = project
+                bestCount = count
+              }
+            }
+            return bestProject
+          }
+  
+          const fromSameBlock = countProjects(sameBlockRows)
+          if (fromSameBlock) return fromSameBlock
+  
+          const exactRows = recentComparables.filter((row) => {
+            const rowProject = (row.project_name || '').toUpperCase().trim()
+            return rowProject && selectedProjectKey && rowProject === selectedProjectKey
+          })
+          if (exactRows.length > 0) return selectedProjectKey
+  
+          const fuzzyRows = recentComparables.filter((row) => {
+            const rowProject = (row.project_name || '').toUpperCase().trim()
+            return (
+              rowProject &&
+              selectedProjectKey &&
+              (rowProject.includes(selectedProjectKey) ||
+                selectedProjectKey.includes(rowProject))
+            )
+          })
+  
+          const fromFuzzy = countProjects(fuzzyRows)
+          if (fromFuzzy) return fromFuzzy
+  
+          return selectedProjectKey
+        })()
+      : ''
+  
+  const sameProjectComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
-    return rowProject && resolvedProjectName && rowProject === resolvedProjectName
+    return rowProject && inferredSameProjectName && rowProject === inferredSameProjectName
   })
   
   const nearbyCondoComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
-    return !(rowProject && resolvedProjectName && rowProject === resolvedProjectName)
+    return !(rowProject && inferredSameProjectName && rowProject === inferredSameProjectName)
   })
 
   const sameBlockComparables = recentComparables.filter((row) => {
@@ -1147,9 +1220,66 @@ export default function Home() {
   
     if (category === 'condo' || category === 'ec') {
       const subjectCondoSqm = Number(sqftToSqm(floorAreaSqm)) || 0
-
-      // Fetch same-project rows separately with no distance/size filter
-      const sameProjectName = (selectedProjectName || '').toUpperCase().trim()
+    
+      const selectedProjectKey = (selectedProjectName || '').toUpperCase().trim()
+    
+      const countProjects = (
+        rows: Array<
+          typeof withNormalized[number]
+        >
+      ) => {
+        const counts = new Map<string, number>()
+        for (const row of rows) {
+          const project = (row.project_name || '').toUpperCase().trim()
+          if (!project) continue
+          counts.set(project, (counts.get(project) || 0) + 1)
+        }
+    
+        let bestProject = ''
+        let bestCount = 0
+        for (const [project, count] of counts.entries()) {
+          if (count > bestCount) {
+            bestProject = project
+            bestCount = count
+          }
+        }
+        return bestProject
+      }
+    
+      const sameBlockRowsForInference = withNormalized.filter((row) => {
+        const rowProject = (row.project_name || '').toUpperCase().trim()
+        return (
+          rowProject &&
+          row._normStreet &&
+          subjectStreet &&
+          row._normStreet === subjectStreet &&
+          row._block &&
+          subjectBlock &&
+          row._block === subjectBlock
+        )
+      })
+    
+      const exactMatchRowsForInference = withNormalized.filter((row) => {
+        const rowProject = (row.project_name || '').toUpperCase().trim()
+        return rowProject && selectedProjectKey && rowProject === selectedProjectKey
+      })
+    
+      const fuzzyMatchRowsForInference = withNormalized.filter((row) => {
+        const rowProject = (row.project_name || '').toUpperCase().trim()
+        return (
+          rowProject &&
+          selectedProjectKey &&
+          (rowProject.includes(selectedProjectKey) ||
+            selectedProjectKey.includes(rowProject))
+        )
+      })
+    
+      const sameProjectName =
+        countProjects(sameBlockRowsForInference) ||
+        (exactMatchRowsForInference.length > 0 ? selectedProjectKey : '') ||
+        countProjects(fuzzyMatchRowsForInference) ||
+        selectedProjectKey
+    
       let sameProjectQuery = supabase
         .from('property_transactions_v2')
         .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure')
@@ -1160,11 +1290,11 @@ export default function Home() {
         .not('longitude', 'is', null)
         .order('transaction_date', { ascending: false })
         .limit(20)
-
+    
       if (sameProjectName) {
         sameProjectQuery = sameProjectQuery.ilike('project_name', sameProjectName)
       }
-
+    
       const { data: sameProjectData } = sameProjectName
         ? await sameProjectQuery
         : { data: [] }
@@ -1883,6 +2013,31 @@ export default function Home() {
                   Based on {numOfComps || 0} nearby transactions
                   {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
                 </p>
+              </div>
+            )}
+
+            {hasUnlockedReport && (
+              <div className="mt-4 hidden lg:block">
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm max-w-md">
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
+                    Valuation Summary
+                  </p>
+            
+                  <p className="mt-3 text-4xl font-semibold text-[#2d3135]">
+                    {formatMoney(estimatedPrice)}
+                  </p>
+            
+                  {(estimatedLow || estimatedHigh) && (
+                    <p className="mt-2 text-sm text-[#6a727a]">
+                      Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                    </p>
+                  )}
+            
+                  <p className="mt-2 text-sm text-[#6a727a]">
+                    Based on {numOfComps || 0} nearby transactions
+                    {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
+                  </p>
+                </div>
               </div>
             )}
 
