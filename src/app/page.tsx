@@ -573,19 +573,6 @@ export default function Home() {
     const subjBlock = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
     return !(rowStreet && subjStreet && rowStreet === subjStreet && rowBlock && subjBlock && rowBlock === subjBlock)
   })
-
-  const previewComparables =
-    propertyCategory === 'landed'
-      ? recentComparables.slice(0, 3)
-      : propertyCategory === 'condo' || propertyCategory === 'ec'
-      ? (sameProjectComparables.length > 0
-          ? sameProjectComparables
-          : nearbyCondoComparables
-        ).slice(0, 3)
-      : (sameBlockComparables.length > 0
-          ? sameBlockComparables
-          : nearbyHdbComparables
-        ).slice(0, 3)
   
   const searchAddress = async (value: string) => {
     if (value.trim().length < 3) {
@@ -2105,119 +2092,123 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            
-            {hasReport && (
-              <div
-                ref={resultRef}
-                className="mt-4 space-y-4"
-              >
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                    Valuation Summary
-                  </p>
-
-                  <p className="mt-3 text-3xl font-semibold text-[#2d3135] md:text-4xl">
-                    {formatMoney(estimatedPrice)}
-                  </p>
-
-                  {(estimatedLow || estimatedHigh) && (
-                    <p className="mt-2 text-sm text-[#6a727a]">
-                      Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
-                    </p>
-                  )}
-
-                  <p className="mt-2 text-sm text-[#6a727a]">
-                    Based on {numOfComps || 0} nearby transactions
-                    {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                        {activeTab === 'same' ? 'Same project / block comparables' : 'Nearby comparables'}
-                      </p>
-                      
-                      <p className="mt-1 text-sm text-[#6a727a]">
-                        {activeTab === 'same'
-                          ? 'Transactions from the same project or same block.'
-                          : 'Nearby transactions used as reference.'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {(activeTab === 'same' ? previewComparables : recentComparables).length > 0 ? (
-                    <div className="mt-4 overflow-x-auto max-h-[400px] overflow-y-auto">
-                      <table className="min-w-full border-separate border-spacing-0 text-sm">
-                        <thead>
-                          <tr className="text-left text-[#6a727a]">
-                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
-                              Address / Project
-                            </th>
-                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
-                              Date
-                            </th>
-                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
-                              Price
-                            </th>
-                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
-                              Size
-                            </th>
-                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
-                              PSF
-                            </th>
-                            <th className="border-b border-[#eee4d8] px-4 py-3 font-medium">
-                              Distance
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(activeTab === 'same' ? previewComparables : recentComparables).map((row, index) => (
-                            <tr key={`${row.address}-${row.transaction_date}-${row.transaction_price}-${index}`}>
-                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top">
-                                <div className="font-medium text-[#2d3135]">
-                                  {row.project_name || row.address || '-'}
-                                </div>
-                                {row.project_name && row.address && (
-                                  <div className="mt-1 text-xs text-[#7a8289]">
-                                    {row.address}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
-                                {formatDate(row.transaction_date)}
-                              </td>
-                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
-                                {formatMoney(row.transaction_price)}
-                              </td>
-                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
-                                {sqmToSqft(row.floor_area_sqm)} sqft
-                              </td>
-                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
-                                ${Math.round(row.psf).toLocaleString()}
-                              </td>
-                              <td className="border-b border-[#f3ebe2] px-4 py-3 align-top text-[#2d3135]">
-                                {Math.round(row.distance_m)}m
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm text-[#6a727a]">
-                      {activeTab === 'same'
-                        ? 'No same-project or same-block transactions available yet.'
-                        : 'No nearby transactions available yet.'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </section>
+
+      {hasReport && (
+        <section className="bg-[#f7f4ef]">
+          <div
+            ref={resultRef}
+            className="mx-auto max-w-7xl px-6 py-12 md:px-10"
+          >
+            {/* Valuation Summary */}
+            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm max-w-xl">
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
+                Valuation Summary
+              </p>
+      
+              <p className="mt-3 text-3xl font-semibold text-[#2d3135] md:text-4xl">
+                {formatMoney(estimatedPrice)}
+              </p>
+      
+              {(estimatedLow || estimatedHigh) && (
+                <p className="mt-2 text-sm text-[#6a727a]">
+                  Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                </p>
+              )}
+      
+              <p className="mt-2 text-sm text-[#6a727a]">
+                Based on {numOfComps || 0} nearby transactions
+                {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
+              </p>
+            </div>
+      
+            {/* Tabs */}
+            <div className="mt-10">
+              <h3 className="text-2xl font-semibold text-[#2d3135]">
+                Real Nearby Transactions Around Your Unit
+              </h3>
+      
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setActiveTab('same')}
+                  className={`px-4 py-2 rounded-full text-sm ${
+                    activeTab === 'same'
+                      ? 'bg-[#2f3438] text-white'
+                      : 'bg-white border border-[#ddd]'
+                  }`}
+                >
+                  Same Project
+                </button>
+      
+                <button
+                  onClick={() => setActiveTab('nearby')}
+                  className={`px-4 py-2 rounded-full text-sm ${
+                    activeTab === 'nearby'
+                      ? 'bg-[#2f3438] text-white'
+                      : 'bg-white border border-[#ddd]'
+                  }`}
+                >
+                  Nearby
+                </button>
+              </div>
+      
+              {/* Table */}
+              <div className="mt-6 overflow-x-auto rounded-2xl border border-[#e5dbcf] bg-white">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[#6a727a]">
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Address</th>
+                      <th className="px-4 py-3">Size</th>
+                      <th className="px-4 py-3">Price</th>
+                      <th className="px-4 py-3">PSF</th>
+                      <th className="px-4 py-3">Distance</th>
+                    </tr>
+                  </thead>
+      
+                  <tbody>
+                    {(activeTab === 'same'
+                      ? propertyCategory === 'condo' || propertyCategory === 'ec'
+                        ? sameProjectComparables.length > 0
+                          ? sameProjectComparables
+                          : recentComparables
+                        : propertyCategory === 'hdb'
+                          ? sameBlockComparables.length > 0
+                            ? sameBlockComparables
+                            : recentComparables
+                          : recentComparables
+                      : recentComparables
+                    ).map((row, i) => (
+                      <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
+                        <td className="px-5 py-4">
+                          {formatDate(row.transaction_date)}
+                        </td>
+                        <td className="px-5 py-4">
+                          {row.project_name || row.address}
+                        </td>
+                        <td className="px-5 py-4">
+                          {sqmToSqft(row.floor_area_sqm)} sqft
+                        </td>
+                        <td className="px-5 py-4">
+                          {formatMoney(row.transaction_price)}
+                        </td>
+                        <td className="px-5 py-4">
+                          ${Math.round(row.psf).toLocaleString()}
+                        </td>
+                        <td className="px-5 py-4">
+                          {Math.round(row.distance_m)}m
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="border-t border-[#e8ddd2] bg-white">
         <div className="mx-auto max-w-7xl px-6 py-12 md:px-10">
