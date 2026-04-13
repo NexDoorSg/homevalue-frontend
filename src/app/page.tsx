@@ -32,6 +32,9 @@ type ComparableRow = {
   unit_type?: string | null
   floor_level?: string | null
   tenure?: string | null
+  property_group?: string | null
+  property_subtype?: string | null
+  is_strata?: boolean | null
 }
 
 const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
