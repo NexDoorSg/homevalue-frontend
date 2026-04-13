@@ -964,7 +964,7 @@ export default function Home() {
   
     if (category === 'hdb') {
       // Fetch same-block rows separately with no distance/size filter
-      const subjStreetForQuery = (selectedStreetName || '').toUpperCase().trim()
+      const subjStreetForQuery = abbreviateRoadWords((selectedStreetName || '').toUpperCase().trim())
       const subjBlockForQuery = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
 
       let sameBlockQuery = supabase
