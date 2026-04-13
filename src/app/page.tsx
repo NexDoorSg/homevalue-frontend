@@ -878,7 +878,15 @@ export default function Home() {
       .not('longitude', 'is', null)
   
     if (category === 'hdb') {
-      query = query.eq('unit_type', targetPropertyType).limit(5000)
+      const LAT_DELTA = 0.018  // ~2km
+      const LON_DELTA = 0.018
+      query = query
+        .eq('unit_type', targetPropertyType)
+        .gte('latitude', lat - LAT_DELTA)
+        .lte('latitude', lat + LAT_DELTA)
+        .gte('longitude', lon - LON_DELTA)
+        .lte('longitude', lon + LON_DELTA)
+        .limit(5000)
     }
   
     if (category === 'condo') {
