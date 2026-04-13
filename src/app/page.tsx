@@ -330,7 +330,6 @@ export default function Home() {
     const subjStreet = abbreviateRoadWords((selectedStreetName || '').toUpperCase().trim())
     const rowBlock = (row.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
     const subjBlock = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
-    console.log('[SAME BLOCK DEBUG] rowStreet:', rowStreet, '| subjStreet:', subjStreet, '| rowBlock:', rowBlock, '| subjBlock:', subjBlock)
     return rowStreet && subjStreet && rowStreet === subjStreet && rowBlock && subjBlock && rowBlock === subjBlock
   })
 
