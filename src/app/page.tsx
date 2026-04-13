@@ -249,6 +249,159 @@ function getDistanceMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+async function resolveCanonicalProjectName(params: {
+  lat: number
+  lon: number
+  address: string
+  streetName?: string | null
+  rawProjectName?: string | null
+  category: 'condo' | 'ec' | 'landed'
+}) {
+  const { lat, lon, address, streetName, rawProjectName, category } = params
+
+  const normalize = (value: string | null | undefined) =>
+    (value || '').toUpperCase().replace(/\s+/g, ' ').trim()
+
+  const subjectStreet = abbreviateRoadWords(normalize(streetName))
+  const subjectBlock =
+    normalize(address).match(/^(\d+[A-Z]?)\b/)?.[1] || ''
+  const rawProjectKey = normalize(rawProjectName)
+
+  const LAT_DELTA = 0.003
+  const LON_DELTA = 0.003
+
+  let query = supabase
+    .from('property_transactions_v2')
+    .select('project_name, street_name, address, latitude, longitude, completion_year, is_strata')
+    .not('project_name', 'is', null)
+    .not('latitude', 'is', null)
+    .not('longitude', 'is', null)
+    .gte('latitude', lat - LAT_DELTA)
+    .lte('latitude', lat + LAT_DELTA)
+    .gte('longitude', lon - LON_DELTA)
+    .lte('longitude', lon + LON_DELTA)
+    .limit(200)
+
+  if (category === 'condo') {
+    query = query.eq('property_subtype', 'condo')
+  } else if (category === 'ec') {
+    query = query.eq('property_subtype', 'ec')
+  } else {
+    query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+  }
+
+  const { data, error } = await query
+
+  if (error || !data || data.length === 0) {
+    return {
+      canonicalProjectName: rawProjectKey || null,
+      completionYear: null as number | null,
+      isStrata: null as boolean | null,
+    }
+  }
+
+  const rows = data.map((row) => {
+    const rowProject = normalize(row.project_name)
+    const rowStreet = abbreviateRoadWords(normalize(row.street_name))
+    const rowBlock = normalize(row.address).match(/^(\d+[A-Z]?)\b/)?.[1] || ''
+
+    return {
+      project_name: rowProject,
+      street_name: rowStreet,
+      address: normalize(row.address),
+      completion_year: row.completion_year ? Number(row.completion_year) : null,
+      is_strata: row.is_strata ?? null,
+      sameStreet: !!rowStreet && !!subjectStreet && rowStreet === subjectStreet,
+      sameBlock:
+        !!rowStreet &&
+        !!subjectStreet &&
+        rowStreet === subjectStreet &&
+        !!rowBlock &&
+        !!subjectBlock &&
+        rowBlock === subjectBlock,
+      exactRawMatch: !!rowProject && !!rawProjectKey && rowProject === rawProjectKey,
+      fuzzyRawMatch:
+        !!rowProject &&
+        !!rawProjectKey &&
+        (rowProject.includes(rawProjectKey) || rawProjectKey.includes(rowProject)),
+    }
+  })
+
+  const countProjects = (
+    input: Array<{
+      project_name: string
+      completion_year: number | null
+      is_strata: boolean | null
+    }>
+  ) => {
+    const counts = new Map<
+      string,
+      { count: number; completionYear: number | null; isStrata: boolean | null }
+    >()
+
+    for (const row of input) {
+      if (!row.project_name) continue
+
+      const existing = counts.get(row.project_name)
+      if (existing) {
+        existing.count += 1
+      } else {
+        counts.set(row.project_name, {
+          count: 1,
+          completionYear: row.completion_year,
+          isStrata: row.is_strata,
+        })
+      }
+    }
+
+    let bestProject: string | null = null
+    let bestCount = 0
+    let bestCompletionYear: number | null = null
+    let bestIsStrata: boolean | null = null
+
+    for (const [project, info] of counts.entries()) {
+      if (info.count > bestCount) {
+        bestProject = project
+        bestCount = info.count
+        bestCompletionYear = info.completionYear
+        bestIsStrata = info.isStrata
+      }
+    }
+
+    return {
+      canonicalProjectName: bestProject,
+      completionYear: bestCompletionYear,
+      isStrata: bestIsStrata,
+    }
+  }
+
+  const sameBlockRows = rows.filter((row) => row.sameBlock)
+  if (sameBlockRows.length > 0) {
+    return countProjects(sameBlockRows)
+  }
+
+  const exactRawRows = rows.filter((row) => row.exactRawMatch)
+  if (exactRawRows.length > 0) {
+    return countProjects(exactRawRows)
+  }
+
+  const fuzzyRawRows = rows.filter((row) => row.fuzzyRawMatch)
+  if (fuzzyRawRows.length > 0) {
+    return countProjects(fuzzyRawRows)
+  }
+
+  const sameStreetRows = rows.filter((row) => row.sameStreet)
+  if (sameStreetRows.length > 0) {
+    return countProjects(sameStreetRows)
+  }
+
+  return {
+    canonicalProjectName: rawProjectKey || null,
+    completionYear: null as number | null,
+    isStrata: null as boolean | null,
+  }
+}
+
 type EmailResult = {
   ok: boolean
   error?: string
@@ -628,26 +781,27 @@ export default function Home() {
         return
       }
       
-      const resolvedProjectName = resolved.projectName || null
-      
-      // Look up completion year and is_strata for condo/EC/landed
+      let resolvedProjectName = resolved.projectName || null
       let subjectCompletionYear: number | null = null
       let subjectIsStrata: boolean | null = null
-      
-      if (resolvedProjectName && (propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed')) {
-        const { data: projectData } = await supabase
-          .from('property_transactions_v2')
-          .select('completion_year, is_strata')
-          .ilike('project_name', resolvedProjectName)
-          .not('completion_year', 'is', null)
-          .limit(1)
-          .maybeSingle()
-      
-        if (projectData) {
-          const yr = Number(projectData.completion_year)
-          subjectCompletionYear = (yr > 1950 && yr <= new Date().getFullYear() + 5) ? yr : null
-          subjectIsStrata = projectData.is_strata ?? null
-        }
+
+      if (
+        propertyCategory === 'condo' ||
+        propertyCategory === 'ec' ||
+        propertyCategory === 'landed'
+      ) {
+        const canonical = await resolveCanonicalProjectName({
+          lat: resolved.lat,
+          lon: resolved.lon,
+          address: resolved.address,
+          streetName: resolved.streetName,
+          rawProjectName: resolved.projectName,
+          category: propertyCategory,
+        })
+
+        resolvedProjectName = canonical.canonicalProjectName || resolvedProjectName
+        subjectCompletionYear = canonical.completionYear
+        subjectIsStrata = canonical.isStrata
       }
 
       const result = await getValuation({
