@@ -1051,9 +1051,11 @@ export default function Home() {
 
       // Keep all deduped rows — same project rows will go to Same Project tab,
       // nearby rows will go to Nearby tab, each capped at 10 in the UI
-      const sameProjectRows = deduped.filter(
-        (row) => row._normProject === subjectProject
-      ).slice(0, 10)
+      const sameProjectRows = deduped.filter((row) => {
+        const rowProject = (row.project_name || '').toUpperCase().trim()
+        const subjProject = (selectedProjectName || '').toUpperCase().trim()
+        return rowProject && subjProject && rowProject === subjProject
+      }).slice(0, 10)
 
       const nearbyRows = (() => {
         const projectCounts: Record<string, number> = {}
