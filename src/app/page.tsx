@@ -964,7 +964,64 @@ export default function Home() {
     }))
   
     if (category === 'hdb') {
-      const hdbCandidates = withNormalized
+      // Fetch same-block rows separately with no distance/size filter
+      const subjStreetForQuery = (selectedStreetName || '').toUpperCase().trim()
+      const subjBlockForQuery = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
+
+      let sameBlockQuery = supabase
+        .from('property_transactions_v2')
+        .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure')
+        .eq('source', source)
+        .eq('unit_type', targetPropertyType)
+        .not('transaction_price', 'is', null)
+        .not('floor_area_sqm', 'is', null)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+        .order('transaction_date', { ascending: false })
+        .limit(20)
+
+      if (subjStreetForQuery && subjBlockForQuery) {
+        sameBlockQuery = sameBlockQuery.ilike('address', `${subjBlockForQuery} ${subjStreetForQuery}%`)
+      }
+
+      const { data: sameBlockData } = (subjStreetForQuery && subjBlockForQuery)
+        ? await sameBlockQuery
+        : { data: [] }
+
+      const sameBlockRows = ((sameBlockData || []) as ComparableRow[])
+        .map((row) => {
+          const transactionPrice = Number(row.transaction_price)
+          const floorArea = Number(row.floor_area_sqm)
+          const rowLat = Number(row.latitude)
+          const rowLon = Number(row.longitude)
+          const floorAreaSqft = floorArea * 10.7639
+          return {
+            address: row.address,
+            street_name: row.street_name || null,
+            project_name: row.project_name || null,
+            transaction_date: row.transaction_date,
+            transaction_price: transactionPrice,
+            floor_area_sqm: floorArea,
+            latitude: rowLat,
+            longitude: rowLon,
+            unit_type: row.unit_type || null,
+            floor_level: row.floor_level || null,
+            tenure: (row as ComparableRow & { tenure?: string | null }).tenure || null,
+            distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
+            psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
+          }
+        })
+        .filter(
+          (row) =>
+            Number.isFinite(row.transaction_price) &&
+            row.transaction_price > 0 &&
+            Number.isFinite(row.floor_area_sqm) &&
+            row.floor_area_sqm > 0
+        )
+        .slice(0, 10)
+
+      // Nearby: use bounding box pool, exclude same block, sort by priority then date
+      const nearbyHdbRows = withNormalized
         .map((row) => {
           const sameStreet = !!row._normStreet && row._normStreet === subjectStreet
           const sameBlock =
@@ -973,43 +1030,36 @@ export default function Home() {
             !!subjectBlock &&
             row._block === subjectBlock
 
+          // Exclude same-block rows — they're handled separately
+          if (sameBlock) return null
+
           let priority = 999
+          if (sameStreet && row._sizeBand === 'same') priority = 1
+          else if (sameStreet && row._sizeBand === 'similar') priority = 2
+          else if (sameStreet) priority = 3
+          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 4
+          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 5
+          else if (row.distance_m <= 500) priority = 6
+          else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 7
+          else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 8
+          else if (row.distance_m <= 1200) priority = 9
+          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 10
+          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 11
+          else if (row.distance_m <= 2000) priority = 12
 
-          if (sameBlock && row._sizeBand === 'same') priority = 1
-          else if (sameBlock && row._sizeBand === 'similar') priority = 2
-          else if (sameBlock) priority = 3
-          else if (sameStreet && row._sizeBand === 'same') priority = 4
-          else if (sameStreet && row._sizeBand === 'similar') priority = 5
-          else if (sameStreet) priority = 6
-          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 7
-          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 8
-          else if (row.distance_m <= 500) priority = 9
-          else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 10
-          else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 11
-          else if (row.distance_m <= 1200) priority = 12
-          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 13
-          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 14
-          else if (row.distance_m <= 2000) priority = 15
-
-          return {
-            ...row,
-            _priority: priority,
-          }
+          return { ...row, _priority: priority }
         })
-        .filter((row) => row._priority < 999)
-
-      return [...hdbCandidates]
+        .filter((row): row is NonNullable<typeof row> => row !== null && row._priority < 999)
         .sort((a, b) => {
-          // Primary: priority tier
           if (a._priority !== b._priority) return a._priority - b._priority
-          // Secondary: most recent first
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
           const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
           if (dateB !== dateA) return dateB - dateA
-          // Tertiary: closest first
           return a.distance_m - b.distance_m
         })
         .slice(0, 10)
+
+      return [...sameBlockRows, ...nearbyHdbRows]
     }
   
     if (category === 'condo') {
