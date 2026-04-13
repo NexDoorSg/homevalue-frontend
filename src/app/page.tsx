@@ -539,6 +539,26 @@ export default function Home() {
         setFormMessage('Could not match this address. Please choose an address from the dropdown.')
         return
       }
+      
+      // Look up completion year and is_strata for condo/EC/landed
+      let subjectCompletionYear: number | null = null
+      let subjectIsStrata: boolean | null = null
+      
+      if (selectedProjectName && (propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed')) {
+        const { data: projectData } = await supabase
+          .from('property_transactions_v2')
+          .select('completion_year, is_strata')
+          .ilike('project_name', selectedProjectName)
+          .not('completion_year', 'is', null)
+          .limit(1)
+          .single()
+      
+        if (projectData) {
+          const yr = Number(projectData.completion_year)
+          subjectCompletionYear = (yr > 1950 && yr <= new Date().getFullYear() + 5) ? yr : null
+          subjectIsStrata = projectData.is_strata ?? null
+        }
+      }
 
       const result = await getValuation({
         lat: resolved.lat,
@@ -559,6 +579,9 @@ export default function Home() {
         floorLevel: Number(floorLevel) || undefined,
         propertyType,
         propertyCategory,
+        subjectProjectName: selectedProjectName,
+        subjectCompletionYear: subjectCompletionYear,
+        subjectIsStrata: subjectIsStrata,
       })
 
       if (!result) {
