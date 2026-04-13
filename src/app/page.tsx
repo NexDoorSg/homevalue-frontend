@@ -1847,7 +1847,7 @@ export default function Home() {
               <>
                 <div className="mt-8 rounded-3xl border border-[#e5dbcf] bg-[#faf8f4] p-6">
                   <p className="text-base leading-7 text-[#646c74]">
-                    This estimate is based on an average of what has been sold in the area based on land size. For actual valuation, please contact us directly.
+                    This valuation is estimated based on recent land transactions in the area. Landed properties are highly unique so for a more accurate assessment, we recommend speaking with one of our agents directly.
                   </p>
                 </div>
 
