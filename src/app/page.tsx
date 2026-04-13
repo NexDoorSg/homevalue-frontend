@@ -204,8 +204,15 @@ function formatTenure(value: string | null | undefined) {
 }
 
 function isValidPhone(value: string) {
-  const digits = value.replace(/\D/g, '')
-  return digits.length >= 8
+  const trimmed = value.trim()
+  // International number with country code (starts with + or 00)
+  if (trimmed.startsWith('+') || trimmed.startsWith('00')) {
+    const digits = trimmed.replace(/\D/g, '')
+    return digits.length >= 10 && digits.length <= 15
+  }
+  // Local number — exactly 8 digits
+  const digits = trimmed.replace(/\D/g, '')
+  return digits.length === 8
 }
 
 function isValidEmail(value: string) {
@@ -319,16 +326,16 @@ export default function Home() {
   })
 
   const sameBlockComparables = recentComparables.filter((row) => {
-    const rowStreet = (row.street_name || '').toUpperCase().trim()
-    const subjStreet = (selectedStreetName || '').toUpperCase().trim()
+    const rowStreet = abbreviateRoadWords((row.street_name || '').toUpperCase().trim())
+    const subjStreet = abbreviateRoadWords((selectedStreetName || '').toUpperCase().trim())
     const rowBlock = (row.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
     const subjBlock = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
     return rowStreet && subjStreet && rowStreet === subjStreet && rowBlock && subjBlock && rowBlock === subjBlock
   })
 
   const nearbyHdbComparables = recentComparables.filter((row) => {
-    const rowStreet = (row.street_name || '').toUpperCase().trim()
-    const subjStreet = (selectedStreetName || '').toUpperCase().trim()
+    const rowStreet = abbreviateRoadWords((row.street_name || '').toUpperCase().trim())
+    const subjStreet = abbreviateRoadWords((selectedStreetName || '').toUpperCase().trim())
     const rowBlock = (row.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
     const subjBlock = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
     return !(rowStreet && subjStreet && rowStreet === subjStreet && rowBlock && subjBlock && rowBlock === subjBlock)
