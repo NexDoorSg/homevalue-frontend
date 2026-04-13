@@ -1072,6 +1072,8 @@ export default function Home() {
       })()
 
       return [...sameProjectRows, ...nearbyRows]
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // LANDED: Redesigned 2-stage scoring system
     // ═══════════════════════════════════════════════════════════════════════════
