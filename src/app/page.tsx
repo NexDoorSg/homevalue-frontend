@@ -849,6 +849,27 @@ export default function Home() {
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
       setHasReport(true)
+
+      const leadPayload = {
+        ...buildLeadPayload(leadName, leadPhone, leadEmail),
+        estimated_price: result.estimated,
+        estimated_low: result.low,
+        estimated_high: result.high,
+        comparables_count: result.comparables,
+        radius_used_m: result.radius,
+        source: 'valuation',
+      }
+      
+      const { error: leadInsertError } = await supabase.from('leads').insert([leadPayload])
+      
+      if (leadInsertError) {
+        console.error('Valuation lead save error:', leadInsertError)
+      } else {
+        const emailResult = await sendLeadEmail(leadPayload)
+        if (!emailResult.ok) {
+          console.error('Lead saved but email notification failed:', emailResult.error)
+        }
+      }
   
       const comparables = await fetchRecentComparables(
         resolved.lat,
