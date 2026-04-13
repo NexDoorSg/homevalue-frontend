@@ -1614,21 +1614,20 @@ export default function Home() {
                   </p>
                 )}
 
-                <div className={`grid gap-4 ${propertyCategory !== 'landed' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Floor level
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 11"
-                      value={floorLevel}
-                      onChange={(e) => setFloorLevel(e.target.value)}
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
-                
-                  {propertyCategory !== 'landed' && (
+                {propertyCategory !== 'landed' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                        Floor level
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 11"
+                        value={floorLevel}
+                        onChange={(e) => setFloorLevel(e.target.value)}
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                      />
+                    </div>
                     <div>
                       <label className="mb-2 block text-sm font-medium text-[#4d555d]">
                         Stack number
@@ -1641,8 +1640,8 @@ export default function Home() {
                         className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                       />
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-[#4d555d]">
