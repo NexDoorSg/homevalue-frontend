@@ -448,24 +448,18 @@ export default function Home() {
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [formMessage, setFormMessage] = useState('')
-  const [hasTeaserResult, setHasTeaserResult] = useState(false)
-  const [hasUnlockedReport, setHasUnlockedReport] = useState(false)
-  const [isLoadingFullReport, setIsLoadingFullReport] = useState(false)
+  
+  const [hasReport, setHasReport] = useState(false)
 
+  const [leadName, setLeadName] = useState('')
+  const [leadPhone, setLeadPhone] = useState('')
+  const [leadEmail, setLeadEmail] = useState('')
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [consultName, setConsultName] = useState('')
   const [consultPhone, setConsultPhone] = useState('')
   const [consultEmail, setConsultEmail] = useState('')
   const [consultPlan, setConsultPlan] = useState('')
   const [consultationMessage, setConsultationMessage] = useState('')
-
-  const [unlockName, setUnlockName] = useState('')
-  const [unlockPhone, setUnlockPhone] = useState('')
-  const [unlockEmail, setUnlockEmail] = useState('')
-  const [unlockMessage, setUnlockMessage] = useState('')
-
-  const [activeCondoTab, setActiveCondoTab] = useState<'same_project' | 'nearby'>('same_project')
-  const [activeHdbTab, setActiveHdbTab] = useState<'same_block' | 'nearby'>('same_block')
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
@@ -624,9 +618,6 @@ export default function Home() {
     setNumOfComps(null)
     setRadiusUsedM(null)
     setRecentComparables([])
-    setHasTeaserResult(false)
-    setHasUnlockedReport(false)
-    setUnlockMessage('')
   }
 
   const handleAddressChange = (value: string) => {
@@ -730,8 +721,6 @@ export default function Home() {
 
   const handleGenerateReport = async () => {
     setFormMessage('')
-    setUnlockMessage('')
-    setHasUnlockedReport(false)
     setRecentComparables([])
 
     if (!address.trim()) {
@@ -834,8 +823,8 @@ export default function Home() {
         setEstimatedHigh(null)
         setNumOfComps(null)
         setRadiusUsedM(null)
-        setHasTeaserResult(false)
         setFormMessage('Not enough comparable transactions found for this property yet.')
+        setHasReport(false)
         return
       }
 
@@ -844,7 +833,7 @@ export default function Home() {
       setEstimatedHigh(result.high)
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
-      setHasTeaserResult(true)
+      setHasReport(true)
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 200)
@@ -865,8 +854,7 @@ export default function Home() {
         landSizeSqm.trim() ||
         builtUpSqm.trim() ||
         selectedLat ||
-        selectedLon ||
-        hasTeaserResult
+        selectedLon
     )
   }
 
@@ -1737,104 +1725,6 @@ export default function Home() {
     return []
   }
 
-  const handleUnlockReport = async () => {
-    setUnlockMessage('')
-
-    if (!unlockName.trim()) {
-      setUnlockMessage('Please enter your name.')
-      return
-    }
-
-    if (!unlockPhone.trim()) {
-      setUnlockMessage('Please enter your phone number.')
-      return
-    }
-
-    if (!isValidPhone(unlockPhone)) {
-      setUnlockMessage('Please enter a valid phone number.')
-      return
-    }
-
-    if (!unlockEmail.trim()) {
-      setUnlockMessage('Please enter your email.')
-      return
-    }
-
-    if (!isValidEmail(unlockEmail)) {
-      setUnlockMessage('Please enter a valid email address.')
-      return
-    }
-
-    if (!selectedLat || !selectedLon || !estimatedPrice) {
-      setUnlockMessage('Please generate your estimate first.')
-      return
-    }
-
-    setIsLoadingFullReport(true)
-
-    try {
-      const normalizedUnlockEmail = unlockEmail.trim().toLowerCase()
-
-      const leadPayload = buildLeadPayload(
-        unlockName,
-        unlockPhone,
-        normalizedUnlockEmail,
-        { plan: 'full_report' }
-      )
-
-      const response = await fetch('/api/unlock-full-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(leadPayload),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result?.error || 'Failed to unlock full report')
-      }
-
-      if (result.reachedLimit) {
-        setUnlockMessage(
-          result.message ||
-            "You've reached the free full-report limit for the past 30 days. Please contact us directly and we'll be happy to help."
-        )
-        return
-      }
-
-      const emailResult = await sendLeadEmail({
-        ...leadPayload,
-        source: 'full_report',
-      })
-
-      const comparables = await fetchRecentComparables(
-        selectedLat,
-        selectedLon,
-        propertyType,
-        propertyCategory,
-        radiusUsedM || undefined
-      )
-
-      setRecentComparables(comparables)
-      setHasUnlockedReport(true)
-
-      if (!emailResult.ok) {
-        setUnlockMessage('Full report unlocked. Email notification failed; check Vercel logs.')
-      } else {
-        setUnlockMessage('Full report unlocked successfully.')
-      }
-
-      setUnlockName('')
-      setUnlockPhone('')
-      setUnlockEmail('')
-    } catch (error) {
-      console.error('Full report unlock failed:', error)
-      setUnlockMessage('Could not unlock the report right now. Please try again.')
-    } finally {
-      setIsLoadingFullReport(false)
-    }
-  }
-
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
       <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
@@ -2077,116 +1967,52 @@ export default function Home() {
               </div>
             </div>
             
-            {hasTeaserResult && !hasUnlockedReport && (
-              <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                  Unlock Full Report
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-[#2d3135]">
-                  See Your Exact Valuation and Nearby Comparables
-                </h3>
-                <p className="mt-2 text-sm text-[#67707a]">
-                  Get your exact valuation range, nearby comparable transactions, and a clearer picture of where your property stands in today&apos;s market.
-                </p>
-                <div className="mt-5 grid gap-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      value={unlockName}
-                      onChange={(e) => setUnlockName(e.target.value)}
-                      placeholder="Your name"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Phone number
-                    </label>
-                    <input
-                      type="text"
-                      value={unlockPhone}
-                      onChange={(e) => setUnlockPhone(e.target.value)}
-                      placeholder="Your phone number"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={unlockEmail}
-                      onChange={(e) => setUnlockEmail(e.target.value)}
-                      placeholder="Your email"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleUnlockReport}
-                    disabled={isLoadingFullReport}
-                    className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isLoadingFullReport ? 'Unlocking...' : 'See Full Valuation Report'}
-                  </button>
-
-                  <p className="text-xs text-[#7a8289]">
-                    Limited free reports available each month
-                  </p>
-                  
-                  {unlockMessage && (
-                    <p className="text-sm text-[#8b6b52]">{unlockMessage}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {hasUnlockedReport && (
-              <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                  Valuation Summary
-                </p>
-                <p className="mt-3 text-3xl font-semibold text-[#2d3135]">
-                  {formatMoney(estimatedPrice)}
-                </p>
-            
-                {(estimatedLow || estimatedHigh) && (
-                  <p className="mt-2 text-sm text-[#6a727a]">
-                    Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
-                  </p>
-                )}
-            
-                <p className="mt-2 text-sm text-[#6a727a]">
-                  Based on {numOfComps || 0} nearby transactions
-                  {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
-                </p>
-              </div>
-            )}
-
-            {hasUnlockedReport && (
-              <div className="mt-4 hidden lg:block">
-                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm max-w-md">
+            {hasReport && (
+              <div
+                ref={resultRef}
+                className="mt-4 space-y-4"
+              >
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
                   <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
                     Valuation Summary
                   </p>
-            
-                  <p className="mt-3 text-4xl font-semibold text-[#2d3135]">
+
+                  <p className="mt-3 text-3xl font-semibold text-[#2d3135] md:text-4xl">
                     {formatMoney(estimatedPrice)}
                   </p>
-            
+
                   {(estimatedLow || estimatedHigh) && (
                     <p className="mt-2 text-sm text-[#6a727a]">
                       Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
                     </p>
                   )}
-            
+
+                  <p className="mt-2 text-sm text-[#6a727a]">
+                    Based on {numOfComps || 0} nearby transactions
+                    {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
+                  </p>
+                </div>
+              </div>
+            )}{hasReport && (
+              <div
+                ref={resultRef}
+                className="mt-4 space-y-4"
+              >
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                  <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
+                    Valuation Summary
+                  </p>
+
+                  <p className="mt-3 text-3xl font-semibold text-[#2d3135] md:text-4xl">
+                    {formatMoney(estimatedPrice)}
+                  </p>
+
+                  {(estimatedLow || estimatedHigh) && (
+                    <p className="mt-2 text-sm text-[#6a727a]">
+                      Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                    </p>
+                  )}
+
                   <p className="mt-2 text-sm text-[#6a727a]">
                     Based on {numOfComps || 0} nearby transactions
                     {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
@@ -2194,370 +2020,9 @@ export default function Home() {
                 </div>
               </div>
             )}
-
-            {hasUnlockedReport && (
-              <div className="mt-4 rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm lg:hidden">
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                  Full Report
-                </p>
-                <h3 className="mt-2 text-lg font-semibold text-[#2d3135]">
-                  Real Nearby Transactions Around Your Unit
-                </h3>
-                <p className="mt-2 text-sm text-[#67707a]">
-                  These are the most recent comparable transactions near your selected property.
-                </p>
-
-                {propertyCategory === 'landed' ? (
-                  <div className="mt-4 space-y-3">
-                    {recentComparables.length === 0 ? (
-                      <p className="text-sm text-[#67707a]">No recent comparables available yet.</p>
-                    ) : (
-                      recentComparables.map((row, index) => (
-                        <div
-                          key={`${row.address}-${row.transaction_date}-${index}`}
-                          className="rounded-2xl border border-[#eee4d8] bg-[#fcfbf9] p-4"
-                        >
-                          <p className="text-sm font-medium text-[#2d3135]">
-                            {row.address || '-'}
-                          </p>
-                          <p className="mt-1 text-xs text-[#6a727a]">
-                            {formatDate(row.transaction_date)} • {sqmToSqft(row.floor_area_sqm)} sqft • {Math.round(row.distance_m)}m
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-[#2d3135]">
-                            ${Math.round(row.transaction_price).toLocaleString()}
-                          </p>
-                          <p className="mt-1 text-xs text-[#6a727a]">
-                            ${Math.round(row.psf).toLocaleString()} psf • {formatTenure(row.tenure)}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="mt-4 flex gap-2 overflow-x-auto">
-                      {(propertyCategory === 'condo' || propertyCategory === 'ec') && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setActiveCondoTab('same_project')}
-                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
-                              activeCondoTab === 'same_project'
-                                ? 'bg-[#2f3438] text-white'
-                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
-                            }`}
-                          >
-                            Same Project
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveCondoTab('nearby')}
-                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
-                              activeCondoTab === 'nearby'
-                                ? 'bg-[#2f3438] text-white'
-                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
-                            }`}
-                          >
-                            Nearby
-                          </button>
-                        </>
-                      )}
-                
-                      {propertyCategory === 'hdb' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setActiveHdbTab('same_block')}
-                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
-                              activeHdbTab === 'same_block'
-                                ? 'bg-[#2f3438] text-white'
-                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
-                            }`}
-                          >
-                            Same Block
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveHdbTab('nearby')}
-                            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
-                              activeHdbTab === 'nearby'
-                                ? 'bg-[#2f3438] text-white'
-                                : 'border border-[#e5dbcf] bg-white text-[#67707a]'
-                            }`}
-                          >
-                            Nearby
-                          </button>
-                        </>
-                      )}
-                    </div>
-                
-                    <div className="mt-4 space-y-3">
-                      {(() => {
-                        const activeRows =
-                          propertyCategory === 'condo' || propertyCategory === 'ec'
-                            ? activeCondoTab === 'same_project'
-                              ? sameProjectComparables
-                              : nearbyCondoComparables
-                            : activeHdbTab === 'same_block'
-                            ? sameBlockComparables
-                            : nearbyHdbComparables
-                
-                        if (activeRows.length === 0) {
-                          return (
-                            <p className="text-sm text-[#67707a]">
-                              No recent comparables available yet.
-                            </p>
-                          )
-                        }
-                
-                        return activeRows.map((row, index) => (
-                          <div
-                            key={`${row.address}-${row.transaction_date}-${index}`}
-                            className="rounded-2xl border border-[#eee4d8] bg-[#fcfbf9] p-4"
-                          >
-                            <p className="text-sm font-medium text-[#2d3135]">
-                              {propertyCategory === 'condo' || propertyCategory === 'ec'
-                                ? row.project_name || row.address || '-'
-                                : row.address || '-'}
-                            </p>
-                            <p className="mt-1 text-xs text-[#6a727a]">
-                              {formatDate(row.transaction_date)}
-                              {showFloorRangeColumn && propertyCategory === 'hdb' && row.floor_level
-                                ? ` • ${row.floor_level}`
-                                : ''}
-                              {' • '}
-                              {sqmToSqft(row.floor_area_sqm)} sqft
-                              {' • '}
-                              {Math.round(row.distance_m)}m
-                            </p>
-                            <p className="mt-2 text-sm font-semibold text-[#2d3135]">
-                              ${Math.round(row.transaction_price).toLocaleString()}
-                            </p>
-                            <p className="mt-1 text-xs text-[#6a727a]">
-                              ${Math.round(row.psf).toLocaleString()} psf
-                              {propertyCategory !== 'hdb' && row.tenure
-                                ? ` • ${formatTenure(row.tenure)}`
-                                : ''}
-                            </p>
-                          </div>
-                        ))
-                      })()}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </section>
-      
-        {hasUnlockedReport && (
-          <section className="hidden border-t border-[#e8ddd2] bg-white lg:block">
-            <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
-              <div className="max-w-3xl">
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
-                  Full report
-                </p>
-                <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
-                  Real Nearby Transactions Around Your Unit
-                </h3>
-                <p className="mt-4 text-base leading-7 text-[#646c74]">
-                  These are the most recent comparable transactions near your selected property.
-                </p>
-              </div>
-  
-              {propertyCategory === 'landed' ? (
-                <>
-                  <div className="mt-8 rounded-3xl border border-[#e5dbcf] bg-[#faf8f4] p-6">
-                    <p className="text-base leading-7 text-[#646c74]">
-                      This valuation is estimated based on recent land transactions in the area. Landed properties are highly unique so for a more accurate assessment, we recommend speaking with one of our agents directly.
-                    </p>
-                  </div>
-  
-                  <div className="mt-4 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-[#efe7dd]">
-                        <thead className="bg-[#faf8f4]">
-                          <tr>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Date</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Address</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Size (sqft)</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Price</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">PSF</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Tenure</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Distance</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#f3ede5]">
-                          {recentComparables.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} className="px-5 py-8 text-center text-sm text-[#67707a]">
-                                No recent comparables available yet.
-                              </td>
-                            </tr>
-                          ) : (
-                            recentComparables.map((row, index) => (
-                              <tr key={`${row.address}-${row.transaction_date}-${index}`}>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">{formatDate(row.transaction_date)}</td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">{row.address || '-'}</td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">{sqmToSqft(row.floor_area_sqm)}</td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.transaction_price).toLocaleString()}</td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">${Math.round(row.psf).toLocaleString()}</td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">{formatTenure(row.tenure)}</td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">{Math.round(row.distance_m)}m</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="mt-8 flex gap-3">
-                    {(propertyCategory === 'condo' || propertyCategory === 'ec') && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setActiveCondoTab('same_project')}
-                          className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                            activeCondoTab === 'same_project'
-                              ? 'bg-[#2f3438] text-white'
-                              : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                          }`}
-                        >
-                          Same Project
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveCondoTab('nearby')}
-                          className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                            activeCondoTab === 'nearby'
-                              ? 'bg-[#2f3438] text-white'
-                              : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                          }`}
-                        >
-                          Nearby
-                        </button>
-                      </>
-                    )}
-  
-                    {propertyCategory === 'hdb' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setActiveHdbTab('same_block')}
-                          className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                            activeHdbTab === 'same_block'
-                              ? 'bg-[#2f3438] text-white'
-                              : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                          }`}
-                        >
-                          Same Block
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveHdbTab('nearby')}
-                          className={`rounded-full px-5 py-2 text-sm font-medium transition ${
-                            activeHdbTab === 'nearby'
-                              ? 'bg-[#2f3438] text-white'
-                              : 'border border-[#e5dbcf] bg-white text-[#67707a] hover:bg-[#f8f4ef]'
-                          }`}
-                        >
-                          Nearby
-                        </button>
-                      </>
-                    )}
-                  </div>
-  
-                  <div className="mt-4 overflow-hidden rounded-3xl border border-[#e5dbcf] bg-white shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-[#efe7dd]">
-                        <thead className="bg-[#faf8f4]">
-                          <tr>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Date</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Address</th>
-                            {showFloorRangeColumn && propertyCategory === 'hdb' && (
-                              <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Floor Level</th>
-                            )}
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Size (sqft)</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Price</th>
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">PSF</th>
-                            {propertyCategory !== 'hdb' && (
-                              <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Tenure</th>
-                            )}
-                            <th className="px-5 py-4 text-left text-sm font-semibold text-[#8b6b52]">Distance</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#f3ede5]">
-                          {(() => {
-                            const activeRows =
-                              propertyCategory === 'condo' || propertyCategory === 'ec'
-                                ? activeCondoTab === 'same_project'
-                                  ? sameProjectComparables
-                                  : nearbyCondoComparables
-                                : activeHdbTab === 'same_block'
-                                ? sameBlockComparables
-                                : nearbyHdbComparables
-  
-                            if (activeRows.length === 0) {
-                              return (
-                                <tr>
-                                  <td
-                                    colSpan={7}
-                                    className="px-5 py-8 text-center text-sm text-[#67707a]"
-                                  >
-                                    No recent comparables available yet.
-                                  </td>
-                                </tr>
-                              )
-                            }
-  
-                            return activeRows.map((row, index) => (
-                              <tr key={`${row.address}-${row.transaction_date}-${index}`}>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  {formatDate(row.transaction_date)}
-                                </td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  {propertyCategory === 'condo' || propertyCategory === 'ec'
-                                    ? row.project_name || row.address || '-'
-                                    : row.address || '-'}
-                                </td>
-                                {showFloorRangeColumn && propertyCategory === 'hdb' && (
-                                  <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                    {row.floor_level || '-'}
-                                  </td>
-                                )}
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  {sqmToSqft(row.floor_area_sqm)}
-                                </td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  ${Math.round(row.transaction_price).toLocaleString()}
-                                </td>
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  ${Math.round(row.psf).toLocaleString()}
-                                </td>
-                                {propertyCategory !== 'hdb' && (
-                                  <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                    {formatTenure(row.tenure)}
-                                  </td>
-                                )}
-                                <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                  {Math.round(row.distance_m)}m
-                                </td>
-                              </tr>
-                            ))
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </section>
-        )}
 
       <section className="border-t border-[#e8ddd2] bg-white">
         <div className="mx-auto max-w-7xl px-6 py-12 md:px-10">
