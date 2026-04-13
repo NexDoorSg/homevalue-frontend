@@ -28,6 +28,8 @@ type TransactionRow = {
   project_name?: string | null
   transaction_date?: string | null
   address?: string | null
+  completion_year?: number | string | null
+  is_strata?: boolean | null
 }
 
 type CleanedRow = {
@@ -44,6 +46,8 @@ type CleanedRow = {
   pricePerSqft: number
   distanceM: number
   parsedFloorLevel: number | null
+  completion_year: number | null
+  is_strata: boolean | null
 }
 
 type CandidateResult = {
@@ -281,7 +285,7 @@ async function fetchRowsForRadius(
   let query = supabase
     .from('property_transactions_v2')
     .select(
-      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address'
+      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address, completion_year, is_strata'
     )
     .gte('latitude', box.minLat)
     .lte('latitude', box.maxLat)
@@ -342,6 +346,11 @@ function cleanRows(
         pricePerSqft,
         distanceM: distanceInMeters(lat, lon, rowLat, rowLon),
         parsedFloorLevel: parseFloorLevelFromAddress(row.address),
+        completion_year: (() => {
+          const yr = Number(row.completion_year)
+          return (yr > 1950 && yr <= new Date().getFullYear() + 5) ? yr : null
+        })(),
+        is_strata: row.is_strata ?? null,
       }
     })
     .filter(
