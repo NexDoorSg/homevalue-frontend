@@ -432,8 +432,6 @@ export default function Home() {
         : null
     )
     
-    console.log('[DEBUG] selectedProjectName from OneMap:', item.BUILDING)
-    
     setLookupCandidates(buildLookupCandidates(item))
     resetResults()
   
