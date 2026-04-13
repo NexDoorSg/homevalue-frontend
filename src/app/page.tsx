@@ -17,7 +17,7 @@ type OneMapResult = {
 type PropertyTypeOption = {
   label: string
   value: string
-  category: 'hdb' | 'condo' | 'landed'
+  category: 'hdb' | 'condo' | 'ec' | 'landed'
 }
 
 type ComparableRow = {
@@ -41,12 +41,17 @@ const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
   { label: 'HDB 5 Room', value: '5 ROOM', category: 'hdb' },
   { label: 'HDB Executive', value: 'EXECUTIVE', category: 'hdb' },
 
-  { label: '1 Bedroom', value: '1 BEDROOM', category: 'condo' },
-  { label: '2 Bedroom', value: '2 BEDROOM', category: 'condo' },
-  { label: '3 Bedroom', value: '3 BEDROOM', category: 'condo' },
-  { label: '4 Bedroom', value: '4 BEDROOM', category: 'condo' },
-  { label: '5 Bedroom', value: '5 BEDROOM', category: 'condo' },
-  { label: 'Penthouse', value: 'PENTHOUSE', category: 'condo' },
+  { label: 'Condo 1 Bedroom', value: '1 BEDROOM', category: 'condo' },
+  { label: 'Condo 2 Bedroom', value: '2 BEDROOM', category: 'condo' },
+  { label: 'Condo 3 Bedroom', value: '3 BEDROOM', category: 'condo' },
+  { label: 'Condo 4 Bedroom', value: '4 BEDROOM', category: 'condo' },
+  { label: 'Condo 5 Bedroom', value: '5 BEDROOM', category: 'condo' },
+  { label: 'Condo Penthouse', value: 'PENTHOUSE', category: 'condo' },
+
+  { label: 'EC 2 Bedroom', value: '2 BEDROOM EC', category: 'ec' },
+  { label: 'EC 3 Bedroom', value: '3 BEDROOM EC', category: 'ec' },
+  { label: 'EC 4 Bedroom', value: '4 BEDROOM EC', category: 'ec' },
+  { label: 'EC 5 Bedroom', value: '5 BEDROOM EC', category: 'ec' },
 
   { label: 'Terrace', value: 'TERRACE HOUSE', category: 'landed' },
   { label: 'Semi-D', value: 'SEMI-DETACHED HOUSE', category: 'landed' },
@@ -62,12 +67,13 @@ const TENURE_OPTIONS = [
 
 function getPropertyCategoryFromType(
   propertyType: string
-): 'hdb' | 'condo' | 'landed' {
+): 'hdb' | 'condo' | 'ec' | 'landed' {
   const normalized = propertyType.toUpperCase().trim()
 
   if (!normalized) return 'condo'
 
   const hdbTypes = ['2 ROOM', '3 ROOM', '4 ROOM', '5 ROOM', 'EXECUTIVE']
+  const ecTypes = ['2 BEDROOM EC', '3 BEDROOM EC', '4 BEDROOM EC', '5 BEDROOM EC']
   const landedTypes = [
     'TERRACE HOUSE',
     'SEMI-DETACHED HOUSE',
@@ -75,6 +81,7 @@ function getPropertyCategoryFromType(
   ]
 
   if (hdbTypes.includes(normalized)) return 'hdb'
+  if (ecTypes.includes(normalized)) return 'ec'
   if (landedTypes.includes(normalized)) return 'landed'
   return 'condo'
 }
@@ -313,16 +320,16 @@ export default function Home() {
       (row) => row.floor_level && row.floor_level.trim() !== ''
     )
 
-  const resolvedCondoProject = (selectedProjectName || '').toUpperCase().trim()
+  const resolvedProjectName = (selectedProjectName || '').toUpperCase().trim()
 
   const sameProjectComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
-    return rowProject && resolvedCondoProject && rowProject === resolvedCondoProject
+    return rowProject && resolvedProjectName && rowProject === resolvedProjectName
   })
-
+  
   const nearbyCondoComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
-    return !(rowProject && resolvedCondoProject && rowProject === resolvedCondoProject)
+    return !(rowProject && resolvedProjectName && rowProject === resolvedProjectName)
   })
 
   const sameBlockComparables = recentComparables.filter((row) => {
@@ -704,9 +711,8 @@ export default function Home() {
   const fetchRecentComparables = async (
     lat: number,
     lon: number,
-    source: string,
     targetPropertyType: string,
-    category: 'hdb' | 'condo' | 'landed',
+    category: 'hdb' | 'condo' | 'ec' | 'landed',
     preferredRadius?: number
   ) => {
     function normalizeText(value: string | null | undefined) {
@@ -868,13 +874,28 @@ export default function Home() {
     let query = supabase
       .from('property_transactions_v2')
       .select(
-        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure'
+        'address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure, property_group, property_subtype, is_strata'
       )
-      .eq('source', source)
       .not('transaction_price', 'is', null)
       .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
+    
+    if (category === 'hdb') {
+      query = query.eq('property_group', 'hdb')
+    }
+    
+    if (category === 'condo') {
+      query = query.eq('property_subtype', 'condo')
+    }
+    
+    if (category === 'ec') {
+      query = query.eq('property_subtype', 'ec')
+    }
+    
+    if (category === 'landed') {
+      query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+    }
   
     if (category === 'hdb') {
       const LAT_DELTA = 0.018  // ~2km
@@ -888,7 +909,7 @@ export default function Home() {
         .limit(5000)
     }
   
-    if (category === 'condo') {
+    if (category === 'condo' || category === 'ec') {
       const LAT_DELTA = 0.014  // ~1.5km in latitude degrees
       const LON_DELTA = 0.014  // ~1.5km in longitude degrees
       query = query
@@ -970,7 +991,7 @@ export default function Home() {
       let sameBlockQuery = supabase
         .from('property_transactions_v2')
         .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure')
-        .eq('source', source)
+        .eq('property_group', 'hdb')
         .eq('unit_type', targetPropertyType)
         .not('transaction_price', 'is', null)
         .not('floor_area_sqm', 'is', null)
@@ -1061,7 +1082,7 @@ export default function Home() {
       return [...sameBlockRows, ...nearbyHdbRows]
     }
   
-    if (category === 'condo') {
+    if (category === 'condo' || category === 'ec') {
       const subjectCondoSqm = Number(sqftToSqm(floorAreaSqm)) || 0
 
       // Fetch same-project rows separately with no distance/size filter
@@ -1069,7 +1090,7 @@ export default function Home() {
       let sameProjectQuery = supabase
         .from('property_transactions_v2')
         .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure')
-        .eq('source', source)
+        .eq('property_subtype', category === 'ec' ? 'ec' : 'condo')
         .not('transaction_price', 'is', null)
         .not('floor_area_sqm', 'is', null)
         .not('latitude', 'is', null)
@@ -1449,15 +1470,9 @@ export default function Home() {
         source: 'full_report',
       })
 
-      let source = 'data_gov_hdb'
-      if (propertyCategory !== 'hdb') {
-        source = 'ura_private'
-      }
-
       const comparables = await fetchRecentComparables(
         selectedLat,
         selectedLon,
-        source,
         propertyType,
         propertyCategory,
         radiusUsedM || undefined
@@ -1969,7 +1984,7 @@ export default function Home() {
               <>
                 {/* Tab buttons */}
                 <div className="mt-8 flex gap-3">
-                  {propertyCategory === 'condo' && (
+                  {(propertyCategory === 'condo' || propertyCategory === 'ec') && (
                     <>
                       <button
                         type="button"
@@ -2047,7 +2062,7 @@ export default function Home() {
                       <tbody className="divide-y divide-[#f3ede5]">
                         {(() => {
                           const activeRows =
-                            propertyCategory === 'condo'
+                            propertyCategory === 'condo' || propertyCategory === 'ec'
                               ? activeCondoTab === 'same_project'
                                 ? sameProjectComparables
                                 : nearbyCondoComparables
@@ -2074,7 +2089,7 @@ export default function Home() {
                                 {formatDate(row.transaction_date)}
                               </td>
                               <td className="px-5 py-4 text-sm text-[#2d3135]">
-                                {propertyCategory === 'condo'
+                                {propertyCategory === 'condo' || propertyCategory === 'ec'
                                   ? row.project_name || row.address || '-'
                                   : row.address || '-'}
                               </td>
