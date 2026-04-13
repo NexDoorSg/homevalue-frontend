@@ -1934,8 +1934,10 @@ export default function Home() {
                 )}
               </>
             )}
-
+          </div>
+        </div>
       </section>
+      
         {hasUnlockedReport && (
           <section className="hidden border-t border-[#e8ddd2] bg-white lg:block">
             <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
