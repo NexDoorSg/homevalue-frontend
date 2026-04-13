@@ -449,6 +449,8 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [formMessage, setFormMessage] = useState('')
 
+  const [activeTab, setActiveTab] = useState<'same' | 'nearby'>('same')
+
   const [leadFormMessage, setLeadFormMessage] = useState('')
   const [hasReport, setHasReport] = useState(false)
 
@@ -2134,16 +2136,19 @@ export default function Home() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                        Recent comparables
+                        {activeTab === 'same' ? 'Same project / block comparables' : 'Nearby comparables'}
                       </p>
+                      
                       <p className="mt-1 text-sm text-[#6a727a]">
-                        Nearby transactions used as reference.
+                        {activeTab === 'same'
+                          ? 'Transactions from the same project or same block.'
+                          : 'Nearby transactions used as reference.'}
                       </p>
                     </div>
                   </div>
 
-                  {recentComparables.length > 0 ? (
-                    <div className="mt-4 overflow-x-auto">
+                  {(activeTab === 'same' ? previewComparables : recentComparables).length > 0 ? (
+                    <div className="mt-4 overflow-x-auto max-h-[400px] overflow-y-auto">
                       <table className="min-w-full border-separate border-spacing-0 text-sm">
                         <thead>
                           <tr className="text-left text-[#6a727a]">
@@ -2168,7 +2173,7 @@ export default function Home() {
                           </tr>
                         </thead>
                         <tbody>
-                          {recentComparables.map((row, index) => (
+                          {(activeTab === 'same' ? previewComparables : recentComparables).map((row, index) => (
                             <tr key={`${row.address}-${row.transaction_date}-${row.transaction_price}-${index}`}>
                               <td className="border-b border-[#f3ebe2] px-4 py-3 align-top">
                                 <div className="font-medium text-[#2d3135]">
@@ -2202,7 +2207,9 @@ export default function Home() {
                     </div>
                   ) : (
                     <p className="mt-4 text-sm text-[#6a727a]">
-                      No comparable transactions available yet.
+                      {activeTab === 'same'
+                        ? 'No same-project or same-block transactions available yet.'
+                        : 'No nearby transactions available yet.'}
                     </p>
                   )}
                 </div>
