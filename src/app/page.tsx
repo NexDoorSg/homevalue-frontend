@@ -1049,8 +1049,29 @@ export default function Home() {
         return a.distance_m - b.distance_m
       })
 
-      return deduped.slice(0, 20)
-    }
+      // Keep all deduped rows — same project rows will go to Same Project tab,
+      // nearby rows will go to Nearby tab, each capped at 10 in the UI
+      const sameProjectRows = deduped.filter(
+        (row) => row._normProject === subjectProject
+      ).slice(0, 10)
+
+      const nearbyRows = (() => {
+        const projectCounts: Record<string, number> = {}
+        const result = []
+        for (const row of deduped) {
+          if (row._normProject === subjectProject) continue
+          const proj = row._normProject || ''
+          const count = projectCounts[proj] || 0
+          if (count < 2) {
+            result.push(row)
+            projectCounts[proj] = count + 1
+          }
+          if (result.length >= 10) break
+        }
+        return result
+      })()
+
+      return [...sameProjectRows, ...nearbyRows]
     // ═══════════════════════════════════════════════════════════════════════════
     // LANDED: Redesigned 2-stage scoring system
     // ═══════════════════════════════════════════════════════════════════════════
