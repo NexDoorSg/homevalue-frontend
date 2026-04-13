@@ -1990,47 +1990,6 @@ export default function Home() {
                       })()}
                     </div>
                   </>
-                )
-
-                      if (activeRows.length === 0) {
-                        return (
-                          <p className="text-sm text-[#67707a]">No recent comparables available yet.</p>
-                        )
-                      }
-
-                      return activeRows.map((row, index) => (
-                        <div
-                          key={`${row.address}-${row.transaction_date}-${index}`}
-                          className="rounded-2xl border border-[#eee4d8] bg-[#fcfbf9] p-4"
-                        >
-                          <p className="text-sm font-medium text-[#2d3135]">
-                            {propertyCategory === 'condo' || propertyCategory === 'ec'
-                              ? row.project_name || row.address || '-'
-                              : row.address || '-'}
-                          </p>
-                          <p className="mt-1 text-xs text-[#6a727a]">
-                            {formatDate(row.transaction_date)}
-                            {showFloorRangeColumn && propertyCategory === 'hdb' && row.floor_level
-                              ? ` • ${row.floor_level}`
-                              : ''}
-                            {' • '}
-                            {sqmToSqft(row.floor_area_sqm)} sqft
-                            {' • '}
-                            {Math.round(row.distance_m)}m
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-[#2d3135]">
-                            ${Math.round(row.transaction_price).toLocaleString()}
-                          </p>
-                          <p className="mt-1 text-xs text-[#6a727a]">
-                            ${Math.round(row.psf).toLocaleString()} psf
-                            {propertyCategory !== 'hdb' && row.tenure
-                              ? ` • ${formatTenure(row.tenure)}`
-                              : ''}
-                          </p>
-                        </div>
-                      ))
-                    })()}
-                  </div>
                 )}
               </div>
             )}
