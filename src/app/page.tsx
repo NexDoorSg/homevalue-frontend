@@ -313,6 +313,9 @@ export default function Home() {
 
   const [activeCondoTab, setActiveCondoTab] = useState<'same_project' | 'nearby'>('same_project')
   const [activeHdbTab, setActiveHdbTab] = useState<'same_block' | 'nearby'>('same_block')
+  const [activeMobileResultTab, setActiveMobileResultTab] = useState<
+    'summary' | 'comparables' | 'insights'
+  >('summary')
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
@@ -325,7 +328,7 @@ export default function Home() {
 
   const resolvedProjectName = (selectedProjectName || '').toUpperCase().trim()
 
-  const sameProjectComparables = recentComparables.filter((row) => {
+    const sameProjectComparables = recentComparables.filter((row) => {
     const rowProject = (row.project_name || '').toUpperCase().trim()
     return rowProject && resolvedProjectName && rowProject === resolvedProjectName
   })
@@ -350,6 +353,19 @@ export default function Home() {
     const subjBlock = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
     return !(rowStreet && subjStreet && rowStreet === subjStreet && rowBlock && subjBlock && rowBlock === subjBlock)
   })
+
+  const previewComparables =
+    propertyCategory === 'landed'
+      ? recentComparables.slice(0, 3)
+      : propertyCategory === 'condo' || propertyCategory === 'ec'
+      ? (sameProjectComparables.length > 0
+          ? sameProjectComparables
+          : nearbyCondoComparables
+        ).slice(0, 3)
+      : (sameBlockComparables.length > 0
+          ? sameBlockComparables
+          : nearbyHdbComparables
+        ).slice(0, 3)
   
   const searchAddress = async (value: string) => {
     if (value.trim().length < 3) {
@@ -1532,39 +1548,17 @@ export default function Home() {
               Instantly estimate your property&apos;s value using real nearby transactions.
             </p>
 
-            <div className="mt-8 grid gap-3">
-              <div className="rounded-2xl border border-[#e8ddd2] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-                <p className="text-sm font-medium text-[#2d3135]">Based on nearby sales</p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <div className="rounded-full border border-[#e8ddd2] bg-white px-4 py-2 text-xs font-medium text-[#2d3135] shadow-sm">
+                30 sec estimate
               </div>
-
-              <div className="rounded-2xl border border-[#e8ddd2] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-                <p className="text-sm font-medium text-[#2d3135]">Built on real market evidence</p>
+              <div className="rounded-full border border-[#e8ddd2] bg-white px-4 py-2 text-xs font-medium text-[#2d3135] shadow-sm">
+                2026 transaction data
               </div>
-
-              <div className="rounded-2xl border border-[#e8ddd2] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-                <p className="text-sm font-medium text-[#2d3135]">Designed for homeowners</p>
+              <div className="rounded-full border border-[#e8ddd2] bg-white px-4 py-2 text-xs font-medium text-[#2d3135] shadow-sm">
+                Real nearby comps
               </div>
             </div>
-
-            <div className="mt-8 rounded-3xl border border-[#e8ddd2] bg-white p-6 shadow-sm">
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
-                Why HomeValue
-              </p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-2xl font-semibold text-[#2d3135]">30 sec</p>
-                  <p className="mt-1 text-sm text-[#66707a]">Fast first-pass estimate</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold text-[#2d3135]">2026</p>
-                  <p className="mt-1 text-sm text-[#66707a]">Current transaction data</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold text-[#2d3135]">Real comps</p>
-                  <p className="mt-1 text-sm text-[#66707a]">Nearby supporting evidence</p>
-                </div>
-              </div>
-          </div>
           </div>
           
           <div className="order-1 relative lg:order-2">
@@ -1757,60 +1751,91 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-[#e5dbcf] bg-gradient-to-r from-[#ffffff] to-[#f8f4ef] p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-[#8b6b52]">
-                  Estimated Value
-                </p>
-
-                {isGenerating && (
-                  <span className="text-xs text-[#8b6b52] animate-pulse">
-                    Calculating...
-                  </span>
-                )}
+            <div ref={resultRef} className="mt-4 space-y-4">
+  
+              {/* Mobile Tabs */}
+              <div className="flex gap-2 overflow-x-auto">
+                {[
+                  { key: 'summary', label: 'Summary' },
+                  { key: 'comparables', label: 'Comparables' },
+                  { key: 'insights', label: 'Insights' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveMobileResultTab(tab.key as any)}
+                    className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
+                      activeMobileResultTab === tab.key
+                        ? 'bg-[#2f3438] text-white'
+                        : 'border border-[#e5dbcf] bg-white text-[#67707a]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-
-              <p className="mt-2 text-4xl font-semibold text-[#2d3135] tracking-tight">
-                {hasTeaserResult ? formatTeaserMoney(estimatedPrice) : '$---,---'}
-              </p>
-
-              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#eee5dc]">
-                <div
-                  className={`h-full rounded-full bg-[#8b6b52] transition-all duration-700 ${
-                    hasTeaserResult ? 'w-[70%]' : 'w-[20%]'
-                  }`}
-                />
-              </div>
-
-              <p className="mt-2 text-xs text-[#7a8289]">
-                Based on nearby 2026 transaction data
-              </p>
-            </div>
-
-            <div ref={resultRef} className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
-                <p className="text-sm text-[#8b6b52]">Your Instant Estimate</p>
-                <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
-                  {hasTeaserResult ? formatTeaserMoney(estimatedPrice) : '$8XX,XXX'}
-                </p>
-                <p className="mt-2 text-sm text-[#6a727a]">
-                  See your exact valuation range and nearby comparable transactions in the full report.
-                </p>
-            </div>
-
-              <div className="rounded-2xl border border-[#eee3d7] bg-[#fcfaf7] p-5 shadow-sm">
-                <p className="text-sm text-[#8b6b52]">Nearby Market Evidence</p>
-                <p className="mt-2 text-lg font-semibold text-[#2d3135]">
-                  {hasTeaserResult
-                    ? `${numOfComps || 0} nearby transactions found`
-                    : 'Recent nearby transactions will appear here'}
-                </p>
-                <p className="mt-1 text-sm text-[#6a727a]">
-                  {hasTeaserResult
-                    ? 'Unlock the full report to see the full breakdown'
-                    : 'Use your estimate to unlock the exact valuation and comparables'}
-                </p>
-              </div>
+            
+              {/* Summary Tab */}
+              {activeMobileResultTab === 'summary' && (
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                  <p className="text-sm text-[#8b6b52]">Estimated Value</p>
+                  <p className="mt-2 text-3xl font-semibold text-[#2d3135]">
+                    {hasTeaserResult
+                      ? hasUnlockedReport
+                        ? formatMoney(estimatedPrice)
+                        : formatTeaserMoney(estimatedPrice)
+                      : '$---,---'}
+                  </p>
+              
+                  {hasUnlockedReport && (estimatedLow || estimatedHigh) && (
+                    <p className="mt-2 text-sm text-[#6a727a]">
+                      Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
+                    </p>
+                  )}
+              
+                  <p className="mt-2 text-sm text-[#6a727a]">
+                    {hasUnlockedReport
+                      ? `Based on ${numOfComps || 0} nearby transactions`
+                      : 'Unlock the full report to see the exact valuation range'}
+                  </p>
+                </div>
+              )}
+            
+              {/* Comparables Tab */}
+              {activeMobileResultTab === 'comparables' && (
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                  <p className="text-sm text-[#8b6b52] mb-3">Recent Comparables</p>
+            
+                  {previewComparables.length === 0 ? (
+                    <p className="text-sm text-[#67707a]">No data yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {previewComparables.map((row, index) => (
+                        <div key={index} className="border-b pb-3 last:border-none">
+                          <p className="text-sm font-medium text-[#2d3135]">
+                            {row.project_name || row.address || '-'}
+                          </p>
+                          <p className="text-xs text-[#6a727a]">
+                            {formatDate(row.transaction_date)} • {sqmToSqft(row.floor_area_sqm)} sqft
+                          </p>
+                          <p className="text-sm font-semibold text-[#2d3135]">
+                            ${Math.round(row.transaction_price).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            
+              {/* Insights Tab */}
+              {activeMobileResultTab === 'insights' && (
+                <div className="rounded-2xl border border-[#e5dbcf] bg-white p-5 shadow-sm">
+                  <p className="text-sm text-[#8b6b52]">Market Insight</p>
+                  <p className="mt-2 text-sm text-[#6a727a]">
+                    Based on {numOfComps || 0} nearby transactions within {radiusUsedM || 0}m radius.
+                  </p>
+                </div>
+              )}
             </div>
 
             {hasTeaserResult && !hasUnlockedReport && (
@@ -2124,84 +2149,38 @@ export default function Home() {
       )}
 
       <section className="border-t border-[#e8ddd2] bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
+        <div className="mx-auto max-w-7xl px-6 py-12 md:px-10">
           <div className="max-w-2xl">
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
-              Why use HomeValue
+              Why HomeValue
             </p>
-            <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
-              A clearer way to understand your property&apos;s value
+            <h3 className="mt-3 text-2xl font-semibold text-[#2d3135] md:text-3xl">
+              A faster way to get a market-backed starting point
             </h3>
-            <p className="mt-4 text-base leading-7 text-[#646c74]">
-              Designed to help homeowners and buyers get a more informed view of the market using
-              recent nearby sales and structured transaction data.
+            <p className="mt-4 text-sm leading-7 text-[#646c74] md:text-base">
+              Built using real nearby transactions so homeowners can get a clearer sense of value before deciding their next move.
             </p>
           </div>
-
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2f3438] text-lg text-white">
-                1
-              </div>
-              <h4 className="mt-5 text-xl font-semibold text-[#2d3135]">Market-based estimate</h4>
-              <p className="mt-3 text-sm leading-6 text-[#67707a]">
-                Valuations are anchored to actual nearby transactions rather than guesswork.
+      
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-5">
+              <h4 className="text-lg font-semibold text-[#2d3135]">Market-based estimate</h4>
+              <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                Anchored to real nearby transactions.
               </p>
             </div>
-
-            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#8b6b52] text-lg text-white">
-                2
-              </div>
-              <h4 className="mt-5 text-xl font-semibold text-[#2d3135]">Comparable evidence</h4>
-              <p className="mt-3 text-sm leading-6 text-[#67707a]">
-                Recent nearby sales help explain how the estimate is formed.
+      
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-5">
+              <h4 className="text-lg font-semibold text-[#2d3135]">Comparable evidence</h4>
+              <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                See what similar homes have been selling for.
               </p>
             </div>
-
-            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#c8a287] text-lg text-white">
-                3
-              </div>
-              <h4 className="mt-5 text-xl font-semibold text-[#2d3135]">Useful starting point</h4>
-              <p className="mt-3 text-sm leading-6 text-[#67707a]">
-                Use it to benchmark price expectations before your next move.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-[#f7f4ef]">
-        <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
-          <div className="max-w-2xl">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
-              What you&apos;ll see
-            </p>
-            <h3 className="mt-3 text-3xl font-semibold text-[#2d3135]">
-              Your report brings together the numbers that matter
-            </h3>
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            <div className="rounded-3xl border border-[#e5dbcf] bg-white p-7 shadow-sm">
-              <h4 className="text-2xl font-semibold text-[#2d3135]">Estimated value</h4>
-              <p className="mt-3 text-sm leading-6 text-[#67707a]">
-                A clear estimate based on nearby comparable transactions and property details.
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-[#e5dbcf] bg-white p-7 shadow-sm">
-              <h4 className="text-2xl font-semibold text-[#2d3135]">Indicative range</h4>
-              <p className="mt-3 text-sm leading-6 text-[#67707a]">
-                A practical range to help you better understand possible pricing expectations.
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-[#e5dbcf] bg-white p-7 shadow-sm">
-              <h4 className="text-2xl font-semibold text-[#2d3135]">Nearby supporting data</h4>
-              <p className="mt-3 text-sm leading-6 text-[#67707a]">
-                Comparable transactions around your home so you can see what the market has been doing.
+      
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-5">
+              <h4 className="text-lg font-semibold text-[#2d3135]">Useful next step</h4>
+              <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                A practical benchmark before selling, buying, or planning ahead.
               </p>
             </div>
           </div>
