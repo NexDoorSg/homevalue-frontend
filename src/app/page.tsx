@@ -901,7 +901,6 @@ export default function Home() {
   
     if (category === 'hdb') {
       const hdbCandidates = withNormalized
-        .filter((row) => row._sizeBand !== 'different')
         .map((row) => {
           const sameStreet = !!row._normStreet && row._normStreet === subjectStreet
           const sameBlock =
@@ -909,35 +908,42 @@ export default function Home() {
             !!row._block &&
             !!subjectBlock &&
             row._block === subjectBlock
-    
+
           let priority = 999
-    
+
           if (sameBlock && row._sizeBand === 'same') priority = 1
           else if (sameBlock && row._sizeBand === 'similar') priority = 2
-          else if (sameStreet && row._sizeBand === 'same') priority = 3
-          else if (sameStreet && row._sizeBand === 'similar') priority = 4
-          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 5
-          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 6
-          else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 7
-          else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 8
-          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 9
-          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 10
-    
+          else if (sameBlock) priority = 3
+          else if (sameStreet && row._sizeBand === 'same') priority = 4
+          else if (sameStreet && row._sizeBand === 'similar') priority = 5
+          else if (sameStreet) priority = 6
+          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 7
+          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 8
+          else if (row.distance_m <= 500) priority = 9
+          else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 10
+          else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 11
+          else if (row.distance_m <= 1200) priority = 12
+          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 13
+          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 14
+          else if (row.distance_m <= 2000) priority = 15
+
           return {
             ...row,
             _priority: priority,
           }
         })
         .filter((row) => row._priority < 999)
-    
+
       return [...hdbCandidates]
         .sort((a, b) => {
+          // Primary: priority tier
+          if (a._priority !== b._priority) return a._priority - b._priority
+          // Secondary: most recent first
           const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
           const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-    
           if (dateB !== dateA) return dateB - dateA
-          if (a.distance_m !== b.distance_m) return a.distance_m - b.distance_m
-          return a._priority - b._priority
+          // Tertiary: closest first
+          return a.distance_m - b.distance_m
         })
         .slice(0, 10)
     }
