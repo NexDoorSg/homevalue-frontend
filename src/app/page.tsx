@@ -1165,8 +1165,15 @@ export default function Home() {
       const subjectLandSqm = Number(sqftToSqm(landSizeSqm)) || 0
       console.log('[LANDED DEBUG] subjectLandSqm:', subjectLandSqm, 'from landSizeSqm:', landSizeSqm)
 
+      // Same-street rows always included regardless of size
+      const sameStreetRows = deduped.filter(
+        (row) => row._normStreet && subjectStreet && row._normStreet === subjectStreet
+      )
+
       function applyFilter(distanceM: number, lowerRatio: number) {
         return deduped.filter((row) => {
+          // Same-street rows bypass size filter
+          if (row._normStreet && subjectStreet && row._normStreet === subjectStreet) return true
           if (row.distance_m > distanceM) return false
           if (subjectLandSqm > 0 && row.floor_area_sqm > 0) {
             if (row.floor_area_sqm < subjectLandSqm * lowerRatio) return false
@@ -1186,6 +1193,16 @@ export default function Home() {
       // Pass 3: 2500m, lower bound 25%
       if (withinRange.length < 8) {
         withinRange = applyFilter(2500, 0.25)
+      }
+
+      // Ensure same-street rows are always in the pool
+      const withinRangeKeys = new Set(withinRange.map(r => `${r.address}|${r.transaction_date}|${r.transaction_price}`))
+      for (const row of sameStreetRows) {
+        const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
+        if (!withinRangeKeys.has(key)) {
+          withinRange.push(row)
+          withinRangeKeys.add(key)
+        }
       }
 
       console.log('[LANDED DEBUG] withinRange count:', withinRange.length)
