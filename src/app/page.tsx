@@ -1961,14 +1961,33 @@ export default function Home() {
                     onChange={(e) => setPropertyType(e.target.value)}
                     className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                   >
-                    <option value="" disabled>
-                      e.g. Select property type
-                    </option>
-                    {PROPERTY_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
+                    <option value="" disabled>Select a property type</option>
+                    <optgroup label="HDB">
+                      <option value="2 ROOM">2 Room</option>
+                      <option value="3 ROOM">3 Room</option>
+                      <option value="4 ROOM">4 Room</option>
+                      <option value="5 ROOM">5 Room</option>
+                      <option value="EXECUTIVE">Executive</option>
+                    </optgroup>
+                    <optgroup label="Condominium">
+                      <option value="1 BEDROOM">1 Bedroom</option>
+                      <option value="2 BEDROOM">2 Bedroom</option>
+                      <option value="3 BEDROOM">3 Bedroom</option>
+                      <option value="4 BEDROOM">4 Bedroom</option>
+                      <option value="5 BEDROOM">5 Bedroom+</option>
+                      <option value="PENTHOUSE">Penthouse</option>
+                    </optgroup>
+                    <optgroup label="Executive Condo (EC)">
+                      <option value="2 BEDROOM EC">2 Bedroom</option>
+                      <option value="3 BEDROOM EC">3 Bedroom</option>
+                      <option value="4 BEDROOM EC">4 Bedroom</option>
+                      <option value="5 BEDROOM EC">5 Bedroom+</option>
+                    </optgroup>
+                    <optgroup label="Landed">
+                      <option value="TERRACE HOUSE">Terrace</option>
+                      <option value="SEMI-DETACHED HOUSE">Semi-D</option>
+                      <option value="DETACHED HOUSE">Detached</option>
+                    </optgroup>
                   </select>
                 </div>
                 
