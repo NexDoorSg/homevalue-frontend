@@ -1056,6 +1056,23 @@ export default function Home() {
         subjectCompletionYear = canonical.completionYear
         subjectIsStrata = canonical.isStrata
       }
+
+      // For HDB: look up completion year from the block's own transactions
+      if (propertyCategory === 'hdb') {
+        const subjectBlockNo = (resolved.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\s/)?.[1] || ''
+        if (subjectBlockNo) {
+          const { data: hdbMeta } = await supabase
+            .from('property_transactions_v2')
+            .select('completion_year')
+            .eq('property_group', 'hdb')
+            .ilike('address', `${subjectBlockNo} %`)
+            .not('completion_year', 'is', null)
+            .limit(1)
+          if (hdbMeta && hdbMeta[0]?.completion_year) {
+            subjectCompletionYear = Number(hdbMeta[0].completion_year)
+          }
+        }
+      }
   
       const result = await getValuation({
         lat: resolved.lat,
@@ -1079,6 +1096,11 @@ export default function Home() {
         subjectProjectName: resolvedProjectName,
         subjectCompletionYear: subjectCompletionYear,
         subjectIsStrata: subjectIsStrata,
+        subjectAddress: propertyCategory === 'hdb' ? resolved.address : undefined,
+        subjectBlockNo: propertyCategory === 'hdb'
+          ? (resolved.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\s/)?.[1] || ''
+          : undefined,
+        subjectCompletionYearHdb: propertyCategory === 'hdb' ? subjectCompletionYear : undefined,
       })
   
       if (!result) {
