@@ -2343,10 +2343,6 @@ export default function Home() {
                   {isGenerating ? 'Generating...' : 'See My Home Value'}
                 </button>
 
-                <p className="mt-2 text-xs text-[#7a8289]">
-                  Powered by real transaction data from HDB & URA
-                </p>
-
                 {/* CHANGE 6: Mobile stat cards */}
                 <div className="lg:hidden mt-1">
                   <StatCards />
