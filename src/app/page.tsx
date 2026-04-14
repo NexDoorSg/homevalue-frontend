@@ -2200,13 +2200,16 @@ export default function Home() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-left text-[#6a727a]">
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Address</th>
-                      <th className="px-4 py-3">Size</th>
-                      <th className="px-4 py-3">Price</th>
-                      <th className="px-4 py-3">PSF</th>
-                      <th className="px-4 py-3">Distance</th>
-                    </tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Address</th>
+                    <th className="px-4 py-3">Size</th>
+                    <th className="px-4 py-3">Price</th>
+                    <th className="px-4 py-3">PSF</th>
+                    {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
+                      <th className="px-4 py-3">Tenure</th>
+                    )}
+                    <th className="px-4 py-3">Distance</th>
+                  </tr>
                   </thead>
       
                   <tbody>
@@ -2230,6 +2233,9 @@ export default function Home() {
                           <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
                           <td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
                           <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
+                          {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
+                            <td className="px-5 py-4">{formatTenure(row.tenure)}</td>
+                          )}
                           <td className="px-5 py-4">{Math.round(row.distance_m)}m</td>
                         </tr>
                       ))
