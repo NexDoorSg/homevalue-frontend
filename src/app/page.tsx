@@ -99,6 +99,14 @@ function cleanAddress(value: string) {
 
 function abbreviateRoadWords(value: string) {
   return value
+    .replace(/\bBUKIT\b/g, 'BT')
+    .replace(/\bMOUNT\b/g, 'MT')
+    .replace(/\bJALAN\b/g, 'JLN')
+    .replace(/\bKAMPONG\b/g, 'KG')
+    .replace(/\bLORONG\b/g, 'LOR')
+    .replace(/\bUPPER\b/g, 'UPP')
+    .replace(/\bTANJONG\b/g, 'TG')
+    .replace(/\bCOMMONWEALTH\b/g, "C'WEALTH")
     .replace(/\bAVENUE\b/g, 'AVE')
     .replace(/\bSTREET\b/g, 'ST')
     .replace(/\bROAD\b/g, 'RD')
@@ -106,7 +114,6 @@ function abbreviateRoadWords(value: string) {
     .replace(/\bCRESCENT\b/g, 'CRES')
     .replace(/\bPLACE\b/g, 'PL')
     .replace(/\bCLOSE\b/g, 'CL')
-    .replace(/\bLANE\b/g, 'LN')
     .replace(/\bTERRACE\b/g, 'TER')
     .replace(/\bBOULEVARD\b/g, 'BLVD')
     .replace(/\bCENTRAL\b/g, 'CTRL')
@@ -114,6 +121,8 @@ function abbreviateRoadWords(value: string) {
     .replace(/\bNORTH\b/g, 'NTH')
     .replace(/\bSOUTH\b/g, 'STH')
     .replace(/\bGARDENS\b/g, 'GDNS')
+    .replace(/\bPARK\b/g, 'PK')
+    .replace(/\bMARKET\b/g, 'MKT')
     .replace(/\bINDUSTRIAL PARK\b/g, 'IND PK')
     .replace(/\s+/g, ' ')
     .trim()
