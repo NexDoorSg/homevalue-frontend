@@ -470,6 +470,7 @@ export default function Home() {
   const [showPlanPopup, setShowPlanPopup] = useState(false)
   const [planPopupStep, setPlanPopupStep] = useState<'question' | 'confirm'>('question')
   const [planPopupInteracted, setPlanPopupInteracted] = useState(false)
+  const [planPopupDismissed, setPlanPopupDismissed] = useState(false)
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [consultName, setConsultName] = useState('')
   const [consultPhone, setConsultPhone] = useState('')
@@ -881,17 +882,30 @@ export default function Home() {
         radius_used_m: result.radius,
       }
       
-      const { data: insertedLead, error: leadInsertError } = await supabase
+      const { error: leadInsertError } = await supabase
         .from('leads')
         .insert([leadPayload])
-        .select('id')
-        .single()
-      
+
       if (leadInsertError) {
         console.error('Valuation lead save error:', leadInsertError)
         setFormMessage(`Lead save failed: ${leadInsertError.message}`)
       } else {
-        if (insertedLead?.id) setLeadId(insertedLead.id)
+        const emailResult = await sendLeadEmail(leadPayload)
+        if (!emailResult.ok) {
+          console.error('Lead saved but email notification failed:', emailResult.error)
+        }
+
+        // Fetch the ID of the row we just inserted so the popup can update it
+        const { data: fetchedLead } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('email', leadPayload.email)
+          .eq('phone', leadPayload.phone)
+          .order('id', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (fetchedLead?.id) setLeadId(fetchedLead.id)
       }
   
       const comparables = await fetchRecentComparables(
@@ -1119,7 +1133,6 @@ export default function Home() {
   }
 
   const handlePlanSelect = async (plan: string) => {
-    setPlanPopupInteracted(true)
     setPlanPopupStep('confirm')
 
     const updatePayload: Record<string, unknown> = { plan }
@@ -1141,11 +1154,13 @@ export default function Home() {
     await sendLeadEmail(emailPayload)
 
     setTimeout(() => {
+      setPlanPopupDismissed(true)
       setShowPlanPopup(false)
     }, 2500)
   }
 
   const handlePopupDismiss = () => {
+    setPlanPopupDismissed(true)
     setPlanPopupInteracted(true)
     setShowPlanPopup(false)
   }
@@ -2386,7 +2401,7 @@ export default function Home() {
       )}
 
       {/* Plan Popup */}
-      {showPlanPopup && !planPopupInteracted && (
+      {showPlanPopup && !planPopupDismissed && (
         <>
           {/* Mobile: bottom sheet */}
           <div className="fixed inset-x-0 bottom-0 z-50 md:hidden">
@@ -2424,8 +2439,8 @@ export default function Home() {
               ) : (
                 <div className="flex flex-col items-center py-4 text-center">
                   <div className="text-3xl">🎉</div>
-                  <h3 className="mt-3 text-lg font-semibold text-[#2d3135]">We&apos;ll be in touch shortly.</h3>
-                  <p className="mt-1 text-sm text-[#6a727a]">One of our agents will reach out to help you.</p>
+                  <h3 className="mt-3 text-lg font-semibold text-[#2d3135]">Thanks {leadName.split(' ')[0]} — one of our agents will be in touch with you shortly.</h3>
+                  <p className="mt-1 text-sm text-[#6a727a]">We look forward to helping you.</p>
                 </div>
               )}
             </div>
@@ -2467,8 +2482,8 @@ export default function Home() {
               ) : (
                 <div className="flex flex-col items-center py-2 text-center">
                   <div className="text-3xl">🎉</div>
-                  <h3 className="mt-3 text-base font-semibold text-[#2d3135]">We&apos;ll be in touch shortly.</h3>
-                  <p className="mt-1 text-sm text-[#6a727a]">One of our agents will reach out to help you.</p>
+                  <h3 className="mt-3 text-base font-semibold text-[#2d3135]">Thanks {leadName.split(' ')[0]} — one of our agents will be in touch with you shortly.</h3>
+                  <p className="mt-1 text-sm text-[#6a727a]">We look forward to helping you.</p>
                 </div>
               )}
             </div>
