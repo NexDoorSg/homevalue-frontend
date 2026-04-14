@@ -968,7 +968,6 @@ export default function Home() {
           : null,
       tenure: propertyContextExists && propertyCategory === 'landed' ? tenure : null,
       plan: extra?.plan ?? null,
-      status: 'new',
     }
   }
 
@@ -2392,95 +2391,49 @@ export default function Home() {
         </div>
       )}
 
-      {/* Plan Popup */}
+      {/* Plan Popup — centre modal for both mobile and desktop */}
       {showPlanPopup && !planPopupDismissed && (
-        <>
-          {/* Mobile: bottom sheet */}
-          <div className="fixed inset-x-0 bottom-0 z-50 md:hidden">
-            <div className="rounded-t-[28px] border-t border-[#e3d6c8] bg-white px-6 pb-8 pt-6 shadow-[0_-12px_40px_rgba(37,42,46,0.12)]">
-              {planPopupStep === 'question' ? (
-                <>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
-                  <h3 className="mt-2 text-lg font-semibold text-[#2d3135]">
-                    Now that you know your home&apos;s value, what&apos;s your next move?
-                  </h3>
-                  <div className="mt-5 flex flex-col gap-3">
-                    {[
-                      { label: '🏷️ Thinking of selling', value: 'Thinking of selling' },
-                      { label: '🏠 Looking to buy', value: 'Looking to buy' },
-                      { label: '📊 Just exploring my options', value: 'Just exploring my options' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => handlePlanSelect(option.value)}
-                        className="w-full rounded-2xl border border-[#e3d6c8] bg-[#faf8f4] px-4 py-3 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#8b6b52] hover:bg-white"
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handlePopupDismiss}
-                    className="mt-4 w-full text-center text-xs text-[#9aa0a6] underline underline-offset-2"
-                  >
-                    Maybe later
-                  </button>
-                </>
-              ) : (
-                <div className="flex flex-col items-center py-4 text-center">
-                  <div className="text-3xl">🎉</div>
-                  <h3 className="mt-3 text-lg font-semibold text-[#2d3135]">Thanks {leadName.split(' ')[0]} — one of our agents will be in touch with you shortly.</h3>
-                  <p className="mt-1 text-sm text-[#6a727a]">We look forward to helping you.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:max-w-lg md:p-10">
+            {planPopupStep === 'question' ? (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
+                <h3 className="mt-3 text-xl font-semibold leading-snug text-[#2d3135] md:text-2xl">
+                  Now that you know your home&apos;s value, what&apos;s your next move?
+                </h3>
+                <div className="mt-6 flex flex-col gap-3">
+                  {[
+                    { label: '🏷️ Thinking of selling', value: 'Thinking of selling' },
+                    { label: '🏠 Looking to buy', value: 'Looking to buy' },
+                    { label: '📊 Just exploring my options', value: 'Just exploring my options' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handlePlanSelect(option.value)}
+                      className="w-full rounded-2xl border border-[#e3d6c8] bg-[#faf8f4] px-5 py-4 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#8b6b52] hover:bg-white md:text-base"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={handlePopupDismiss}
+                  className="mt-5 w-full text-center text-xs text-[#9aa0a6] underline underline-offset-2"
+                >
+                  Maybe later
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-col items-center py-4 text-center">
+                <div className="text-4xl">🎉</div>
+                <h3 className="mt-4 text-xl font-semibold text-[#2d3135] md:text-2xl">Thanks {leadName.split(' ')[0]} — one of our agents will be in touch with you shortly.</h3>
+                <p className="mt-2 text-sm text-[#6a727a]">We look forward to helping you.</p>
+              </div>
+            )}
           </div>
-
-          {/* Desktop: bottom-right widget */}
-          <div className="fixed bottom-6 right-6 z-50 hidden w-[420px] md:block">
-            <div className="rounded-[24px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
-              {planPopupStep === 'question' ? (
-                <>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
-                  <h3 className="mt-2 text-base font-semibold text-[#2d3135]">
-                    Now that you know your home&apos;s value, what&apos;s your next move?
-                  </h3>
-                  <div className="mt-4 flex flex-col gap-2">
-                    {[
-                      { label: '🏷️ Thinking of selling', value: 'Thinking of selling' },
-                      { label: '🏠 Looking to buy', value: 'Looking to buy' },
-                      { label: '📊 Just exploring my options', value: 'Just exploring my options' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => handlePlanSelect(option.value)}
-                        className="w-full rounded-xl border border-[#e3d6c8] bg-[#faf8f4] px-4 py-2.5 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#8b6b52] hover:bg-white"
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handlePopupDismiss}
-                    className="mt-3 w-full text-center text-xs text-[#9aa0a6] underline underline-offset-2"
-                  >
-                    Maybe later
-                  </button>
-                </>
-              ) : (
-                <div className="flex flex-col items-center py-2 text-center">
-                  <div className="text-3xl">🎉</div>
-                  <h3 className="mt-3 text-base font-semibold text-[#2d3135]">Thanks {leadName.split(' ')[0]} — one of our agents will be in touch with you shortly.</h3>
-                  <p className="mt-1 text-sm text-[#6a727a]">We look forward to helping you.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
+        </div>
       )}
     </main>
   )
