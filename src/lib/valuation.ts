@@ -885,8 +885,8 @@ function buildNonLandedCandidate(
 
   const estimated = avgPsm * floorAreaSqm
 
-  // Apply +4% upward bias (seller-facing tool)
-  const biasedEstimate = estimated * 1.04
+  // Apply +1% upward bias (seller-facing tool)
+  const biasedEstimate = estimated * 1.01
 
   // Use std dev of comparable PSFs for range, capped by property type
   const psfValues = usable.map((row) => row.pricePerSqm)
@@ -967,7 +967,7 @@ function buildNonLandedFallback(
 
   const estimated = avgPsm * floorAreaSqm
 
-  const biasedEstimate = estimated * 1.04
+  const biasedEstimate = estimated * 1.01
 
   return {
     estimated: biasedEstimate,
@@ -1039,7 +1039,7 @@ function buildLandedCandidate(
 
   estimated = estimated * (1 + cappedAdjustment)
 
-  const biasedEstimate = estimated * 1.04
+  const biasedEstimate = estimated * 1.03
 
   const psfValues = usable.map((row) => row.pricePerSqft)
   const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
@@ -1130,7 +1130,7 @@ if (sameTenureRows.length >= 2) {
 
   const estimated = avgLandPsf * landSizeSqft
 
-  const biasedEstimate = estimated * 1.04
+  const biasedEstimate = estimated * 1.03
 
   return {
     estimated: biasedEstimate,
