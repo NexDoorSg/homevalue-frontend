@@ -1149,6 +1149,8 @@ export default function Home() {
     setPlanPopupInteracted(true)
     setShowPlanPopup(false)
   }
+
+  const fetchRecentComparables = async (
     lat: number,
     lon: number,
     targetPropertyType: string,
