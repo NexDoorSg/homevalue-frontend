@@ -882,30 +882,21 @@ export default function Home() {
         radius_used_m: result.radius,
       }
       
-      const { error: leadInsertError } = await supabase
+      const { data: insertedLeads, error: leadInsertError } = await supabase
         .from('leads')
         .insert([leadPayload])
+        .select('id')
 
       if (leadInsertError) {
         console.error('Valuation lead save error:', leadInsertError)
         setFormMessage(`Lead save failed: ${leadInsertError.message}`)
       } else {
+        if (insertedLeads && insertedLeads[0]?.id) setLeadId(insertedLeads[0].id)
+
         const emailResult = await sendLeadEmail(leadPayload)
         if (!emailResult.ok) {
           console.error('Lead saved but email notification failed:', emailResult.error)
         }
-
-        // Fetch the ID of the row we just inserted so the popup can update it
-        const { data: fetchedLead } = await supabase
-          .from('leads')
-          .select('id')
-          .eq('email', leadPayload.email)
-          .eq('phone', leadPayload.phone)
-          .order('id', { ascending: false })
-          .limit(1)
-          .single()
-
-        if (fetchedLead?.id) setLeadId(fetchedLead.id)
       }
   
       const comparables = await fetchRecentComparables(
@@ -926,7 +917,7 @@ export default function Home() {
       setTimeout(() => {
         setPlanPopupStep('question')
         setShowPlanPopup(true)
-      }, 5200)
+      }, 4000)
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -2209,7 +2200,7 @@ export default function Home() {
                     </div>
                   )}
                   <div className="border-l border-[#e8ddd2] pl-6">
-                    <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8b6b52]">Comps Used</p>
+                    <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8b6b52]">Transactions Used</p>
                     <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{numOfComps || 0}</p>
                     {radiusUsedM && (
                       <p className="text-xs text-[#9aa0a6]">within {radiusUsedM}m</p>
@@ -2447,8 +2438,8 @@ export default function Home() {
           </div>
 
           {/* Desktop: bottom-right widget */}
-          <div className="fixed bottom-6 right-6 z-50 hidden w-80 md:block">
-            <div className="rounded-[24px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
+          <div className="fixed bottom-6 right-6 z-50 hidden w-[420px] md:block">
+            <div className="rounded-[24px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
               {planPopupStep === 'question' ? (
                 <>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
