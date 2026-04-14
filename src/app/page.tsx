@@ -2154,29 +2154,31 @@ export default function Home() {
                 Real Nearby Transactions Around Your Unit
               </h3>
       
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => setActiveTab('same')}
-                  className={`px-4 py-2 rounded-full text-sm ${
-                    activeTab === 'same'
-                      ? 'bg-[#2f3438] text-white'
-                      : 'bg-white border border-[#ddd]'
-                  }`}
-                >
-                  Same Project
-                </button>
-      
-                <button
-                  onClick={() => setActiveTab('nearby')}
-                  className={`px-4 py-2 rounded-full text-sm ${
-                    activeTab === 'nearby'
-                      ? 'bg-[#2f3438] text-white'
-                      : 'bg-white border border-[#ddd]'
-                  }`}
-                >
-                  Nearby
-                </button>
-              </div>
+              {propertyCategory !== 'landed' && (
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => setActiveTab('same')}
+                    className={`px-4 py-2 rounded-full text-sm ${
+                      activeTab === 'same'
+                        ? 'bg-[#2f3438] text-white'
+                        : 'bg-white border border-[#ddd]'
+                    }`}
+                  >
+                    {propertyCategory === 'hdb' ? 'Same Block' : 'Same Project'}
+                  </button>
+              
+                  <button
+                    onClick={() => setActiveTab('nearby')}
+                    className={`px-4 py-2 rounded-full text-sm ${
+                      activeTab === 'nearby'
+                        ? 'bg-[#2f3438] text-white'
+                        : 'bg-white border border-[#ddd]'
+                    }`}
+                  >
+                    Nearby
+                  </button>
+                </div>
+              )}
       
               {/* Table */}
               <div className="mt-6 overflow-x-auto rounded-2xl border border-[#e5dbcf] bg-white">
@@ -2193,21 +2195,19 @@ export default function Home() {
                   </thead>
       
                   <tbody>
-                    {(activeTab === 'same'
+                    (propertyCategory === 'landed'
+                      ? recentComparables
+                      : activeTab === 'same'
                       ? propertyCategory === 'condo' || propertyCategory === 'ec'
                         ? sameProjectComparables.length > 0
                           ? sameProjectComparables
                           : []
-                        : propertyCategory === 'hdb'
-                        ? sameBlockComparables.length > 0
-                          ? sameBlockComparables
-                          : []
-                        : recentComparables
+                        : sameBlockComparables.length > 0
+                        ? sameBlockComparables
+                        : []
                       : propertyCategory === 'condo' || propertyCategory === 'ec'
                       ? nearbyCondoComparables
-                      : propertyCategory === 'hdb'
-                      ? nearbyHdbComparables
-                      : recentComparables
+                      : nearbyHdbComparables
                     ).map((row, i) => (
                       <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
                         <td className="px-5 py-4">
