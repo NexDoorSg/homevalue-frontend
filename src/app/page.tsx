@@ -1034,7 +1034,7 @@ export default function Home() {
       setTimeout(() => {
         setPlanPopupStep('question')
         setShowPlanPopup(true)
-      }, 4000)
+      }, 3000)
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
