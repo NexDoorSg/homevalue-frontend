@@ -968,6 +968,7 @@ export default function Home() {
           : null,
       tenure: propertyContextExists && propertyCategory === 'landed' ? tenure : null,
       plan: extra?.plan ?? null,
+      status: 'new',
     }
   }
 
