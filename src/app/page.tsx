@@ -466,6 +466,10 @@ export default function Home() {
   const [leadName, setLeadName] = useState('')
   const [leadPhone, setLeadPhone] = useState('')
   const [leadEmail, setLeadEmail] = useState('')
+  const [leadId, setLeadId] = useState<number | null>(null)
+  const [showPlanPopup, setShowPlanPopup] = useState(false)
+  const [planPopupStep, setPlanPopupStep] = useState<'question' | 'confirm'>('question')
+  const [planPopupInteracted, setPlanPopupInteracted] = useState(false)
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [consultName, setConsultName] = useState('')
   const [consultPhone, setConsultPhone] = useState('')
@@ -476,6 +480,15 @@ export default function Home() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
   const propertyCategory = getPropertyCategoryFromType(propertyType)
+
+  const estimatedPsf = (() => {
+    if (!estimatedPrice) return null
+    const sqftVal = propertyCategory === 'landed'
+      ? Number(builtUpSqm)
+      : Number(floorAreaSqm)
+    if (!sqftVal || sqftVal <= 0) return null
+    return Math.round(estimatedPrice / sqftVal)
+  })()
   const showFloorRangeColumn =
     propertyCategory === 'hdb' &&
     recentComparables.some(
@@ -868,20 +881,17 @@ export default function Home() {
         radius_used_m: result.radius,
       }
       
-      const { error: leadInsertError } = await supabase
+      const { data: insertedLead, error: leadInsertError } = await supabase
         .from('leads')
         .insert([leadPayload])
+        .select('id')
+        .single()
       
       if (leadInsertError) {
         console.error('Valuation lead save error:', leadInsertError)
         setFormMessage(`Lead save failed: ${leadInsertError.message}`)
       } else {
-        console.log('Lead saved successfully')
-      
-        const emailResult = await sendLeadEmail(leadPayload)
-        if (!emailResult.ok) {
-          console.error('Lead saved but email notification failed:', emailResult.error)
-        }
+        if (insertedLead?.id) setLeadId(insertedLead.id)
       }
   
       const comparables = await fetchRecentComparables(
@@ -898,6 +908,11 @@ export default function Home() {
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 200)
+
+      setTimeout(() => {
+        setPlanPopupStep('question')
+        setShowPlanPopup(true)
+      }, 5200)
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -1103,7 +1118,37 @@ export default function Home() {
     setLeadEmail('')
   }
 
-  const fetchRecentComparables = async (
+  const handlePlanSelect = async (plan: string) => {
+    setPlanPopupInteracted(true)
+    setPlanPopupStep('confirm')
+
+    const updatePayload: Record<string, unknown> = { plan }
+
+    if (leadId) {
+      await supabase.from('leads').update(updatePayload).eq('id', leadId)
+    }
+
+    // Fire email notification with plan
+    const emailPayload = {
+      name: leadName,
+      phone: leadPhone,
+      email: leadEmail,
+      address: address,
+      plan,
+      estimated_price: estimatedPrice,
+      source: 'plan_popup',
+    }
+    await sendLeadEmail(emailPayload)
+
+    setTimeout(() => {
+      setShowPlanPopup(false)
+    }, 2500)
+  }
+
+  const handlePopupDismiss = () => {
+    setPlanPopupInteracted(true)
+    setShowPlanPopup(false)
+  }
     lat: number,
     lon: number,
     targetPropertyType: string,
@@ -2120,25 +2165,41 @@ export default function Home() {
             className="mx-auto max-w-7xl px-6 py-12 md:px-10"
           >
             {/* Valuation Summary */}
-            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm max-w-xl">
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8b6b52]">
+            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                 Valuation Summary
               </p>
-      
-              <p className="mt-3 text-3xl font-semibold text-[#2d3135] md:text-4xl">
-                {formatMoney(estimatedPrice)}
-              </p>
-      
-              {(estimatedLow || estimatedHigh) && (
-                <p className="mt-2 text-sm text-[#6a727a]">
-                  Range: {formatMoney(estimatedLow)} - {formatMoney(estimatedHigh)}
-                </p>
-              )}
-      
-              <p className="mt-2 text-sm text-[#6a727a]">
-                Based on {numOfComps || 0} nearby transactions
-                {radiusUsedM ? ` within ${radiusUsedM}m` : ''}
-              </p>
+
+              <div className="mt-4 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                {/* Left — main price */}
+                <div>
+                  <p className="text-4xl font-semibold text-[#2d3135] md:text-5xl">
+                    {formatMoney(estimatedPrice)}
+                  </p>
+                  {(estimatedLow || estimatedHigh) && (
+                    <p className="mt-2 text-sm text-[#6a727a]">
+                      Range: {formatMoney(estimatedLow)} — {formatMoney(estimatedHigh)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Right — stat cells */}
+                <div className="flex gap-6 md:gap-10">
+                  {estimatedPsf && (
+                    <div className="border-l border-[#e8ddd2] pl-6">
+                      <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8b6b52]">Est. PSF</p>
+                      <p className="mt-1 text-2xl font-semibold text-[#2d3135]">${estimatedPsf.toLocaleString()}</p>
+                    </div>
+                  )}
+                  <div className="border-l border-[#e8ddd2] pl-6">
+                    <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8b6b52]">Comps Used</p>
+                    <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{numOfComps || 0}</p>
+                    {radiusUsedM && (
+                      <p className="text-xs text-[#9aa0a6]">within {radiusUsedM}m</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
       
             {/* Tabs */}
@@ -2320,6 +2381,97 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Plan Popup */}
+      {showPlanPopup && !planPopupInteracted && (
+        <>
+          {/* Mobile: bottom sheet */}
+          <div className="fixed inset-x-0 bottom-0 z-50 md:hidden">
+            <div className="rounded-t-[28px] border-t border-[#e3d6c8] bg-white px-6 pb-8 pt-6 shadow-[0_-12px_40px_rgba(37,42,46,0.12)]">
+              {planPopupStep === 'question' ? (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[#2d3135]">
+                    Now that you know your home&apos;s value, what&apos;s your next move?
+                  </h3>
+                  <div className="mt-5 flex flex-col gap-3">
+                    {[
+                      { label: '🏷️ Thinking of selling', value: 'Thinking of selling' },
+                      { label: '🏠 Looking to buy', value: 'Looking to buy' },
+                      { label: '📊 Just exploring my options', value: 'Just exploring my options' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handlePlanSelect(option.value)}
+                        className="w-full rounded-2xl border border-[#e3d6c8] bg-[#faf8f4] px-4 py-3 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#8b6b52] hover:bg-white"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePopupDismiss}
+                    className="mt-4 w-full text-center text-xs text-[#9aa0a6] underline underline-offset-2"
+                  >
+                    Maybe later
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center py-4 text-center">
+                  <div className="text-3xl">🎉</div>
+                  <h3 className="mt-3 text-lg font-semibold text-[#2d3135]">We&apos;ll be in touch shortly.</h3>
+                  <p className="mt-1 text-sm text-[#6a727a]">One of our agents will reach out to help you.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop: bottom-right widget */}
+          <div className="fixed bottom-6 right-6 z-50 hidden w-80 md:block">
+            <div className="rounded-[24px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
+              {planPopupStep === 'question' ? (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
+                  <h3 className="mt-2 text-base font-semibold text-[#2d3135]">
+                    Now that you know your home&apos;s value, what&apos;s your next move?
+                  </h3>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {[
+                      { label: '🏷️ Thinking of selling', value: 'Thinking of selling' },
+                      { label: '🏠 Looking to buy', value: 'Looking to buy' },
+                      { label: '📊 Just exploring my options', value: 'Just exploring my options' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handlePlanSelect(option.value)}
+                        className="w-full rounded-xl border border-[#e3d6c8] bg-[#faf8f4] px-4 py-2.5 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#8b6b52] hover:bg-white"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePopupDismiss}
+                    className="mt-3 w-full text-center text-xs text-[#9aa0a6] underline underline-offset-2"
+                  >
+                    Maybe later
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center py-2 text-center">
+                  <div className="text-3xl">🎉</div>
+                  <h3 className="mt-3 text-base font-semibold text-[#2d3135]">We&apos;ll be in touch shortly.</h3>
+                  <p className="mt-1 text-sm text-[#6a727a]">One of our agents will reach out to help you.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </main>
   )
