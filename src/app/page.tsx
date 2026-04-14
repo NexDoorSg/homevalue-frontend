@@ -2196,6 +2196,11 @@ export default function Home() {
               )}
       
               {/* Table */}
+              {propertyCategory === 'landed' && (
+                <p className="mt-4 text-sm text-[#6a727a] italic">
+                  Landed property values vary significantly based on layout, condition, and land shape. The estimate above is a starting point — for a more accurate assessment, speak with one of our agents directly.
+                </p>
+              )}
               <div className="mt-6 overflow-x-auto rounded-2xl border border-[#e5dbcf] bg-white">
                 <table className="min-w-full text-sm">
                   <thead>
