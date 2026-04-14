@@ -206,7 +206,6 @@ function formatDate(value: string | null) {
 function formatTenure(value: string | null | undefined) {
   if (!value) return '-'
   const v = value.trim()
-  // Extract lease duration and commencement year
   const match = v.match(/^(\d+)\s*yrs?\s*lease\s*commencing\s*from\s*(\d{4})/i)
   if (match) {
     const yrs = Number(match[1])
@@ -214,7 +213,6 @@ function formatTenure(value: string | null | undefined) {
     if (yrs >= 900) return `999-yr (from ${from})`
     return `${yrs}-yr (from ${from})`
   }
-  // No commencement year variants
   if (/freehold/i.test(v)) return 'Freehold'
   if (/9999/i.test(v)) return 'Freehold'
   if (/999\s*years/i.test(v)) return '999-yr'
@@ -224,12 +222,10 @@ function formatTenure(value: string | null | undefined) {
 
 function isValidPhone(value: string) {
   const trimmed = value.trim()
-  // International number with country code (starts with + or 00)
   if (trimmed.startsWith('+') || trimmed.startsWith('00')) {
     const digits = trimmed.replace(/\D/g, '')
     return digits.length >= 10 && digits.length <= 15
   }
-  // Local number — exactly 8 digits
   const digits = trimmed.replace(/\D/g, '')
   return digits.length === 8
 }
@@ -238,7 +234,6 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 }
 
-// ─── Haversine-based distance (accurate for Singapore's latitude) ──────────
 function getDistanceMeters(
   lat1: number,
   lon1: number,
@@ -246,7 +241,7 @@ function getDistanceMeters(
   lon2: number
 ) {
   const toRad = (deg: number) => (deg * Math.PI) / 180
-  const R = 6371000 // Earth radius in metres
+  const R = 6371000
   const dLat = toRad(lat2 - lat1)
   const dLon = toRad(lon2 - lon1)
   const a =
@@ -414,6 +409,127 @@ async function resolveCanonicalProjectName(params: {
 type EmailResult = {
   ok: boolean
   error?: string
+}
+
+// ─── Loading skeleton component ───────────────────────────────────────────────
+function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'landed' }) {
+  return (
+    <section className="bg-[#f7f4ef]">
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: -600px 0; }
+          100% { background-position: 600px 0; }
+        }
+        @keyframes loadbar {
+          0%   { width: 0%; }
+          20%  { width: 25%; }
+          50%  { width: 55%; }
+          75%  { width: 75%; }
+          90%  { width: 88%; }
+          100% { width: 95%; }
+        }
+        @keyframes barshine {
+          0%   { background-position: -400px 0; }
+          100% { background-position: 400px 0; }
+        }
+        .sk {
+          background: linear-gradient(90deg, #f0ece6 25%, #e8e2da 50%, #f0ece6 75%);
+          background-size: 600px 100%;
+          animation: shimmer 1.4s infinite;
+          border-radius: 8px;
+        }
+        .load-bar-fill {
+          height: 100%;
+          border-radius: 99px;
+          background: linear-gradient(90deg, #8b6b52, #b08060, #8b6b52);
+          background-size: 400px 100%;
+          animation: loadbar 4s ease-out forwards, barshine 1.2s linear infinite;
+          width: 0%;
+        }
+      `}</style>
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-12 md:px-10">
+        {/* Loading bar */}
+        <div className="flex flex-col items-center mb-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">
+            Analysing transactions
+          </p>
+          <div className="w-full max-w-sm h-1.5 bg-[#e8ddd2] rounded-full overflow-hidden">
+            <div className="load-bar-fill" />
+          </div>
+          <LoadingStatusMessage />
+        </div>
+
+        {/* Skeleton summary card */}
+        <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8 mb-10">
+          <div className="sk w-36 h-3 mb-5" />
+          <div className="sk w-64 h-12 rounded-xl mb-3" />
+          <div className="sk w-48 h-3.5 mb-8" />
+          <div className="flex gap-8 border-t border-[#e8ddd2] pt-6">
+            <div className="border-l border-[#e8ddd2] pl-6">
+              <div className="sk w-16 h-2.5 mb-2" />
+              <div className="sk w-24 h-7 rounded-md" />
+            </div>
+            <div className="border-l border-[#e8ddd2] pl-6">
+              <div className="sk w-28 h-2.5 mb-2" />
+              <div className="sk w-14 h-7 rounded-md" />
+              <div className="sk w-20 h-2 mt-2" />
+            </div>
+          </div>
+        </div>
+
+        {/* Skeleton section heading + tabs */}
+        <div className="sk w-72 h-6 rounded-md mb-5" />
+        {category !== 'landed' && (
+          <div className="flex gap-2 mb-6">
+            <div className="sk w-28 h-9 rounded-full" />
+            <div className="sk w-20 h-9 rounded-full" />
+          </div>
+        )}
+
+        {/* Skeleton table */}
+        <div className="rounded-2xl border border-[#e5dbcf] bg-white overflow-hidden">
+          <div className="grid grid-cols-4 gap-0 px-5 py-3 border-b border-[#e8ddd2]">
+            {[36, 60, 32, 40].map((w, i) => (
+              <div key={i} className="sk h-3" style={{ width: w }} />
+            ))}
+          </div>
+          {[0,1,2,3,4,5].map((i) => (
+            <div key={i} className="grid grid-cols-4 gap-0 px-5 py-4 border-t border-[#f0ebe4]">
+              {[48, 160, 56, 72].map((w, j) => (
+                <div key={j} className="sk h-3.5" style={{ width: w }} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function LoadingStatusMessage() {
+  const [msgIndex, setMsgIndex] = useState(0)
+  const messages = [
+    'Looking up nearby transactions...',
+    'Finding comparable properties...',
+    'Calculating your home value...',
+    'Almost there...',
+  ]
+
+  // cycle through messages
+  useState(() => {
+    const timers = [
+      setTimeout(() => setMsgIndex(1), 1200),
+      setTimeout(() => setMsgIndex(2), 2400),
+      setTimeout(() => setMsgIndex(3), 3400),
+    ]
+    return () => timers.forEach(clearTimeout)
+  })
+
+  return (
+    <p className="text-xs text-[#9aa0a6] mt-3 text-center min-h-[18px]">
+      {messages[msgIndex]}
+    </p>
+  )
 }
 
 export default function Home() {
@@ -799,6 +915,11 @@ export default function Home() {
     }
   
     setIsGenerating(true)
+
+    // Scroll to skeleton immediately
+    setTimeout(() => {
+      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   
     try {
       const resolved = await resolveAddressForGeneration()
@@ -909,10 +1030,6 @@ export default function Home() {
       )
   
       setRecentComparables(comparables)
-  
-      setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 200)
 
       setTimeout(() => {
         setPlanPopupStep('question')
@@ -1132,7 +1249,6 @@ export default function Home() {
       await supabase.from('leads').update(updatePayload).eq('id', leadId)
     }
 
-    // Fire email notification with plan
     const emailPayload = {
       name: leadName,
       phone: leadPhone,
@@ -1215,7 +1331,7 @@ export default function Home() {
       const text = normalizeText(value)
       if (!text) return ''
       return text
-        .replace(/\bSINGAPORE\s+\d{6}\b/g, '')  // strip "SINGAPORE 309073"
+        .replace(/\bSINGAPORE\s+\d{6}\b/g, '')
         .replace(/^(\d+[A-Z]?)\s+/, '')
         .trim()
     }
@@ -1238,20 +1354,6 @@ export default function Home() {
       return normalizeProject(addressValue)
     }
 
-    // ─── REDESIGNED getLandedCluster ───────────────────────────────────────────
-    // Extracts the geographic "family name" from a street, stripping road-type
-    // suffixes (AVE, RD, DR, etc.) and directional words (NTH, STH, etc.).
-    // 
-    // Examples after normalizeStreet:
-    //   "GOLDHILL AVE"    → "GOLDHILL"
-    //   "GOLDHILL RISE"   → "GOLDHILL"   (RISE is a suffix)
-    //   "GOLDHILL VIEW"   → "GOLDHILL"   (VIEW is a suffix)
-    //   "CHANCERY LN"     → "CHANCERY"
-    //   "CHANCERY HILL DR"→ "CHANCERY HILL"
-    //   "MT SINAI DR"     → "MT SINAI"
-    //   "JALAN LIMAU"     → "JALAN LIMAU" (no suffix to strip)
-    //
-    // This is generic — no hardcoded street names. Works for any landed area.
     function getLandedCluster(
       streetName: string | null | undefined,
       addressValue: string | null | undefined
@@ -1259,21 +1361,17 @@ export default function Home() {
       const street = getEffectiveStreet(streetName, addressValue)
       if (!street) return ''
 
-      // Road-type and directional suffixes to strip (applied AFTER normalizeStreet)
       const SUFFIXES = new Set([
         'AVE', 'ST', 'RD', 'DR', 'CRES', 'PL', 'CL', 'LN', 'TER', 'BLVD',
         'CTRL', 'HTS', 'GDNS', 'NTH', 'STH', 'EAST', 'WEST',
-        // Additional common Singapore road suffixes
         'RISE', 'VIEW', 'WALK', 'GROVE', 'PARK', 'HILL', 'VALE', 'GREEN',
         'GARDEN', 'LINK', 'WAY', 'LOOP', 'RING', 'TURN', 'MOUNT',
-        // Numbering suffixes (e.g. "LORONG 1" → "LORONG")
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
         '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
       ])
 
       const parts = street.split(' ')
 
-      // Strip suffixes from the end, but keep at least the first word
       let endIndex = parts.length
       while (endIndex > 1 && SUFFIXES.has(parts[endIndex - 1])) {
         endIndex--
@@ -1281,7 +1379,6 @@ export default function Home() {
 
       const cluster = parts.slice(0, endIndex).join(' ')
 
-      // Only return meaningful clusters (3+ chars avoids "MT", "ST", "BT" alone)
       return cluster.length >= 3 ? cluster : ''
     }
   
@@ -1347,7 +1444,7 @@ export default function Home() {
     }
   
     if (category === 'hdb') {
-      const LAT_DELTA = 0.018  // ~2km
+      const LAT_DELTA = 0.018
       const LON_DELTA = 0.018
       query = query
         .eq('unit_type', targetPropertyType)
@@ -1360,8 +1457,8 @@ export default function Home() {
     }
   
     if (category === 'condo' || category === 'ec') {
-      const LAT_DELTA = 0.014  // ~1.5km in latitude degrees
-      const LON_DELTA = 0.014  // ~1.5km in longitude degrees
+      const LAT_DELTA = 0.014
+      const LON_DELTA = 0.014
       query = query
         .gte('latitude', lat - LAT_DELTA)
         .lte('latitude', lat + LAT_DELTA)
@@ -1372,7 +1469,7 @@ export default function Home() {
     }
   
     if (category === 'landed') {
-      const LAT_DELTA = 0.045  // ~5km
+      const LAT_DELTA = 0.045
       const LON_DELTA = 0.045
       query = query
         .or(
@@ -1448,7 +1545,6 @@ export default function Home() {
     }))
   
     if (category === 'hdb') {
-      // Fetch same-block rows separately with no distance/size filter
       const subjStreetForQuery = abbreviateRoadWords((selectedStreetName || '').toUpperCase().trim())
       const subjBlockForQuery = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
 
@@ -1504,7 +1600,6 @@ export default function Home() {
         )
         .slice(0, 10)
 
-      // Nearby: use bounding box pool, exclude same block, sort by priority then date
       const nearbyHdbRows = withNormalized
         .map((row) => {
           const sameStreet = !!row._normStreet && row._normStreet === subjectStreet
@@ -1514,7 +1609,6 @@ export default function Home() {
             !!subjectBlock &&
             row._block === subjectBlock
 
-          // Exclude same-block rows — they're handled separately
           if (sameBlock) return null
 
           let priority = 999
@@ -1659,7 +1753,6 @@ export default function Home() {
         )
         .slice(0, 10)
 
-      // Nearby: use the bounding-box pool, exclude same project, cap at 2 per project
       function condoFilter(distanceM: number, lowerRatio: number, upperRatio: number) {
         return withNormalized.filter((row) => {
           if (row.distance_m > distanceM) return false
@@ -1706,33 +1799,7 @@ export default function Home() {
       return [...sameProjectRows, ...nearbyRows]
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // LANDED: Redesigned 2-stage scoring system
-    // ═══════════════════════════════════════════════════════════════════════════
-    //
-    // Design principles:
-    //   1. Same street is the DOMINANT signal — always appears first
-    //   2. Same cluster (e.g. GOLDHILL AVE / GOLDHILL RISE) is the second signal
-    //   3. Distance matters but does NOT overpower street/cluster
-    //   4. Size is a tiebreaker only — nothing is excluded by size
-    //   5. Recency is a tiebreaker — recent is better, but not at the cost of
-    //      pulling in a random far-away street over a nearby cluster match
-    //   6. Hard cap at 5km — anything further is not a comparable
-    //   7. ONE sort produces the final order — no manual array concatenation
-    //
-    // Score breakdown (lower = more relevant):
-    //   Tier (0-300):     same-street=0, same-cluster=100, other=200
-    //   Distance (0-50):  continuous, capped at 5km
-    //   Size (0-6):       same=0, similar=3, different=6
-    //   Recency (0-15):   0.3 per month old, capped at 15
-    //
-    // The tier gap (100 points) is deliberately large so that a same-street row
-    // 3km away (score ~0+30+6+10 = 46) always beats a non-cluster row 200m away
-    // (score ~200+2+0+0 = 202). This matches how a real agent thinks.
-    // ═══════════════════════════════════════════════════════════════════════════
-
     if (category === 'landed') {
-      // Stage 1: Filter to landed unit types only
       const landedOnly = withNormalized.filter((row) => {
         const unitType = normalizeText(row.unit_type)
         return (
@@ -1743,7 +1810,6 @@ export default function Home() {
         )
       })
 
-      // Deduplicate (same address + date + price = same transaction)
       const seen = new Set<string>()
       const deduped = landedOnly.filter((row) => {
         const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
@@ -1752,10 +1818,7 @@ export default function Home() {
         return true
       })
 
-      // Adaptive filtering: lower bound on size only (no upper bound),
-      // with fallback passes if pool is too small.
       const subjectLandSqm = Number(sqftToSqm(landSizeSqm)) || 0
-      // Same-street rows always included regardless of size
       const sameStreetRows = deduped.filter(
         (row) => row._normStreet && subjectStreet && row._normStreet === subjectStreet
       )
@@ -1767,15 +1830,12 @@ export default function Home() {
         })
       }
 
-      // Pass 1: 1500m
       let withinRange = applyFilter(1500)
 
-      // Pass 2: 2500m
       if (withinRange.length < 8) {
         withinRange = applyFilter(2500)
       }
       
-      // Ensure same-street rows are always in the pool
       const withinRangeKeys = new Set(withinRange.map(r => `${r.address}|${r.transaction_date}|${r.transaction_price}`))
       for (const row of sameStreetRows) {
         const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
@@ -1787,18 +1847,14 @@ export default function Home() {
 
       const now = Date.now()
 
-      // Extract subject first word for fallback cluster matching
-      // e.g. "GOLDHILL" from "GOLDHILL AVE"
       const subjectFirstWord = (subjectStreet || '').split(' ')[0] || ''
 
       const scored = withinRange.map((row) => {
-        // ── TIER: The primary grouping signal ──
         const sameStreet =
           !!row._normStreet &&
           !!subjectStreet &&
           row._normStreet === subjectStreet
 
-        // Primary cluster match (via getLandedCluster suffix-stripping)
         const clusterMatch =
           !sameStreet &&
           !!row._cluster &&
@@ -1807,9 +1863,6 @@ export default function Home() {
           subjectCluster.length >= 3 &&
           row._cluster === subjectCluster
 
-        // Fallback cluster match: compare first word of street name
-        // Catches cases where suffix stripping produces different results
-        // e.g. "GOLDHILL" from "GOLDHILL AVE" matches "GOLDHILL" from "GOLDHILL VIEW"
         const rowFirstWord = (row._normStreet || '').split(' ')[0] || ''
         const firstWordMatch =
           !sameStreet &&
@@ -1825,17 +1878,14 @@ export default function Home() {
         else if (sameCluster) tierScore = 100
         else tierScore = 200
 
-        // ── DISTANCE: 10 points per km, capped at 50 ──
         const distanceScore = Math.min(
           Math.round((row.distance_m / 1000) * 10),
           50
         )
 
-        // ── SIZE: Tiebreaker only (0-6 points) ──
         const sizeScore =
           row._sizeBand === 'same' ? 0 : row._sizeBand === 'similar' ? 3 : 6
 
-        // ── RECENCY: Tiebreaker only (0-15 points) ──
         const txTime = row.transaction_date
           ? new Date(row.transaction_date).getTime()
           : 0
@@ -1848,13 +1898,6 @@ export default function Home() {
         return { ...row, _totalScore: totalScore, _tierScore: tierScore }
       })
 
-      // ── SORT: tier-aware ordering ──
-      // Tier 0 (same street) and Tier 100 (same cluster): date desc → distance asc
-      //   Contextually relevant rows — recency is the primary signal.
-      // Tier 200 (nearby): date desc → distance asc as tiebreaker
-      //   Homeowner wants to see what the market is doing RIGHT NOW.
-      //   A Mar 2026 transaction at 857m is more useful than Oct 2025 at 248m.
-      //   Distance is used only to break ties within the same month.
       scored.sort((a, b) => {
         const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
@@ -1867,6 +1910,45 @@ export default function Home() {
   
     return []
   }
+
+  // ─── Mobile card row renderer ─────────────────────────────────────────────
+  const renderMobileCard = (
+    row: typeof recentComparables[number],
+    i: number
+  ) => (
+    <div
+      key={i}
+      className="border-b border-[#f0ebe4] px-4 py-4 last:border-b-0"
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <span className="text-sm font-medium text-[#2d3135] leading-snug">
+          {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
+        </span>
+        <span className="text-xs text-[#9aa0a6] whitespace-nowrap flex-shrink-0">
+          {formatDate(row.transaction_date)}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <span className="text-xs font-medium text-[#2d3135] bg-[#f0ece6] rounded-md px-2 py-1">
+          {formatMoney(row.transaction_price)}
+        </span>
+        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
+          ${Math.round(row.psf).toLocaleString()} psf
+        </span>
+        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
+          {sqmToSqft(row.floor_area_sqm)} sqft
+        </span>
+        {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
+          <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
+            {formatTenure(row.tenure)}
+          </span>
+        )}
+        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
+          {Math.round(row.distance_m)}m
+        </span>
+      </div>
+    </div>
+  )
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
@@ -1922,7 +2004,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Form card — full width on mobile, right column on desktop */}
+          {/* Form card */}
           <div className="order-1 lg:order-2 relative">
             <div className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
 
@@ -2166,11 +2248,19 @@ export default function Home() {
         </div>
       </section>
 
-      {hasReport && (
+      {/* CHANGE 1: Show skeleton while generating */}
+      {isGenerating && (
+        <div ref={resultRef}>
+          <LoadingSkeleton category={propertyCategory} />
+        </div>
+      )}
+
+      {/* CHANGE 4: Removed top padding (py-12 → pt-2 pb-12) to close the gap */}
+      {!isGenerating && hasReport && (
         <section className="bg-[#f7f4ef]">
           <div
             ref={resultRef}
-            className="mx-auto max-w-7xl px-6 py-12 md:px-10"
+            className="mx-auto max-w-7xl px-6 pt-2 pb-12 md:px-10"
           >
             {/* Valuation Summary */}
             <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
@@ -2179,7 +2269,6 @@ export default function Home() {
               </p>
 
               <div className="mt-4 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-                {/* Left — main price */}
                 <div>
                   <p className="text-4xl font-semibold text-[#2d3135] md:text-5xl">
                     {formatMoney(estimatedPrice)}
@@ -2191,7 +2280,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Right — stat cells */}
                 <div className="flex gap-6 md:gap-10">
                   {estimatedPsf && (
                     <div className="border-l border-[#e8ddd2] pl-6">
@@ -2210,7 +2298,7 @@ export default function Home() {
               </div>
             </div>
       
-            {/* Tabs */}
+            {/* Tabs + Comparables */}
             <div className="mt-10">
               <h3 className="text-2xl font-semibold text-[#2d3135]">
                 Real Nearby Transactions Around Your Unit
@@ -2242,58 +2330,70 @@ export default function Home() {
                 </div>
               )}
       
-              {/* Table */}
               {propertyCategory === 'landed' && (
                 <p className="mt-4 text-sm text-[#6a727a] italic">
                   Landed property values vary significantly based on layout, condition, and land shape. The estimate above is a starting point — for a more accurate assessment, speak with one of our agents directly.
                 </p>
               )}
-              <div className="mt-6 overflow-x-auto rounded-2xl border border-[#e5dbcf] bg-white">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-[#6a727a]">
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Address</th>
-                    <th className="px-4 py-3">Size</th>
-                    <th className="px-4 py-3">Price</th>
-                    <th className="px-4 py-3">PSF</th>
-                    {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
-                      <th className="px-4 py-3">Tenure</th>
-                    )}
-                    <th className="px-4 py-3">Distance</th>
-                  </tr>
-                  </thead>
-      
-                  <tbody>
-                    {(() => {
-                      const tableRows = propertyCategory === 'landed'
-                        ? recentComparables
-                        : activeTab === 'same'
-                        ? propertyCategory === 'condo' || propertyCategory === 'ec'
-                          ? sameProjectComparables.length > 0 ? sameProjectComparables : []
-                          : sameBlockComparables.length > 0 ? sameBlockComparables : []
-                        : propertyCategory === 'condo' || propertyCategory === 'ec'
-                        ? nearbyCondoComparables
-                        : nearbyHdbComparables
-                  
-                      return tableRows.map((row, i) => (
-                        <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
-                          <td className="px-5 py-4">{formatDate(row.transaction_date)}</td>
-                          <td className="px-5 py-4">
-                            {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
-                          </td>
-                          <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
-                          <td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
-                          <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
-                          {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
-                            <td className="px-5 py-4">{formatTenure(row.tenure)}</td>
-                          )}
-                          <td className="px-5 py-4">{Math.round(row.distance_m)}m</td>
-                        </tr>
-                      ))
-                    })()}
-                  </tbody>
-                </table>
+
+              {/* CHANGE 2: Mobile = cards, desktop = table */}
+              <div className="mt-6 rounded-2xl border border-[#e5dbcf] bg-white overflow-hidden">
+                {(() => {
+                  const tableRows = propertyCategory === 'landed'
+                    ? recentComparables
+                    : activeTab === 'same'
+                    ? propertyCategory === 'condo' || propertyCategory === 'ec'
+                      ? sameProjectComparables.length > 0 ? sameProjectComparables : []
+                      : sameBlockComparables.length > 0 ? sameBlockComparables : []
+                    : propertyCategory === 'condo' || propertyCategory === 'ec'
+                    ? nearbyCondoComparables
+                    : nearbyHdbComparables
+
+                  return (
+                    <>
+                      {/* Mobile cards — hidden on md+ */}
+                      <div className="md:hidden">
+                        {tableRows.map((row, i) => renderMobileCard(row, i))}
+                      </div>
+
+                      {/* Desktop table — hidden on mobile */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-[#6a727a]">
+                              <th className="px-4 py-3">Date</th>
+                              <th className="px-4 py-3">Address</th>
+                              <th className="px-4 py-3">Size</th>
+                              <th className="px-4 py-3">Price</th>
+                              <th className="px-4 py-3">PSF</th>
+                              {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
+                                <th className="px-4 py-3">Tenure</th>
+                              )}
+                              <th className="px-4 py-3">Distance</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tableRows.map((row, i) => (
+                              <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
+                                <td className="px-5 py-4">{formatDate(row.transaction_date)}</td>
+                                <td className="px-5 py-4">
+                                  {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
+                                </td>
+                                <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
+                                <td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
+                                <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
+                                {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
+                                  <td className="px-5 py-4">{formatTenure(row.tenure)}</td>
+                                )}
+                                <td className="px-5 py-4">{Math.round(row.distance_m)}m</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -2391,7 +2491,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Plan Popup — centre modal for both mobile and desktop */}
+      {/* Plan Popup */}
       {showPlanPopup && !planPopupDismissed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:max-w-lg md:p-10">
@@ -2426,7 +2526,15 @@ export default function Home() {
                 </button>
               </>
             ) : (
-              <div className="flex flex-col items-center py-4 text-center">
+              /* CHANGE 3: Confirmation card with close button */
+              <div className="relative flex flex-col items-center py-4 text-center">
+                <button
+                  type="button"
+                  onClick={handlePopupDismiss}
+                  className="absolute top-0 right-0 w-8 h-8 rounded-full border-[1.5px] border-[#2d3135] bg-white text-[#2d3135] text-sm font-medium flex items-center justify-center transition hover:bg-[#2d3135] hover:text-white"
+                >
+                  ✕
+                </button>
                 <div className="text-4xl">🎉</div>
                 <h3 className="mt-4 text-xl font-semibold text-[#2d3135] md:text-2xl">Thanks {leadName.split(' ')[0]} — one of our agents will be in touch with you shortly.</h3>
                 <p className="mt-2 text-sm text-[#6a727a]">We look forward to helping you.</p>
