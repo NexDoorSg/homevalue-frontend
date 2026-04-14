@@ -1901,16 +1901,16 @@ export default function Home() {
               Instant estimates from real Singapore transactions — no agents, no guesswork.
             </p>
             <div className="mt-10 border-t border-[#e8ddd2] pt-8 flex flex-col gap-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
+              <div className="flex items-center gap-3">
+                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
                 <p className="text-sm text-[#67707a]">Powered by HDB &amp; URA transaction data</p>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
+              <div className="flex items-center gap-3">
+                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
                 <p className="text-sm text-[#67707a]">Covers HDB, condo, EC &amp; landed</p>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
+              <div className="flex items-center gap-3">
+                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
                 <p className="text-sm text-[#67707a]">Updated with 2026 transactions</p>
               </div>
             </div>
@@ -2096,7 +2096,7 @@ export default function Home() {
                   </div>
                 )}
                 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[#4d555d]">
                       Name
@@ -2122,19 +2122,19 @@ export default function Home() {
                       className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                     />
                   </div>
-                
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={leadEmail}
-                      onChange={(e) => setLeadEmail(e.target.value)}
-                      placeholder="Your email"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={leadEmail}
+                    onChange={(e) => setLeadEmail(e.target.value)}
+                    placeholder="Your email"
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  />
                 </div>
                 
                 <button
