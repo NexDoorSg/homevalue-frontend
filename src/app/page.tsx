@@ -1679,12 +1679,6 @@ export default function Home() {
     // ═══════════════════════════════════════════════════════════════════════════
 
     if (category === 'landed') {
-      // ── Debug: log subject values to verify in browser console ──
-      console.log('[LANDED DEBUG] selectedStreetName:', selectedStreetName)
-      console.log('[LANDED DEBUG] address:', address)
-      console.log('[LANDED DEBUG] subjectStreet:', subjectStreet)
-      console.log('[LANDED DEBUG] subjectCluster:', subjectCluster)
-
       // Stage 1: Filter to landed unit types only
       const landedOnly = withNormalized.filter((row) => {
         const unitType = normalizeText(row.unit_type)
@@ -1695,8 +1689,6 @@ export default function Home() {
           unitType.includes('BUNGALOW')
         )
       })
-
-      console.log('[LANDED DEBUG] landedOnly count:', landedOnly.length)
 
       // Deduplicate (same address + date + price = same transaction)
       const seen = new Set<string>()
@@ -1710,8 +1702,6 @@ export default function Home() {
       // Adaptive filtering: lower bound on size only (no upper bound),
       // with fallback passes if pool is too small.
       const subjectLandSqm = Number(sqftToSqm(landSizeSqm)) || 0
-      console.log('[LANDED DEBUG] subjectLandSqm:', subjectLandSqm, 'from landSizeSqm:', landSizeSqm)
-
       // Same-street rows always included regardless of size
       const sameStreetRows = deduped.filter(
         (row) => row._normStreet && subjectStreet && row._normStreet === subjectStreet
@@ -1741,26 +1731,6 @@ export default function Home() {
           withinRangeKeys.add(key)
         }
       }
-
-      console.log('[LANDED DEBUG] withinRange count:', withinRange.length)
-
-      // ── Debug: check for Goldhill rows specifically ──
-      const goldhillCheck = withinRange.filter(
-        (r) =>
-          (r._normStreet || '').includes('GOLDHILL') ||
-          (r.address || '').toUpperCase().includes('GOLDHILL')
-      )
-      console.log('[LANDED DEBUG] Goldhill rows in range:', goldhillCheck.length)
-      goldhillCheck.forEach((r) => {
-        console.log(
-          '[LANDED DEBUG] Goldhill row:',
-          r._normStreet,
-          '| row cluster:', r._cluster,
-          '| subject cluster:', subjectCluster,
-          '| cluster match:', r._cluster === subjectCluster,
-          '| dist:', Math.round(r.distance_m) + 'm'
-        )
-      })
 
       const now = Date.now()
 
@@ -1837,19 +1807,6 @@ export default function Home() {
         const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
         if (dateB !== dateA) return dateB - dateA
         return a.distance_m - b.distance_m
-      })
-
-      // ── Debug: log final ranked results ──
-      scored.slice(0, 15).forEach((r, i) => {
-        console.log(
-          `[LANDED COMP ${i + 1}]`,
-          r.address || r._normStreet,
-          '| tier:', r._tierScore,
-          '| score:', r._totalScore,
-          '| dist:', Math.round(r.distance_m) + 'm',
-          '| cluster:', r._cluster,
-          '| date:', r.transaction_date
-        )
       })
 
       return scored.slice(0, 15)
