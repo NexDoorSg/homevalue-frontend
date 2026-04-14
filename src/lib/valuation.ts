@@ -15,6 +15,10 @@ type ValuationParams = {
   subjectProjectName?: string | null
   subjectCompletionYear?: number | null
   subjectIsStrata?: boolean | null
+  subjectAddress?: string | null
+  subjectStreetName?: string | null
+  subjectBlockNo?: string | null
+  subjectCompletionYearHdb?: number | null
 }
 
 type TransactionRow = {
@@ -273,6 +277,187 @@ function getFloorWeight(subjectFloor?: number, comparableFloor?: number | null) 
   return 0.95
 }
 
+// ─── Extract block number from HDB address (e.g. "31 BALAM RD" → "31") ───────
+function extractBlockNumber(address: string | null | undefined): string {
+  const text = normalizeText(address)
+  if (!text) return ''
+  const match = text.match(/^(\d+[A-Z]?)\s/)
+  return match ? match[1] : ''
+}
+
+// ─── Get most recent transaction date from a pool of rows ────────────────────
+function getMostRecentDate(rows: CleanedRow[]): Date | null {
+  let latest: Date | null = null
+  for (const row of rows) {
+    if (!row.transaction_date) continue
+    const d = new Date(row.transaction_date)
+    if (!latest || d > latest) latest = d
+  }
+  return latest
+}
+
+// ─── HDB-specific valuation builder ──────────────────────────────────────────
+//
+// Priority logic:
+//   Scenario 1: Same block has transactions within 6 months
+//               → use same-block only
+//   Scenario 2: Same block has transactions between 6–12 months old
+//               → same-block anchor + nearby same-completion-year drift
+//   Scenario 3: Same block transactions older than 12 months OR no same-block
+//               → nearby blocks filtered by completion_year ±5 years
+//   Scenario 4: No nearby similar completion year
+//               → all nearby with strong recency weighting
+//
+function buildHdbCandidate(
+  allRows: CleanedRow[],
+  radius: number,
+  floorAreaSqm: number,
+  subjectFloorLevel: number | undefined,
+  subjectBlockNo: string,
+  subjectCompletionYear: number | null
+): CandidateResult | null {
+  if (allRows.length === 0) return null
+
+  // ── Identify same-block rows ──
+  const sameBlockRows = subjectBlockNo
+    ? allRows.filter((row) => extractBlockNumber(row.address) === subjectBlockNo)
+    : []
+
+  // ── How fresh is the most recent same-block transaction? ──
+  const mostRecentSameBlock = getMostRecentDate(sameBlockRows)
+  const now = Date.now()
+  const daysSinceSameBlock = mostRecentSameBlock
+    ? (now - mostRecentSameBlock.getTime()) / (1000 * 60 * 60 * 24)
+    : Infinity
+
+  // ── Nearby rows with similar completion year (±5 years) ──
+  const nearbyWithSimilarAge = subjectCompletionYear
+    ? allRows.filter((row) => {
+        if (extractBlockNumber(row.address) === subjectBlockNo) return false
+        if (!row.completion_year) return false
+        return Math.abs(row.completion_year - subjectCompletionYear) <= 5
+      })
+    : []
+
+  let valuationPool: CleanedRow[]
+  let method: string
+
+  if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 180) {
+    // ── Scenario 1: Same-block data is fresh (within 6 months) ──
+    valuationPool = sameBlockRows
+    method = 'hdb_same_block_fresh'
+
+  } else if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
+    // ── Scenario 2: Same-block data is 6–12 months old ──
+    // Use same-block as anchor PSF, compute market drift from nearby same-age blocks
+    // then apply drift to same-block PSF
+    if (nearbyWithSimilarAge.length >= 3) {
+      // Compute weighted PSF from nearby same-age blocks at two time slices:
+      // "recent" (last 6 months) and "older" (6–12 months ago)
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000
+      const recentNearby = nearbyWithSimilarAge.filter(
+        (r) => r.transaction_date && new Date(r.transaction_date).getTime() >= sixMonthsAgo
+      )
+      const olderNearby = nearbyWithSimilarAge.filter(
+        (r) => r.transaction_date && new Date(r.transaction_date).getTime() < sixMonthsAgo
+      )
+
+      const avgRecent = recentNearby.length >= 2
+        ? recentNearby.reduce((s, r) => s + r.pricePerSqm, 0) / recentNearby.length
+        : null
+      const avgOlder = olderNearby.length >= 2
+        ? olderNearby.reduce((s, r) => s + r.pricePerSqm, 0) / olderNearby.length
+        : null
+
+      const driftMultiplier =
+        avgRecent && avgOlder && avgOlder > 0
+          ? avgRecent / avgOlder
+          : 1.0
+
+      // Clamp drift to ±10% to avoid extreme corrections
+      const clampedDrift = Math.max(0.90, Math.min(1.10, driftMultiplier))
+
+      // Apply drift to same-block PSF
+      const sameBlockAvgPsm =
+        sameBlockRows.reduce((s, r) => s + r.pricePerSqm, 0) / sameBlockRows.length
+      const adjustedPsm = sameBlockAvgPsm * clampedDrift
+      const estimated = adjustedPsm * floorAreaSqm
+      const biasedEstimate = estimated * 1.04
+
+      const psfValues = sameBlockRows.map((r) => r.pricePerSqm).sort((a, b) => a - b)
+      const stdDev = Math.sqrt(
+        psfValues.reduce((s, v) => s + Math.pow(v - sameBlockAvgPsm, 2), 0) / psfValues.length
+      )
+      const stdDevPct = stdDev / sameBlockAvgPsm
+      const halfSpread = Math.min(stdDevPct, 0.06)
+
+      return {
+        estimated: biasedEstimate,
+        low: biasedEstimate * (1 - halfSpread * 0.5),
+        high: biasedEstimate * (1 + halfSpread),
+        comparables: sameBlockRows.length,
+        radius,
+        method: 'hdb_same_block_drift_adjusted',
+      }
+    }
+
+    // Not enough nearby same-age data for drift — just use same-block directly
+    valuationPool = sameBlockRows
+    method = 'hdb_same_block_stale'
+
+  } else if (nearbyWithSimilarAge.length >= 3) {
+    // ── Scenario 3: No usable same-block data — use nearby same completion year ──
+    valuationPool = nearbyWithSimilarAge
+    method = 'hdb_nearby_same_age'
+
+  } else {
+    // ── Scenario 4: No same-age nearby — use all nearby with recency weighting ──
+    valuationPool = allRows
+    method = 'hdb_nearby_all'
+  }
+
+  if (valuationPool.length === 0) return null
+
+  // ── Trim outliers ──
+  const trimmed = trimRowsByMetric(valuationPool, (row) => row.pricePerSqm)
+  if (trimmed.length === 0) return null
+
+  const values = trimmed.map((row) => row.pricePerSqm)
+  const weights = trimmed.map((row) => {
+    const distanceWeight = 1 / Math.max(row.distanceM, 50)
+    const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
+    const sizeWeight = 1 / Math.max(sizeDiff, 5)
+    const recencyWeight = getRecencyWeight(row.transaction_date, 'hdb')
+    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
+    // Same-block rows get extra weight even in mixed pools
+    const blockWeight = extractBlockNumber(row.address) === subjectBlockNo ? 3.0 : 1.0
+    return distanceWeight * sizeWeight * recencyWeight * floorWeight * blockWeight
+  })
+
+  const avgPsm = weightedAverage(values, weights)
+  if (!avgPsm || !Number.isFinite(avgPsm)) return null
+
+  const estimated = avgPsm * floorAreaSqm
+  const biasedEstimate = estimated * 1.04
+
+  const psfValues = trimmed.map((row) => row.pricePerSqm)
+  const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
+  const stdDev = Math.sqrt(
+    psfValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / psfValues.length
+  )
+  const stdDevPct = stdDev / mean
+  const halfSpread = Math.min(stdDevPct, 0.06)
+
+  return {
+    estimated: biasedEstimate,
+    low: biasedEstimate * (1 - halfSpread * 0.5),
+    high: biasedEstimate * (1 + halfSpread),
+    comparables: trimmed.length,
+    radius,
+    method,
+  }
+}
+
 async function fetchRowsForRadius(
   lat: number,
   lon: number,
@@ -485,7 +670,6 @@ function selectCondoEcComparablePool(
       )
     : []
 
-  // 1) If we have enough same-project data, stay within same project only
   if (sameProjectRows.length >= 2) {
     const sameProjectTight = filterByAreaRatio(
       sameProjectRows,
@@ -506,7 +690,6 @@ function selectCondoEcComparablePool(
     return sameProjectRows
   }
 
-  // 2) Otherwise build an age/tenure-compatible pool and keep same-project rows inside it
   let pool = [...rows]
 
   if (subjectCompletionYear) {
@@ -526,7 +709,6 @@ function selectCondoEcComparablePool(
       if (broaderAgeFiltered.length >= 3) {
         pool = broaderAgeFiltered
       } else {
-        // Last protection against brand-new launches distorting old resale projects
         const antiNewLaunch = pool.filter((row) => {
           if (!subjectCompletionYear) return true
           if (!row.completion_year) return true
@@ -565,7 +747,6 @@ function selectCondoEcComparablePool(
     }
   }
 
-  // If same-project rows exist, prepend them so they survive later trimming/weighting
   if (sameProjectRows.length > 0) {
     const sameProjectKeys = new Set(
       sameProjectRows.map(
@@ -796,7 +977,6 @@ function tierComparableRows(
 
   const normalizedSubjectProject = normalizeText(subjectProjectName)
 
-  // Tier 1: Same project — always most reliable
   if (normalizedSubjectProject) {
     const tier1 = rows.filter(
       (row) => normalizeText(row.project_name) === normalizedSubjectProject
@@ -804,14 +984,12 @@ function tierComparableRows(
     if (tier1.length >= 3) return tier1
   }
 
-  // Tier 2: Similar age projects (within 10 years) with valid completion year
   if (subjectCompletionYear) {
     const tier2 = rows.filter((row) => {
       if (!row.completion_year) return false
       return Math.abs(row.completion_year - subjectCompletionYear) <= 10
     })
     if (tier2.length >= 3) {
-      // If we also have same-project rows, prepend them
       if (normalizedSubjectProject) {
         const sameProject = rows.filter(
           (row) => normalizeText(row.project_name) === normalizedSubjectProject
@@ -825,17 +1003,14 @@ function tierComparableRows(
     }
   }
 
-  // Tier 3: Fall back to all rows but exclude projects that are clearly
-  // new launches (completion year more than 15 years newer than subject)
   if (subjectCompletionYear) {
     const tier3 = rows.filter((row) => {
-      if (!row.completion_year) return true // keep unknowns
+      if (!row.completion_year) return true
       return row.completion_year <= subjectCompletionYear + 15
     })
     if (tier3.length >= 3) return tier3
   }
 
-  // Last resort: return everything
   return rows
 }
 
@@ -884,11 +1059,8 @@ function buildNonLandedCandidate(
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
   const estimated = avgPsm * floorAreaSqm
-
-  // Apply +1% upward bias (seller-facing tool)
   const biasedEstimate = estimated * 1.01
 
-  // Use std dev of comparable PSFs for range, capped by property type
   const psfValues = usable.map((row) => row.pricePerSqm)
   const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
   const stdDev = Math.sqrt(psfValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / psfValues.length)
@@ -966,7 +1138,6 @@ function buildNonLandedFallback(
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
   const estimated = avgPsm * floorAreaSqm
-
   const biasedEstimate = estimated * 1.01
 
   return {
@@ -1075,7 +1246,6 @@ function buildLandedFallback(
     fallbackPool = exactTypeRows
   }
   
-  // Filter by strata vs non-strata
   if (isStrata !== null && isStrata !== undefined) {
     const sameStrataRows = fallbackPool.filter(
       (row) => row.is_strata === isStrata
@@ -1085,13 +1255,13 @@ function buildLandedFallback(
     }
   }
 
-const subjectTenureBucket = getSubjectTenureBucket(tenure)
-const sameTenureRows = fallbackPool.filter(
-  (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
-)
-if (sameTenureRows.length >= 2) {
-  fallbackPool = sameTenureRows
-}
+  const subjectTenureBucket = getSubjectTenureBucket(tenure)
+  const sameTenureRows = fallbackPool.filter(
+    (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
+  )
+  if (sameTenureRows.length >= 2) {
+    fallbackPool = sameTenureRows
+  }
 
   const similarSizeRows = fallbackPool.filter((row) => {
     const ratio = row.floor_area_sqm / landSizeSqm
@@ -1129,7 +1299,6 @@ if (sameTenureRows.length >= 2) {
   if (!avgLandPsf || !Number.isFinite(avgLandPsf)) return null
 
   const estimated = avgLandPsf * landSizeSqft
-
   const biasedEstimate = estimated * 1.03
 
   return {
@@ -1155,9 +1324,105 @@ export async function getValuation({
   subjectProjectName,
   subjectCompletionYear,
   subjectIsStrata,
+  subjectAddress,
+  subjectBlockNo,
+  subjectCompletionYearHdb,
 }: ValuationParams) {
   const searchRadius = getSearchRadius(propertyCategory)
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HDB: dedicated same-block priority logic
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (propertyCategory === 'hdb') {
+    const blockNo = subjectBlockNo || extractBlockNumber(subjectAddress)
+    const completionYear = subjectCompletionYearHdb ?? subjectCompletionYear ?? null
+
+    let bestCandidate: CandidateResult | null = null
+
+    for (const radius of searchRadius) {
+      const { data, error } = await fetchRowsForRadius(
+        lat,
+        lon,
+        radius,
+        propertyType,
+        propertyCategory
+      )
+
+      if (error) {
+        console.error('SUPABASE VALUATION ERROR:', error)
+        continue
+      }
+
+      if (!data || data.length === 0) continue
+
+      const cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
+      if (cleanedRows.length === 0) continue
+
+      const candidate = buildHdbCandidate(
+        cleanedRows,
+        radius,
+        floorAreaSqm,
+        floorLevel,
+        blockNo,
+        completionYear
+      )
+
+      if (!candidate) continue
+
+      if (!bestCandidate) {
+        bestCandidate = candidate
+        continue
+      }
+
+      const currentGood = bestCandidate.comparables >= 3
+      const nextGood = candidate.comparables >= 3
+
+      if (!currentGood && nextGood) {
+        bestCandidate = candidate
+        continue
+      }
+
+      if (currentGood && nextGood) {
+        if (
+          candidate.radius < bestCandidate.radius ||
+          candidate.comparables > bestCandidate.comparables
+        ) {
+          bestCandidate = candidate
+        }
+        continue
+      }
+
+      if (
+        candidate.comparables > bestCandidate.comparables ||
+        (candidate.comparables === bestCandidate.comparables &&
+          candidate.radius < bestCandidate.radius)
+      ) {
+        bestCandidate = candidate
+      }
+    }
+
+    if (bestCandidate) return bestCandidate
+
+    // HDB fallback — use broadest radius
+    const { data, error } = await fetchRowsForRadius(
+      lat,
+      lon,
+      2000,
+      propertyType,
+      propertyCategory
+    )
+
+    if (error || !data || data.length === 0) return null
+
+    const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
+    if (fallbackRows.length === 0) return null
+
+    return buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear)
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LANDED
+  // ═══════════════════════════════════════════════════════════════════════════
   if (propertyCategory === 'landed') {
     if (!landSizeSqm || !builtUpSqm) {
       console.log('Missing landed land size or built-up size.')
@@ -1185,7 +1450,6 @@ export async function getValuation({
       let cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
       if (cleanedRows.length === 0) continue
       
-      // Filter by landed type (terrace/semi-D/detached)
       const exactTypeRows = cleanedRows.filter((row) =>
         isMatchingLandedType(row.unit_type, propertyType)
       )
@@ -1193,7 +1457,6 @@ export async function getValuation({
         cleanedRows = exactTypeRows
       }
       
-      // Filter by strata vs non-strata — these are fundamentally different markets
       if (subjectIsStrata !== null) {
         const sameStrataRows = cleanedRows.filter(
           (row) => row.is_strata === subjectIsStrata
@@ -1203,7 +1466,6 @@ export async function getValuation({
         }
       }
       
-      // Hard filter by tenure — only fall back to mixed tenure if pool is too small
       const subjectTenureBucket = getSubjectTenureBucket(tenure)
       const sameTenureRows = cleanedRows.filter(
         (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
@@ -1211,7 +1473,6 @@ export async function getValuation({
       if (sameTenureRows.length >= 3) {
         cleanedRows = sameTenureRows
       } else if (sameTenureRows.length >= 1) {
-        // Partial match — use same tenure rows but supplement with others
         const otherRows = cleanedRows.filter(
           (row) => normalizeTenureBucket(row.tenure) !== subjectTenureBucket
         )
@@ -1277,6 +1538,9 @@ export async function getValuation({
     return buildLandedFallback(fallbackRows, landSizeSqm, propertyType, tenure, subjectIsStrata)
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONDO / EC
+  // ═══════════════════════════════════════════════════════════════════════════
   let bestCandidate: CandidateResult | null = null
 
   for (const radius of searchRadius) {
@@ -1298,44 +1562,27 @@ export async function getValuation({
     const cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
     if (cleanedRows.length === 0) continue
 
-    let candidate: CandidateResult | null = null
+    let valuationPool = cleanedRows
 
-    if (propertyCategory === 'condo' || propertyCategory === 'ec') {
-      let valuationPool = cleanedRows
-    
-      const sameTypeRows = cleanedRows.filter((row) =>
-        isMatchingNonLandedType(row.unit_type, propertyType)
-      )
-      if (sameTypeRows.length >= 2) {
-        valuationPool = sameTypeRows
-      }
-    
-      const subjectTenureBucket = getSubjectTenureBucket(tenure)
-    
-      candidate = buildCondoEcCandidate(
-        valuationPool,
-        radius,
-        floorAreaSqm,
-        propertyCategory,
-        floorLevel,
-        subjectProjectName,
-        subjectCompletionYear,
-        subjectTenureBucket
-      )
-    } else {
-      let valuationPool = cleanedRows
-    
-      const candidateResult = buildNonLandedCandidate(
-        valuationPool,
-        radius,
-        floorAreaSqm,
-        propertyCategory,
-        floorLevel,
-        subjectProjectName
-      )
-    
-      candidate = candidateResult
+    const sameTypeRows = cleanedRows.filter((row) =>
+      isMatchingNonLandedType(row.unit_type, propertyType)
+    )
+    if (sameTypeRows.length >= 2) {
+      valuationPool = sameTypeRows
     }
+
+    const subjectTenureBucket = getSubjectTenureBucket(tenure)
+
+    const candidate = buildCondoEcCandidate(
+      valuationPool,
+      radius,
+      floorAreaSqm,
+      propertyCategory,
+      floorLevel,
+      subjectProjectName,
+      subjectCompletionYear,
+      subjectTenureBucket
+    )
 
     if (!candidate) continue
 
@@ -1373,7 +1620,7 @@ export async function getValuation({
 
   if (bestCandidate) return bestCandidate
 
-  const fallbackRadius = propertyCategory === 'hdb' ? 2000 : 3000
+  const fallbackRadius = 3000
   const { data, error } = await fetchRowsForRadius(
     lat,
     lon,
@@ -1386,33 +1633,23 @@ export async function getValuation({
 
   let fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
   if (fallbackRows.length === 0) return null
-  
-  if (propertyCategory === 'condo' || propertyCategory === 'ec') {
-    const sameTypeRows = fallbackRows.filter((row) =>
-      isMatchingNonLandedType(row.unit_type, propertyType)
-    )
-    if (sameTypeRows.length >= 2) {
-      fallbackRows = sameTypeRows
-    }
-  
-    const subjectTenureBucket = getSubjectTenureBucket(tenure)
-  
-    return buildCondoEcFallback(
-      fallbackRows,
-      floorAreaSqm,
-      propertyCategory,
-      floorLevel,
-      subjectProjectName,
-      subjectCompletionYear,
-      subjectTenureBucket
-    )
+
+  const sameTypeRows = fallbackRows.filter((row) =>
+    isMatchingNonLandedType(row.unit_type, propertyType)
+  )
+  if (sameTypeRows.length >= 2) {
+    fallbackRows = sameTypeRows
   }
-  
-  return buildNonLandedFallback(
+
+  const subjectTenureBucket = getSubjectTenureBucket(tenure)
+
+  return buildCondoEcFallback(
     fallbackRows,
     floorAreaSqm,
     propertyCategory,
     floorLevel,
-    subjectProjectName
+    subjectProjectName,
+    subjectCompletionYear,
+    subjectTenureBucket
   )
 }
