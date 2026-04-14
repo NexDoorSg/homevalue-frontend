@@ -120,23 +120,19 @@ const FAQ_ITEMS = [
 // ─── Stat cards ───────────────────────────────────────────────────────────────
 function StatCards() {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-4 rounded-2xl border border-[#e5dbcf] bg-white px-4 py-3.5">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Team Experience</p>
-          <p className="mt-0.5 text-base font-semibold text-[#2d3135]">600+ Transactions</p>
-          <p className="text-[11px] text-[#9aa0a6]">Combined across the team</p>
-        </div>
+    <div className="flex gap-0 border-t border-[#e8ddd2] pt-6">
+      <div className="flex-1 pr-6 border-r border-[#e8ddd2]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Team Experience</p>
+        <p className="mt-1.5 text-3xl font-semibold leading-none text-[#2d3135]">600+</p>
+        <p className="mt-1.5 text-[11px] text-[#9aa0a6]">Transactions combined</p>
       </div>
-      <div className="flex items-center gap-4 rounded-2xl border border-[#e5dbcf] bg-white px-4 py-3.5">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Limited Offer</p>
-          <p className="mt-0.5 text-base font-semibold text-[#2d3135]">0% GST</p>
-          <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-[#f5c4b3] bg-[#fff3f0] px-2 py-0.5 text-[10px] font-semibold text-[#c0442a]">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c0442a]" />
-            Slots running out fast
-          </span>
-        </div>
+      <div className="flex-1 pl-6">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Limited Offer</p>
+        <p className="mt-1.5 text-3xl font-semibold leading-none text-[#2d3135]">0% GST</p>
+        <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#f5c4b3] bg-[#fff3f0] px-2 py-0.5 text-[10px] font-semibold text-[#c0442a]">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c0442a]" />
+          Slots running out fast
+        </span>
       </div>
     </div>
   )
