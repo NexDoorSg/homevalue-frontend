@@ -1883,43 +1883,42 @@ export default function Home() {
         <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
         <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
 
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-6 py-8 md:px-10 lg:grid-cols-[1fr_1fr] lg:items-center lg:py-20">
-          
-          {/* Hero copy — hidden on mobile, shown on desktop */}
-          <div className="hidden lg:block lg:order-1 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-14 px-6 py-12 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:py-20">
+          <div className="order-1 pt-4 lg:order-1">
+            <div className="inline-flex rounded-full border border-[#dcc8b5] bg-white px-4 py-2 text-sm font-medium text-[#8b6b52] shadow-sm">
               HomeValue by NexDoor
-            </p>
-            <h1 className="mt-5 text-5xl font-semibold leading-[1.15] tracking-tight text-[#2d3135] xl:text-6xl">
-              What is your home<br />worth right now?
+            </div>
+
+            <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight tracking-tight text-[#2d3135] md:text-6xl">
+              See What Your Home Is Worth Today
             </h1>
-            <p className="mt-5 text-base leading-7 text-[#7a8289]">
-              Instant estimates from real Singapore transactions — no agents, no guesswork.
+
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[#616971] md:text-lg">
+              Instantly estimate your property&apos;s value using real nearby transactions.
             </p>
-            <div className="mt-10 border-t border-[#e8ddd2] pt-8 flex flex-col gap-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Powered by HDB &amp; URA transaction data</p>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <div className="rounded-full border border-[#e8ddd2] bg-white px-4 py-2 text-xs font-medium text-[#2d3135] shadow-sm">
+                30 sec estimate
               </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Covers HDB, condo, EC &amp; landed</p>
+              <div className="rounded-full border border-[#e8ddd2] bg-white px-4 py-2 text-xs font-medium text-[#2d3135] shadow-sm">
+                2026 transaction data
               </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Updated with 2026 transactions</p>
+              <div className="rounded-full border border-[#e8ddd2] bg-white px-4 py-2 text-xs font-medium text-[#2d3135] shadow-sm">
+                Real nearby comps
               </div>
             </div>
           </div>
-
-          {/* Form card — full width on mobile, right column on desktop */}
-          <div className="order-1 lg:order-2 relative">
+          
+          <div className="order-2 relative lg:order-2">
             <div className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
-
-              {/* Mobile-only compact header above form */}
-              <div className="mb-6 lg:hidden">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">HomeValue by NexDoor</p>
-                <h2 className="mt-2 text-xl font-semibold text-[#2d3135]">What is your home worth?</h2>
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-[#2d3135]">
+                  See Your Estimated Value Instantly
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                  Enter your property details to get a quick estimate based on nearby 2026 transactions.
+                </p>
               </div>
 
               <div className="grid gap-4">
@@ -2151,13 +2150,21 @@ export default function Home() {
                 )}
               </div>
 
+              <div className="mt-6 rounded-2xl bg-[#f8f4ef] p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-[#8b6b52]">
+                  Data-backed insight
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#606971]">
+                  Built around nearby comparable transactions to give you a clearer starting point.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {hasReport && (
-        <section className="bg-[#f7f4ef]">
+        <section className="bg-[#f7f4ef] -mt-20 md:-mt-28">
           <div
             ref={resultRef}
             className="mx-auto max-w-7xl px-6 py-12 md:px-10"
@@ -2273,6 +2280,45 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      <section className="border-t border-[#e8ddd2] bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-12 md:px-10">
+          <div className="max-w-2xl">
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-[#8b6b52]">
+              Why HomeValue
+            </p>
+            <h3 className="mt-3 text-2xl font-semibold text-[#2d3135] md:text-3xl">
+              A faster way to get a market-backed starting point
+            </h3>
+            <p className="mt-4 text-sm leading-7 text-[#646c74] md:text-base">
+              Built using real nearby transactions so homeowners can get a clearer sense of value before deciding their next move.
+            </p>
+          </div>
+      
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-5">
+              <h4 className="text-lg font-semibold text-[#2d3135]">Market-based estimate</h4>
+              <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                Anchored to real nearby transactions.
+              </p>
+            </div>
+      
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-5">
+              <h4 className="text-lg font-semibold text-[#2d3135]">Comparable evidence</h4>
+              <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                See what similar homes have been selling for.
+              </p>
+            </div>
+      
+            <div className="rounded-3xl border border-[#e8ddd2] bg-[#faf8f4] p-5">
+              <h4 className="text-lg font-semibold text-[#2d3135]">Useful next step</h4>
+              <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                A practical benchmark before selling, buying, or planning ahead.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {showConsultationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
