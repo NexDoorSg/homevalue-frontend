@@ -880,7 +880,8 @@ export default function Home() {
         resolved.lon,
         propertyType,
         propertyCategory,
-        result.radius
+        result.radius,
+        subjectIsStrata
       )
   
       setRecentComparables(comparables)
@@ -1098,7 +1099,8 @@ export default function Home() {
     lon: number,
     targetPropertyType: string,
     category: 'hdb' | 'condo' | 'ec' | 'landed',
-    preferredRadius?: number
+    preferredRadius?: number,
+    subjectIsStrata?: boolean | null
   ) => {
     function normalizeText(value: string | null | undefined) {
       return (value || '').toUpperCase().replace(/\s+/g, ' ').trim()
@@ -1318,6 +1320,13 @@ export default function Home() {
           ].join(',')
         )
         .limit(8000)
+    
+      if (subjectIsStrata === true) {
+        query = query.eq('is_strata', true)
+      } else {
+        // Default to non-strata for plain street addresses where is_strata is null
+        query = query.eq('is_strata', false)
+      }
     }
   
     const { data, error } = await query
