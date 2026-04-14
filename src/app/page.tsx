@@ -68,6 +68,115 @@ const TENURE_OPTIONS = [
   { label: 'Other leasehold', value: 'OTHER' },
 ]
 
+
+// ─── FAQ data ─────────────────────────────────────────────────────────────────
+const FAQ_ITEMS = [
+  {
+    q: "How does NexDoor HomeValue estimate my property's value?",
+    a: 'We analyse recent transaction data from HDB and URA to find comparable properties near your address. Our engine looks at factors like location, floor area, floor level, and property type to produce a market-based estimate.',
+  },
+  {
+    q: 'How recent is the transaction data used?',
+    a: 'Our database is updated regularly and includes transactions up to 2026. We prioritise the most recent transactions when calculating your estimate.',
+  },
+  {
+    q: 'Why does my estimate look different from other tools?',
+    a: "Different tools use different methodologies, data sources, and update frequencies. Our estimates are based purely on recent transacted prices in the open market — not asking prices or agent opinions.",
+  },
+  {
+    q: 'How accurate is this estimate?',
+    a: 'This is an indicative estimate based on comparable market transactions. It is not a formal valuation and should be treated as a starting reference point. Accuracy depends on how many recent comparable transactions exist near your property.',
+  },
+  {
+    q: 'Does this replace a formal valuation from a bank or licensed appraiser?',
+    a: 'No. This tool does not replace a formal valuation. Banks, HDB, and legal proceedings require a valuation conducted by a licensed appraiser. This estimate is for general reference only.',
+  },
+  {
+    q: 'Does the tool account for renovations or unique features of my unit?',
+    a: 'No. The estimate is based on transacted prices of comparable properties and does not factor in renovation quality, interior condition, orientation, facing, or any unique features of your specific unit.',
+  },
+  {
+    q: "Can property values in Singapore change significantly over a short period?",
+    a: "Yes. Singapore's property market can be sensitive to policy changes, interest rate movements, and broader economic conditions. We recommend checking your estimate periodically rather than relying on a single point-in-time figure.",
+  },
+  {
+    q: "What factors affect my home's value the most?",
+    a: 'For HDB, key factors include remaining lease, floor level, block location, and proximity to amenities. For private properties, factors include project reputation, tenure, unit facing, floor level, and recent transactions within the development.',
+  },
+  {
+    q: 'Is there a difference between HDB and private property valuations?',
+    a: 'Yes. HDB resale valuations are influenced by HDB policies, remaining lease, and ethnic quota restrictions. Private property valuations are driven purely by market forces and are generally more volatile.',
+  },
+  {
+    q: "Can I use this to estimate a property I don't own?",
+    a: 'Yes. You can enter any Singapore residential address to get an indicative estimate. This can be useful when researching a property you are considering buying.',
+  },
+  {
+    q: "How often should I check my home's value?",
+    a: 'We recommend checking every 3 to 6 months, or after any significant market event such as a policy announcement or interest rate change.',
+  },
+]
+
+// ─── Stat cards ───────────────────────────────────────────────────────────────
+function StatCards() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-4 rounded-2xl border border-[#e5dbcf] bg-white px-4 py-3.5">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Team Experience</p>
+          <p className="mt-0.5 text-base font-semibold text-[#2d3135]">600+ Transactions</p>
+          <p className="text-[11px] text-[#9aa0a6]">Combined across the team</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4 rounded-2xl border border-[#e5dbcf] bg-white px-4 py-3.5">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Limited Offer</p>
+          <p className="mt-0.5 text-base font-semibold text-[#2d3135]">0% GST</p>
+          <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-[#f5c4b3] bg-[#fff3f0] px-2 py-0.5 text-[10px] font-semibold text-[#c0442a]">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c0442a]" />
+            Slots running out fast
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── FAQ accordion ────────────────────────────────────────────────────────────
+function FaqSection() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+
+  return (
+    <section className="bg-[#f7f4ef]">
+      <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-16 md:px-10">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">FAQ</p>
+        <h2 className="text-2xl font-semibold text-[#1e2226] mb-8 md:text-3xl">Frequently asked questions</h2>
+        <div className="rounded-2xl border border-[#e5dbcf] bg-white px-6 md:px-8">
+          {FAQ_ITEMS.map((item, i) => (
+            <div key={i} className="border-b border-[#e8ddd2] last:border-b-0">
+              <button
+                type="button"
+                onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                className="flex w-full items-center justify-between gap-4 py-5 text-left"
+              >
+                <span className="text-sm font-semibold text-[#1e2226] leading-snug md:text-base">{item.q}</span>
+                <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] text-sm transition-colors ${openIndex === i ? 'border-[#8b6b52] bg-[#8b6b52] text-white' : 'border-[#b09880] text-[#8b6b52]'}`}>
+                  {openIndex === i ? '−' : '+'}
+                </span>
+              </button>
+              {openIndex === i && (
+                <div className="border-t border-[#f0ebe4] pb-6 pt-4 text-sm leading-7 text-[#3d4550] md:text-base md:leading-8">
+                  {item.a}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function getPropertyCategoryFromType(
   propertyType: string
 ): 'hdb' | 'condo' | 'ec' | 'landed' {
@@ -447,7 +556,7 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
           width: 0%;
         }
       `}</style>
-      <div className="mx-auto max-w-7xl px-6 pt-6 pb-12 md:px-10">
+      <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-6 pb-12 md:px-10">
         {/* Loading bar */}
         <div className="flex flex-col items-center mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">
@@ -1034,7 +1143,7 @@ export default function Home() {
       setTimeout(() => {
         setPlanPopupStep('question')
         setShowPlanPopup(true)
-      }, 3000)
+      }, 4000)
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -1930,21 +2039,21 @@ export default function Home() {
       </div>
       <div className="flex flex-wrap gap-1.5">
         <span className="text-xs font-medium text-[#2d3135] bg-[#f0ece6] rounded-md px-2 py-1">
-          {formatMoney(row.transaction_price)}
+          <span className="text-[#8b6b52] font-semibold">Price: </span>{formatMoney(row.transaction_price)}
         </span>
         <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          ${Math.round(row.psf).toLocaleString()} psf
+          <span className="text-[#8b6b52] font-semibold">PSF: </span>${Math.round(row.psf).toLocaleString()}
         </span>
         <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          {sqmToSqft(row.floor_area_sqm)} sqft
+          <span className="text-[#8b6b52] font-semibold">Size: </span>{sqmToSqft(row.floor_area_sqm)} sqft
         </span>
         {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
           <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-            {formatTenure(row.tenure)}
+            <span className="text-[#8b6b52] font-semibold">Tenure: </span>{formatTenure(row.tenure)}
           </span>
         )}
         <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          {Math.round(row.distance_m)}m
+          <span className="text-[#8b6b52] font-semibold">Dist: </span>{Math.round(row.distance_m)}m
         </span>
       </div>
     </div>
@@ -1953,7 +2062,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
       <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 md:px-10">
+        <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-between px-6 py-3 md:px-10">
           <div
             className="text-3xl tracking-tight text-black md:text-4xl"
             style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
@@ -1975,7 +2084,7 @@ export default function Home() {
         <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
         <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
 
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-6 py-8 md:px-10 lg:grid-cols-[1fr_1fr] lg:items-center lg:py-20">
+        <div className="mx-auto grid max-w-7xl 2xl:max-w-screen-2xl grid-cols-1 gap-10 px-6 py-8 md:px-10 lg:grid-cols-[1fr_1fr] lg:items-center lg:py-12">
           
           {/* Hero copy — hidden on mobile, shown on desktop */}
           <div className="hidden lg:block lg:order-1 pt-4">
@@ -2001,6 +2110,10 @@ export default function Home() {
                 <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
                 <p className="text-sm text-[#67707a]">Updated with 2026 transactions</p>
               </div>
+            </div>
+            {/* CHANGE 5: Desktop stat cards */}
+            <div className="mt-8">
+              <StatCards />
             </div>
           </div>
 
@@ -2238,6 +2351,11 @@ export default function Home() {
                   Powered by real transaction data from HDB & URA
                 </p>
 
+                {/* CHANGE 6: Mobile stat cards */}
+                <div className="lg:hidden mt-1">
+                  <StatCards />
+                </div>
+
                 {formMessage && (
                   <p className="text-sm text-[#8b6b52]">{formMessage}</p>
                 )}
@@ -2260,7 +2378,7 @@ export default function Home() {
         <section className="bg-[#f7f4ef]">
           <div
             ref={resultRef}
-            className="mx-auto max-w-7xl px-6 pt-2 pb-12 md:px-10"
+            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
           >
             {/* Valuation Summary */}
             <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
@@ -2399,6 +2517,9 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* CHANGE: FAQ section — always shown */}
+      {!isGenerating && <FaqSection />}
 
       {showConsultationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
