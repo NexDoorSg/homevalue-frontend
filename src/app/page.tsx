@@ -2195,41 +2195,28 @@ export default function Home() {
                   </thead>
       
                   <tbody>
-                    (propertyCategory === 'landed'
-                      ? recentComparables
-                      : activeTab === 'same'
-                      ? propertyCategory === 'condo' || propertyCategory === 'ec'
-                        ? sameProjectComparables.length > 0
-                          ? sameProjectComparables
-                          : []
-                        : sameBlockComparables.length > 0
-                        ? sameBlockComparables
-                        : []
-                      : propertyCategory === 'condo' || propertyCategory === 'ec'
-                      ? nearbyCondoComparables
-                      : nearbyHdbComparables
-                    ).map((row, i) => (
-                      <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
-                        <td className="px-5 py-4">
-                          {formatDate(row.transaction_date)}
-                        </td>
-                        <td className="px-5 py-4">
-                          {row.project_name || row.address}
-                        </td>
-                        <td className="px-5 py-4">
-                          {sqmToSqft(row.floor_area_sqm)} sqft
-                        </td>
-                        <td className="px-5 py-4">
-                          {formatMoney(row.transaction_price)}
-                        </td>
-                        <td className="px-5 py-4">
-                          ${Math.round(row.psf).toLocaleString()}
-                        </td>
-                        <td className="px-5 py-4">
-                          {Math.round(row.distance_m)}m
-                        </td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const tableRows = propertyCategory === 'landed'
+                        ? recentComparables
+                        : activeTab === 'same'
+                        ? propertyCategory === 'condo' || propertyCategory === 'ec'
+                          ? sameProjectComparables.length > 0 ? sameProjectComparables : []
+                          : sameBlockComparables.length > 0 ? sameBlockComparables : []
+                        : propertyCategory === 'condo' || propertyCategory === 'ec'
+                        ? nearbyCondoComparables
+                        : nearbyHdbComparables
+                  
+                      return tableRows.map((row, i) => (
+                        <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
+                          <td className="px-5 py-4">{formatDate(row.transaction_date)}</td>
+                          <td className="px-5 py-4">{row.project_name || row.address}</td>
+                          <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
+                          <td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
+                          <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
+                          <td className="px-5 py-4">{Math.round(row.distance_m)}m</td>
+                        </tr>
+                      ))
+                    })()}
                   </tbody>
                 </table>
               </div>
