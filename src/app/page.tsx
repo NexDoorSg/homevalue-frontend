@@ -1310,6 +1310,8 @@ export default function Home() {
     }
   
     if (category === 'landed') {
+      const LAT_DELTA = 0.045  // ~5km
+      const LON_DELTA = 0.045
       query = query
         .or(
           [
@@ -1319,12 +1321,16 @@ export default function Home() {
             'unit_type.ilike.%BUNGALOW%',
           ].join(',')
         )
-        .limit(8000)
+        .gte('latitude', lat - LAT_DELTA)
+        .lte('latitude', lat + LAT_DELTA)
+        .gte('longitude', lon - LON_DELTA)
+        .lte('longitude', lon + LON_DELTA)
+        .order('transaction_date', { ascending: false })
+        .limit(3000)
     
       if (subjectIsStrata === true) {
         query = query.eq('is_strata', true)
       } else {
-        // Default to non-strata for plain street addresses where is_strata is null
         query = query.eq('is_strata', false)
       }
     }
@@ -2218,7 +2224,9 @@ export default function Home() {
                       return tableRows.map((row, i) => (
                         <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
                           <td className="px-5 py-4">{formatDate(row.transaction_date)}</td>
-                          <td className="px-5 py-4">{row.project_name || row.address}</td>
+                          <td className="px-5 py-4">
+                            {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
+                          </td>
                           <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
                           <td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
                           <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
