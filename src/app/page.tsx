@@ -693,6 +693,8 @@ export default function Home() {
   const [planPopupInteracted, setPlanPopupInteracted] = useState(false)
   const [planPopupDismissed, setPlanPopupDismissed] = useState(false)
   const [showConsultationModal, setShowConsultationModal] = useState(false)
+  const [showMismatchModal, setShowMismatchModal] = useState(false)
+  const [mismatchMessage, setMismatchMessage] = useState('')
   const [consultName, setConsultName] = useState('')
   const [consultPhone, setConsultPhone] = useState('')
   const [consultEmail, setConsultEmail] = useState('')
@@ -953,7 +955,7 @@ export default function Home() {
   }
 }
 
-  const handleGenerateReport = async () => {
+  const handleGenerateReport = async (bypassMismatch = false) => {
     setFormMessage('')
     setRecentComparables([])
   
@@ -1037,7 +1039,28 @@ export default function Home() {
       let resolvedProjectName = resolved.projectName || null
       let subjectCompletionYear: number | null = null
       let subjectIsStrata: boolean | null = null
-  
+      
+      // ─── Detect property type from address ───────────────────────────────────────
+      const addressLooksLikeHdb = !resolved.projectName
+      
+      if (!bypassMismatch && addressLooksLikeHdb && propertyCategory !== 'hdb') {
+        setMismatchMessage(
+          'This looks like an HDB address, but you selected a private property type. Please double-check your property type for an accurate estimate.'
+        )
+        setShowMismatchModal(true)
+        setIsGenerating(false)
+        return
+      }
+      
+      if (!bypassMismatch && !addressLooksLikeHdb && propertyCategory === 'hdb') {
+        setMismatchMessage(
+          'This looks like a private property address, but you selected an HDB type. Please double-check your property type for an accurate estimate.'
+        )
+        setShowMismatchModal(true)
+        setIsGenerating(false)
+        return
+      }
+      
       if (
         propertyCategory === 'condo' ||
         propertyCategory === 'ec' ||
@@ -1051,10 +1074,40 @@ export default function Home() {
           rawProjectName: resolved.projectName,
           category: propertyCategory,
         })
-  
+      
         resolvedProjectName = canonical.canonicalProjectName || resolvedProjectName
         subjectCompletionYear = canonical.completionYear
         subjectIsStrata = canonical.isStrata
+      
+        // ─── Detect condo vs EC mismatch ─────────────────────────────────────────
+        if (canonical.canonicalProjectName) {
+          const { data: subtypeCheck } = await supabase
+            .from('property_transactions_v2')
+            .select('property_subtype')
+            .ilike('project_name', canonical.canonicalProjectName)
+            .not('property_subtype', 'is', null)
+            .limit(1)
+      
+          const detectedSubtype = subtypeCheck?.[0]?.property_subtype
+      
+          if (!bypassMismatch && detectedSubtype === 'ec' && propertyCategory === 'condo') {
+            setMismatchMessage(
+              'This looks like an EC development, but you selected a Condominium type. Please select from the "EC / Privatised EC" section for an accurate estimate.'
+            )
+            setShowMismatchModal(true)
+            setIsGenerating(false)
+            return
+          }
+      
+          if (!bypassMismatch && detectedSubtype === 'condo' && propertyCategory === 'ec') {
+            setMismatchMessage(
+              'This looks like a Condominium, but you selected an EC type. Please select from the "Condominium" section for an accurate estimate.'
+            )
+            setShowMismatchModal(true)
+            setIsGenerating(false)
+            return
+          }
+        }
       }
 
       // For HDB: look up completion year from the block's own transactions
@@ -2203,18 +2256,18 @@ export default function Home() {
                       <option value="EXECUTIVE">Executive</option>
                     </optgroup>
                     <optgroup label="Condominium">
-                      <option value="1 BEDROOM">1 Bedroom</option>
-                      <option value="2 BEDROOM">2 Bedroom</option>
-                      <option value="3 BEDROOM">3 Bedroom</option>
-                      <option value="4 BEDROOM">4 Bedroom</option>
-                      <option value="5 BEDROOM">5 Bedroom+</option>
+                      <option value="1 BEDROOM">Condo 1 Bed</option>
+                      <option value="2 BEDROOM">Condo 2 Bed</option>
+                      <option value="3 BEDROOM">Condo 3 Bed</option>
+                      <option value="4 BEDROOM">Condo 4 Bed</option>
+                      <option value="5 BEDROOM">Condo 5 Bed+</option>
                       <option value="PENTHOUSE">Penthouse</option>
                     </optgroup>
-                    <optgroup label="Executive Condo (EC)">
-                      <option value="2 BEDROOM EC">2 Bedroom</option>
-                      <option value="3 BEDROOM EC">3 Bedroom</option>
-                      <option value="4 BEDROOM EC">4 Bedroom</option>
-                      <option value="5 BEDROOM EC">5 Bedroom+</option>
+                    <optgroup label="EC / Privatised EC">
+                      <option value="2 BEDROOM EC">EC 2 Bed</option>
+                      <option value="3 BEDROOM EC">EC 3 Bed</option>
+                      <option value="4 BEDROOM EC">EC 4 Bed</option>
+                      <option value="5 BEDROOM EC">EC 5 Bed+</option>
                     </optgroup>
                     <optgroup label="Landed">
                       <option value="TERRACE HOUSE">Terrace</option>
@@ -2534,7 +2587,41 @@ export default function Home() {
 
       {/* CHANGE: FAQ section — always shown */}
       {!isGenerating && <FaqSection />}
-
+      {showMismatchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
+            <h2 className="text-xl font-semibold text-[#2d3135]">
+              Double-check your property type
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-[#67707a]">
+              {mismatchMessage}
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMismatchModal(false)
+                  setMismatchMessage('')
+                }}
+                className="w-full rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d]"
+              >
+                Change property type
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowMismatchModal(false)
+                  setMismatchMessage('')
+                  await handleGenerateReport(true)
+                }}
+                className="w-full rounded-2xl border border-[#e3d6c8] px-5 py-3.5 text-sm font-semibold text-[#2d3135] transition hover:bg-[#f8f4ef]"
+              >
+                Proceed anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showConsultationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
