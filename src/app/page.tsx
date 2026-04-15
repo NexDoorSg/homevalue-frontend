@@ -1622,6 +1622,7 @@ export default function Home() {
     }
   
     const { data, error } = await query
+    console.log('[DEBUG 1] rows returned:', data?.length, 'selectedProjectName:', selectedProjectName, 'selectedProjectKey:', selectedProjectKey)
   
     if (error) {
       console.error('Comparable fetch error:', error)
@@ -1670,6 +1671,7 @@ export default function Home() {
       _cluster: getLandedCluster(row.street_name, row.address),
       _sizeBand: getSizeBand(subjectFloorAreaSqm, row.floor_area_sqm),
     }))
+    console.log('[DEBUG 2] withNormalized:', withNormalized.length, 'selectedProjectKey:', selectedProjectKey)
   
     if (category === 'hdb') {
       const subjStreetForQuery = abbreviateRoadWords((selectedStreetName || '').toUpperCase().trim())
@@ -1828,6 +1830,7 @@ export default function Home() {
         (exactMatchRowsForInference.length > 0 ? selectedProjectKey : '') ||
         countProjects(fuzzyMatchRowsForInference) ||
         selectedProjectKey
+      console.log('[DEBUG 3] exactMatchRows:', exactMatchRowsForInference.length, 'sameProjectName:', sameProjectName)
     
       let sameProjectQuery = supabase
         .from('property_transactions_v2')
@@ -1847,6 +1850,7 @@ export default function Home() {
       const { data: sameProjectData } = sameProjectName
         ? await sameProjectQuery
         : { data: [] }
+      console.log('[DEBUG 4] sameProjectData:', sameProjectData?.length, sameProjectData?.[0]?.project_name)
 
       const sameProjectRows = ((sameProjectData || []) as ComparableRow[])
         .map((row) => {
