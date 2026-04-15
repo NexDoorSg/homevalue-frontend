@@ -660,6 +660,7 @@ export default function Home() {
   const [estimatedHigh, setEstimatedHigh] = useState<number | null>(null)
   const [numOfComps, setNumOfComps] = useState<number | null>(null)
   const [radiusUsedM, setRadiusUsedM] = useState<number | null>(null)
+  const [subjectCompletionYearState, setSubjectCompletionYearState] = useState<number | null>(null)
   const [recentComparables, setRecentComparables] = useState<
     Array<{
       transaction_date: string | null
@@ -1183,6 +1184,7 @@ export default function Home() {
       setEstimatedHigh(result.high)
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
+      setSubjectCompletionYearState(subjectCompletionYear)
       setHasReport(true)
 
       const leadPayload = {
@@ -2463,34 +2465,38 @@ export default function Home() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                 Valuation Summary
               </p>
-
-              <div className="mt-4 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <p className="text-4xl font-semibold text-[#2d3135] md:text-5xl">
-                    {formatMoney(estimatedPrice)}
-                  </p>
-                  {(estimatedLow || estimatedHigh) && (
-                    <p className="mt-2 text-sm text-[#6a727a]">
-                      Range: {formatMoney(estimatedLow)} — {formatMoney(estimatedHigh)}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex gap-6 md:gap-10">
-                  {estimatedPsf && (
-                    <div className="border-l border-[#e8ddd2] pl-6">
-                      <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8b6b52]">Est. PSF</p>
-                      <p className="mt-1 text-2xl font-semibold text-[#2d3135]">${estimatedPsf.toLocaleString()}</p>
-                    </div>
-                  )}
-                  <div className="border-l border-[#e8ddd2] pl-6">
-                    <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8b6b52]">Transactions Used</p>
-                    <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{numOfComps || 0}</p>
-                    {radiusUsedM && (
-                      <p className="text-xs text-[#9aa0a6]">within {radiusUsedM}m</p>
-                    )}
+            
+              <p className="mt-4 text-4xl font-semibold text-[#2d3135] md:text-5xl">
+                {formatMoney(estimatedPrice)}
+              </p>
+              {(estimatedLow || estimatedHigh) && (
+                <p className="mt-2 text-sm text-[#6a727a]">
+                  Range: {formatMoney(estimatedLow)} — {formatMoney(estimatedHigh)}
+                </p>
+              )}
+            
+              <div className="mt-6 pt-6 border-t border-[#e8ddd2] grid grid-cols-2 md:grid-cols-3 gap-0">
+                {estimatedPsf && (
+                  <div className="pr-6 border-r border-[#e8ddd2]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Est. PSF</p>
+                    <p className="mt-1 text-2xl font-semibold text-[#2d3135]">${estimatedPsf.toLocaleString()}</p>
                   </div>
+                )}
+                <div className={`${estimatedPsf ? 'px-6' : 'pr-6'} ${(propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && subjectCompletionYearState ? 'border-r border-[#e8ddd2]' : ''}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Transactions Used</p>
+                  <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{numOfComps || 0}</p>
+                  {radiusUsedM && (
+                    <p className="text-xs text-[#9aa0a6]">within {radiusUsedM}m</p>
+                  )}
                 </div>
+                {subjectCompletionYearState && (propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && (
+                  <div className="pl-6 col-span-2 mt-4 md:col-span-1 md:mt-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">
+                      {propertyCategory === 'hdb' ? 'Est. Built' : 'TOP Year'}
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{subjectCompletionYearState}</p>
+                  </div>
+                )}
               </div>
             </div>
       
