@@ -1021,20 +1021,20 @@ export default function Home() {
       return
     }
   
-    setIsGenerating(true)
-
-    // Scroll to skeleton immediately
-    setTimeout(() => {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
-  
     try {
       const resolved = await resolveAddressForGeneration()
-  
+    
       if (!resolved) {
         setFormMessage('Could not match this address. Please choose an address from the dropdown.')
         return
       }
+    
+      setIsGenerating(true)
+    
+      // Scroll to skeleton immediately
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
   
       let resolvedProjectName = resolved.projectName || null
       let subjectCompletionYear: number | null = null
