@@ -2613,6 +2613,7 @@ export default function Home() {
                 onClick={() => {
                   setShowMismatchModal(false)
                   setMismatchMessage('')
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
                 className="w-full rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d]"
               >
