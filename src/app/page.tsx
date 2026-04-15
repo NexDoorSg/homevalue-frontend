@@ -672,6 +672,7 @@ export default function Home() {
       transaction_price: number
       unit_type?: string | null
       tenure?: string | null
+      completion_year?: number | null
       psf: number
       distance_m: number
     }>
@@ -1740,10 +1741,11 @@ export default function Home() {
     if (category === 'hdb') {
       const subjStreetForQuery = abbreviateRoadWords((selectedStreetName || '').toUpperCase().trim())
       const subjBlockForQuery = (address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
-
+    
+      // ─── Same Block query (dedicated) ────────────────────────────────────────
       let sameBlockQuery = supabase
         .from('property_transactions_v2')
-        .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure')
+        .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure, completion_year')
         .eq('property_group', 'hdb')
         .eq('unit_type', targetPropertyType)
         .not('transaction_price', 'is', null)
@@ -1752,16 +1754,16 @@ export default function Home() {
         .not('longitude', 'is', null)
         .order('transaction_date', { ascending: false })
         .limit(20)
-
+    
       if (subjStreetForQuery && subjBlockForQuery) {
         sameBlockQuery = sameBlockQuery.ilike('address', `${subjBlockForQuery} ${subjStreetForQuery}%`)
       }
-
+    
       const { data: sameBlockData } = (subjStreetForQuery && subjBlockForQuery)
         ? await sameBlockQuery
         : { data: [] }
-
-      const sameBlockRows = ((sameBlockData || []) as ComparableRow[])
+    
+      const sameBlockRows = ((sameBlockData || []) as (ComparableRow & { completion_year?: number | null })[])
         .map((row) => {
           const transactionPrice = Number(row.transaction_price)
           const floorArea = Number(row.floor_area_sqm)
@@ -1779,7 +1781,8 @@ export default function Home() {
             longitude: rowLon,
             unit_type: row.unit_type || null,
             floor_level: row.floor_level || null,
-            tenure: (row as ComparableRow & { tenure?: string | null }).tenure || null,
+            tenure: row.tenure || null,
+            completion_year: row.completion_year ?? null,
             distance_m: getDistanceMeters(lat, lon, rowLat, rowLon),
             psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
           }
@@ -1792,45 +1795,106 @@ export default function Home() {
             row.floor_area_sqm > 0
         )
         .slice(0, 10)
-
-      const nearbyHdbRows = withNormalized
-        .map((row) => {
-          const sameStreet = !!row._normStreet && row._normStreet === subjectStreet
-          const sameBlock =
-            sameStreet &&
-            !!row._block &&
-            !!subjectBlock &&
-            row._block === subjectBlock
-
-          if (sameBlock) return null
-
-          let priority = 999
-          if (sameStreet && row._sizeBand === 'same') priority = 1
-          else if (sameStreet && row._sizeBand === 'similar') priority = 2
-          else if (sameStreet) priority = 3
-          else if (row.distance_m <= 500 && row._sizeBand === 'same') priority = 4
-          else if (row.distance_m <= 500 && row._sizeBand === 'similar') priority = 5
-          else if (row.distance_m <= 500) priority = 6
-          else if (row.distance_m <= 1200 && row._sizeBand === 'same') priority = 7
-          else if (row.distance_m <= 1200 && row._sizeBand === 'similar') priority = 8
-          else if (row.distance_m <= 1200) priority = 9
-          else if (row.distance_m <= 2000 && row._sizeBand === 'same') priority = 10
-          else if (row.distance_m <= 2000 && row._sizeBand === 'similar') priority = 11
-          else if (row.distance_m <= 2000) priority = 12
-
-          return { ...row, _priority: priority }
-        })
-        .filter((row): row is NonNullable<typeof row> => row !== null && row._priority < 999)
-        .sort((a, b) => {
-          if (a._priority !== b._priority) return a._priority - b._priority
-          const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
-          const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
-          if (dateB !== dateA) return dateB - dateA
-          return a.distance_m - b.distance_m
-        })
-        .slice(0, 10)
-
-      return [...sameBlockRows, ...nearbyHdbRows]
+    
+      // ─── Nearby tab: adaptive radius query ───────────────────────────────────
+      // Start at 500m, expand to 1km, then 1.5km until 5+ rows found
+      const radii = [
+        { delta: 500 / 111000, label: '500m' },
+        { delta: 1000 / 111000, label: '1km' },
+        { delta: 1500 / 111000, label: '1.5km' },
+      ]
+    
+      let nearbyRows: Array<{
+        address: string | null
+        street_name: string | null
+        project_name: string | null
+        transaction_date: string | null
+        transaction_price: number
+        floor_area_sqm: number
+        latitude: number
+        longitude: number
+        unit_type: string | null
+        floor_level: string | null
+        tenure: string | null
+        completion_year: number | null
+        distance_m: number
+        psf: number
+      }> = []
+    
+      for (const { delta } of radii) {
+        const { data: nearbyData } = await supabase
+          .from('property_transactions_v2')
+          .select('address, street_name, project_name, transaction_date, transaction_price, floor_area_sqm, latitude, longitude, unit_type, floor_level, tenure, completion_year')
+          .eq('property_group', 'hdb')
+          .eq('unit_type', targetPropertyType)
+          .not('transaction_price', 'is', null)
+          .not('floor_area_sqm', 'is', null)
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null)
+          .gte('latitude', lat - delta)
+          .lte('latitude', lat + delta)
+          .gte('longitude', lon - delta)
+          .lte('longitude', lon + delta)
+          .order('transaction_date', { ascending: false })
+          .limit(200)
+    
+        const candidates = ((nearbyData || []) as (ComparableRow & { completion_year?: number | null })[])
+          .map((row) => {
+            const transactionPrice = Number(row.transaction_price)
+            const floorArea = Number(row.floor_area_sqm)
+            const rowLat = Number(row.latitude)
+            const rowLon = Number(row.longitude)
+            const floorAreaSqft = floorArea * 10.7639
+            const distM = getDistanceMeters(lat, lon, rowLat, rowLon)
+            return {
+              address: row.address,
+              street_name: row.street_name || null,
+              project_name: row.project_name || null,
+              transaction_date: row.transaction_date,
+              transaction_price: transactionPrice,
+              floor_area_sqm: floorArea,
+              latitude: rowLat,
+              longitude: rowLon,
+              unit_type: row.unit_type || null,
+              floor_level: row.floor_level || null,
+              tenure: row.tenure || null,
+              completion_year: row.completion_year ?? null,
+              distance_m: distM,
+              psf: floorAreaSqft > 0 ? transactionPrice / floorAreaSqft : 0,
+            }
+          })
+          .filter(
+            (row) =>
+              Number.isFinite(row.transaction_price) &&
+              row.transaction_price > 0 &&
+              Number.isFinite(row.floor_area_sqm) &&
+              row.floor_area_sqm > 0
+          )
+          // Exclude same block rows
+          .filter((row) => {
+            const rowBlock = (row.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\b/)?.[1] || ''
+            const rowStreet = abbreviateRoadWords((row.street_name || '').toUpperCase().trim())
+            return !(rowBlock === subjBlockForQuery && rowStreet === subjStreetForQuery)
+          })
+          // Sort by date descending, distance as tiebreaker
+          .sort((a, b) => {
+            const dateA = a.transaction_date ? new Date(a.transaction_date).getTime() : 0
+            const dateB = b.transaction_date ? new Date(b.transaction_date).getTime() : 0
+            if (dateB !== dateA) return dateB - dateA
+            return a.distance_m - b.distance_m
+          })
+          .slice(0, 10)
+    
+        if (candidates.length >= 5) {
+          nearbyRows = candidates
+          break
+        }
+    
+        // Keep the best we have so far if last radius
+        nearbyRows = candidates
+      }
+    
+      return [...sameBlockRows, ...nearbyRows]
     }
   
     if (category === 'condo' || category === 'ec') {
@@ -2571,6 +2635,9 @@ export default function Home() {
                               {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
                                 <th className="px-4 py-3">Tenure</th>
                               )}
+                              {propertyCategory === 'hdb' && activeTab === 'nearby' && (
+                                <th className="px-4 py-3">Completion</th>
+                              )}
                               <th className="px-4 py-3">Distance</th>
                             </tr>
                           </thead>
@@ -2586,6 +2653,9 @@ export default function Home() {
                                 <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
                                 {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
                                   <td className="px-5 py-4">{formatTenure(row.tenure)}</td>
+                                )}
+                                {propertyCategory === 'hdb' && activeTab === 'nearby' && (
+                                  <td className="px-5 py-4">{row.completion_year || '-'}</td>
                                 )}
                                 <td className="px-5 py-4">{Math.round(row.distance_m)}m</td>
                               </tr>
