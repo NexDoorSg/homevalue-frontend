@@ -1042,6 +1042,7 @@ export default function Home() {
       
       // ─── Detect property type from address ───────────────────────────────────────
       const addressLooksLikeHdb = !resolved.projectName
+      console.log('[HDB DEBUG] resolved.projectName:', resolved.projectName, 'addressLooksLikeHdb:', addressLooksLikeHdb)
       
       if (!bypassMismatch && addressLooksLikeHdb && propertyCategory !== 'hdb') {
         setMismatchMessage(
