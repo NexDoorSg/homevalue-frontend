@@ -1041,8 +1041,18 @@ export default function Home() {
       let subjectIsStrata: boolean | null = null
       
       // ─── Detect property type from address ───────────────────────────────────────
-      const addressLooksLikeHdb = !resolved.projectName
-      console.log('[HDB DEBUG] resolved.projectName:', resolved.projectName, 'addressLooksLikeHdb:', addressLooksLikeHdb)
+      const addressLooksLikeHdb = await (async () => {
+        const { data } = await supabase
+          .from('property_transactions_v2')
+          .select('property_group')
+          .eq('property_group', 'hdb')
+          .gte('latitude', resolved.lat - 0.001)
+          .lte('latitude', resolved.lat + 0.001)
+          .gte('longitude', resolved.lon - 0.001)
+          .lte('longitude', resolved.lon + 0.001)
+          .limit(1)
+        return !!(data && data.length > 0)
+      })()
       
       if (!bypassMismatch && addressLooksLikeHdb && propertyCategory !== 'hdb') {
         setMismatchMessage(
