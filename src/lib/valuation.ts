@@ -382,18 +382,18 @@ function buildHdbCandidate(
         sameBlockRows.reduce((s, r) => s + r.pricePerSqm, 0) / sameBlockRows.length
       const adjustedPsm = sameBlockAvgPsm * clampedDrift
       const estimated = adjustedPsm * floorAreaSqm
-      const biasedEstimate = estimated * 1.04
+      const biasedEstimate = estimated * 1.01
 
       const psfValues = sameBlockRows.map((r) => r.pricePerSqm).sort((a, b) => a - b)
       const stdDev = Math.sqrt(
         psfValues.reduce((s, v) => s + Math.pow(v - sameBlockAvgPsm, 2), 0) / psfValues.length
       )
       const stdDevPct = stdDev / sameBlockAvgPsm
-      const halfSpread = Math.min(stdDevPct, 0.06)
-
+      const halfSpread = Math.min(stdDevPct, 0.05)
+      
       return {
         estimated: biasedEstimate,
-        low: biasedEstimate * (1 - halfSpread * 0.5),
+        low: biasedEstimate * (1 - halfSpread),
         high: biasedEstimate * (1 + halfSpread),
         comparables: sameBlockRows.length,
         radius,
@@ -438,7 +438,7 @@ function buildHdbCandidate(
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
   const estimated = avgPsm * floorAreaSqm
-  const biasedEstimate = estimated * 1.04
+  const biasedEstimate = estimated * 1.01
 
   const psfValues = trimmed.map((row) => row.pricePerSqm)
   const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
@@ -446,11 +446,11 @@ function buildHdbCandidate(
     psfValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / psfValues.length
   )
   const stdDevPct = stdDev / mean
-  const halfSpread = Math.min(stdDevPct, 0.06)
+  const halfSpread = Math.min(stdDevPct, 0.05)
 
   return {
     estimated: biasedEstimate,
-    low: biasedEstimate * (1 - halfSpread * 0.5),
+    low: biasedEstimate * (1 - halfSpread),
     high: biasedEstimate * (1 + halfSpread),
     comparables: trimmed.length,
     radius,
@@ -822,7 +822,7 @@ function buildCondoEcCandidate(
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
   const estimated = avgPsm * floorAreaSqm
-  const biasedEstimate = estimated * 1.02
+  const biasedEstimate = estimated * 1.01
 
   const sortedPsm = usable
     .map((row) => row.pricePerSqm)
@@ -911,12 +911,12 @@ function buildCondoEcFallback(
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
   const estimated = avgPsm * floorAreaSqm
-  const biasedEstimate = estimated * 1.02
+  const biasedEstimate = estimated * 1.01
 
   return {
     estimated: biasedEstimate,
-    low: biasedEstimate * 0.94,
-    high: biasedEstimate * 1.08,
+    low: biasedEstimate * 0.93,
+    high: biasedEstimate * 1.07,
     comparables: usable.length,
     radius: Math.round(usable[usable.length - 1].distanceM),
     method: 'condo_ec_fallback',
@@ -1066,12 +1066,12 @@ function buildNonLandedCandidate(
   const stdDev = Math.sqrt(psfValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / psfValues.length)
   const stdDevPct = stdDev / mean
 
-  const maxSpread = propertyCategory === 'hdb' ? 0.06 : 0.08
+  const maxSpread = propertyCategory === 'hdb' ? 0.05 : 0.08
   const halfSpread = Math.min(stdDevPct, maxSpread)
-
+  
   return {
     estimated: biasedEstimate,
-    low: biasedEstimate * (1 - halfSpread * 0.5),
+    low: biasedEstimate * (1 - halfSpread),
     high: biasedEstimate * (1 + halfSpread),
     comparables: usable.length,
     radius,
@@ -1142,8 +1142,8 @@ function buildNonLandedFallback(
 
   return {
     estimated: biasedEstimate,
-    low: biasedEstimate * 0.94,
-    high: biasedEstimate * 1.08,
+    low: biasedEstimate * 0.93,
+    high: biasedEstimate * 1.07,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
     method: normalizedSubjectProject ? 'same_project_fallback' : 'broad_fallback'
@@ -1210,17 +1210,17 @@ function buildLandedCandidate(
 
   estimated = estimated * (1 + cappedAdjustment)
 
-  const biasedEstimate = estimated * 1.03
+  const biasedEstimate = estimated * 1.01
 
   const psfValues = usable.map((row) => row.pricePerSqft)
   const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
   const stdDev = Math.sqrt(psfValues.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / psfValues.length)
   const stdDevPct = stdDev / mean
-  const halfSpread = Math.min(stdDevPct, 0.12)
+  const halfSpread = Math.min(stdDevPct, 0.10)
 
   return {
     estimated: biasedEstimate,
-    low: biasedEstimate * (1 - halfSpread * 0.5),
+    low: biasedEstimate * (1 - halfSpread),
     high: biasedEstimate * (1 + halfSpread),
     comparables: usable.length,
     radius,
@@ -1299,12 +1299,12 @@ function buildLandedFallback(
   if (!avgLandPsf || !Number.isFinite(avgLandPsf)) return null
 
   const estimated = avgLandPsf * landSizeSqft
-  const biasedEstimate = estimated * 1.03
+  const biasedEstimate = estimated * 1.01
 
   return {
     estimated: biasedEstimate,
-    low: biasedEstimate * 0.92,
-    high: biasedEstimate * 1.10,
+    low: biasedEstimate * 0.93,
+    high: biasedEstimate * 1.07,
     comparables: fallbackRows.length,
     radius: Math.round(fallbackRows[fallbackRows.length - 1].distanceM),
     method: 'landed_fallback'
