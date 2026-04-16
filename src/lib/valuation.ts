@@ -278,6 +278,33 @@ function getFloorWeight(subjectFloor?: number, comparableFloor?: number | null) 
   return 0.95
 }
 
+function applyFloorAdjustment(
+  estimate: number,
+  floorLevel: number | undefined,
+  propertyCategory: PropertyCategory
+): number {
+  if (!floorLevel || propertyCategory === 'landed') return estimate
+
+  const floorsAboveBase = Math.max(0, floorLevel - 1)
+
+  if (propertyCategory === 'hdb') {
+    const adjustment = floorsAboveBase * 0.005
+    const capped = Math.min(0.15, adjustment)
+    return estimate * (1 + capped)
+  }
+
+  if (propertyCategory === 'ec') {
+    const adjustment = floorsAboveBase * 0.010
+    const capped = Math.min(0.20, adjustment)
+    return estimate * (1 + capped)
+  }
+
+  // condo
+  const adjustment = floorsAboveBase * 0.012
+  const capped = Math.min(0.20, adjustment)
+  return estimate * (1 + capped)
+}
+
 function extractBlockNumber(address: string | null | undefined): string {
   const text = normalizeText(address)
   if (!text) return ''
@@ -367,10 +394,11 @@ function buildHdbCandidate(
       const stdDevPct = stdDev / sameBlockAvgPsm
       const halfSpread = Math.min(stdDevPct, 0.05)
       
+      const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, 'hdb')
       return {
-        estimated: biasedEstimate,
-        low: biasedEstimate * (1 - halfSpread),
-        high: biasedEstimate * (1 + halfSpread),
+        estimated: floorAdjusted,
+        low: floorAdjusted * (1 - halfSpread),
+        high: floorAdjusted * (1 + halfSpread),
         comparables: sameBlockRows.length,
         radius,
         method: 'hdb_same_block_drift_adjusted',
@@ -419,10 +447,11 @@ function buildHdbCandidate(
   const stdDevPct = stdDev / mean
   const halfSpread = Math.min(stdDevPct, 0.05)
 
+  const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, 'hdb')
   return {
-    estimated: biasedEstimate,
-    low: biasedEstimate * (1 - halfSpread),
-    high: biasedEstimate * (1 + halfSpread),
+    estimated: floorAdjusted,
+    low: floorAdjusted * (1 - halfSpread),
+    high: floorAdjusted * (1 + halfSpread),
     comparables: trimmed.length,
     radius,
     method,
@@ -814,10 +843,11 @@ function buildCondoEcCandidate(
       ? highPsm * floorAreaSqm
       : biasedEstimate * (1 + fallbackSpread)
 
+  const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, propertyCategory)
   return {
-    estimated: biasedEstimate,
-    low,
-    high,
+    estimated: floorAdjusted,
+    low: floorAdjusted * (low / biasedEstimate),
+    high: floorAdjusted * (high / biasedEstimate),
     comparables: usable.length,
     radius,
     method: 'condo_ec_hybrid',
@@ -884,10 +914,11 @@ function buildCondoEcFallback(
   const estimated = avgPsm * floorAreaSqm
   const biasedEstimate = estimated * 1.01
 
+  const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, propertyCategory)
   return {
-    estimated: biasedEstimate,
-    low: biasedEstimate * 0.93,
-    high: biasedEstimate * 1.07,
+    estimated: floorAdjusted,
+    low: floorAdjusted * 0.93,
+    high: floorAdjusted * 1.07,
     comparables: usable.length,
     radius: Math.round(usable[usable.length - 1].distanceM),
     method: 'condo_ec_fallback',
