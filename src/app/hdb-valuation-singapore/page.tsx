@@ -1,16 +1,24 @@
+export const metadata = {
+  title: "HDB Valuation Singapore (2026) – Check Your Flat Value Instantly | HomeValue",
+  description:
+    "Find out how much your HDB flat in Singapore is worth using real recent transactions. Get an instant, data-driven valuation in seconds – free and no obligation.",
+}
+
 export default function HdbValuationSingaporePage() {
   return (
     <main className="min-h-screen bg-[#f7f4ef] px-6 py-12 md:px-12 lg:px-20">
       <div className="mx-auto max-w-4xl">
         <div className="bg-white rounded-2xl p-8 shadow-sm">
           <h1 className="text-3xl font-semibold tracking-tight text-[#1e2226] md:text-4xl">
-            HDB Valuation Singapore (Free Estimate Based on Recent Transactions)
+            HDB Valuation Singapore – How Much Is Your HDB Worth?
           </h1>
 
           <p className="mt-4 text-base leading-7 text-[#4a4f55]">
-            Find out how much your HDB flat in Singapore may be worth using recent
-            transaction data. Our free valuation tool gives homeowners a fast,
-            data-driven estimate based on nearby comparable sales and market trends.
+            Wondering how much your HDB flat in Singapore is worth? This page helps you
+            estimate your HDB valuation in Singapore using recent resale transactions,
+            nearby comparable units, and current market trends. Whether you are planning
+            to sell or just exploring your options, you can also use our free HDB valuation
+            tool to get an instant estimate based on real data in Singapore.
           </p>
 
           <div className="mt-6">
@@ -26,14 +34,13 @@ export default function HdbValuationSingaporePage() {
 
           <section className="mt-12">
             <h2 className="text-xl font-semibold text-[#1e2226]">
-              How HDB Valuation Works in Singapore
+              HDB Prices in Singapore – What Is Your Flat Worth Today?
             </h2>
             <p className="mt-4 text-base leading-7 text-[#4a4f55]">
-              HDB valuation depends on factors such as location, flat type, floor
-              level, remaining lease, condition, and recent nearby transactions.
-              Buyers and sellers often look at comparable resale prices in the
-              surrounding area to understand current market value before deciding on
-              pricing.
+              HDB resale prices in Singapore vary based on location, flat type, floor
+              level, remaining lease, condition, and recent nearby transactions. Mature
+              towns, transport connectivity, and block-level demand can all affect how much
+              buyers are willing to pay in today’s market.
             </p>
           </section>
 
@@ -60,9 +67,10 @@ export default function HdbValuationSingaporePage() {
               Get an Instant HDB Valuation
             </h2>
             <p className="mt-4 text-base leading-7 text-[#4a4f55]">
-              Instead of relying on rough estimates, use our HomeValue tool to get a
-              fast HDB valuation in Singapore based on recent transactions and
-              comparable homes in the market.
+              Many homeowners search for terms like "HDB valuation Singapore",
+              "how much is my HDB worth", or "HDB resale value Singapore".
+              Instead of relying on rough estimates, our HomeValue tool gives you a fast
+              and data-driven valuation based on real nearby transactions.
             </p>
 
             <p className="mt-4 text-sm text-[#5f666d]">
@@ -80,40 +88,58 @@ export default function HdbValuationSingaporePage() {
               Explore HDB Valuation by Area
             </h2>
 
-            <div className="mt-6 space-y-3 text-sm">
-              <div>
-                <a
-                  href="/hdb-valuation-tampines"
-                  className="underline text-[#8b6b52] hover:text-[#6f5440]"
-                >
+            <p className="mt-4 text-base text-[#4a4f55]">
+              Looking for a more local estimate? Explore recent transaction-based HDB
+              valuation pages for specific towns across Singapore:
+            </p>
+
+            <ul className="mt-6 space-y-2 text-sm">
+              <li>
+                <a href="/hdb-valuation-tampines" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Tampines
                 </a>
-              </div>
-              <div>
-                <a
-                  href="/hdb-valuation-yishun"
-                  className="underline text-[#8b6b52] hover:text-[#6f5440]"
-                >
+              </li>
+              <li>
+                <a href="/hdb-valuation-yishun" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Yishun
                 </a>
-              </div>
-              <div>
-                <a
-                  href="/hdb-valuation-woodlands"
-                  className="underline text-[#8b6b52] hover:text-[#6f5440]"
-                >
+              </li>
+              <li>
+                <a href="/hdb-valuation-woodlands" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Woodlands
                 </a>
-              </div>
-              <div>
-                <a
-                  href="/hdb-valuation-jurong-west"
-                  className="underline text-[#8b6b52] hover:text-[#6f5440]"
-                >
+              </li>
+              <li>
+                <a href="/hdb-valuation-jurong-west" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Jurong West
                 </a>
-              </div>
-            </div>
+              </li>
+              <li>
+                <a href="/hdb-valuation-bedok" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Bedok
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-sengkang" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Sengkang
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-punggol" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Punggol
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-ang-mo-kio" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Ang Mo Kio
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-bishan" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Bishan
+                </a>
+              </li>
+            </ul>
           </section>
 
           <div className="mt-12 border-t border-[#e5e0da]" />
