@@ -142,14 +142,10 @@ export default function YishunValuationPage() {
             </p>
 
             <ul className="mt-2 space-y-1 text-sm">
+              
               <li>
                 <a href="/hdb-valuation-tampines" className="underline text-[#8b6b52] hover:text-[#6f5440]">
-                  HDB Valuation Yishun
-                </a>
-              </li>
-              <li>
-                <a href="/hdb-valuation-yishun" className="underline text-[#8b6b52] hover:text-[#6f5440]">
-                  HDB Valuation Yishun
+                  HDB Valuation Tampines
                 </a>
               </li>
               <li>
@@ -160,6 +156,31 @@ export default function YishunValuationPage() {
               <li>
                 <a href="/hdb-valuation-jurong-west" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Jurong West
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-bedok" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Bedok
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-sengkang" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Sengkang
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-punggol" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Punggol
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-ang-mo-kio" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Ang Mo Kio
+                </a>
+              </li>
+              <li>
+                <a href="/hdb-valuation-bishan" className="underline text-[#8b6b52] hover:text-[#6f5440]">
+                  HDB Valuation Bishan
                 </a>
               </li>
             </ul>
