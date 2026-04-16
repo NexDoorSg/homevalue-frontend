@@ -19,6 +19,7 @@ type ValuationParams = {
   subjectStreetName?: string | null
   subjectBlockNo?: string | null
   subjectCompletionYearHdb?: number | null
+  cacheKey?: string // NEW
 }
 
 type TransactionRow = {
@@ -277,7 +278,6 @@ function getFloorWeight(subjectFloor?: number, comparableFloor?: number | null) 
   return 0.95
 }
 
-// ─── Extract block number from HDB address (e.g. "31 BALAM RD" → "31") ───────
 function extractBlockNumber(address: string | null | undefined): string {
   const text = normalizeText(address)
   if (!text) return ''
@@ -285,7 +285,6 @@ function extractBlockNumber(address: string | null | undefined): string {
   return match ? match[1] : ''
 }
 
-// ─── Get most recent transaction date from a pool of rows ────────────────────
 function getMostRecentDate(rows: CleanedRow[]): Date | null {
   let latest: Date | null = null
   for (const row of rows) {
@@ -296,18 +295,6 @@ function getMostRecentDate(rows: CleanedRow[]): Date | null {
   return latest
 }
 
-// ─── HDB-specific valuation builder ──────────────────────────────────────────
-//
-// Priority logic:
-//   Scenario 1: Same block has transactions within 6 months
-//               → use same-block only
-//   Scenario 2: Same block has transactions between 6–12 months old
-//               → same-block anchor + nearby same-completion-year drift
-//   Scenario 3: Same block transactions older than 12 months OR no same-block
-//               → nearby blocks filtered by completion_year ±5 years
-//   Scenario 4: No nearby similar completion year
-//               → all nearby with strong recency weighting
-//
 function buildHdbCandidate(
   allRows: CleanedRow[],
   radius: number,
@@ -318,19 +305,16 @@ function buildHdbCandidate(
 ): CandidateResult | null {
   if (allRows.length === 0) return null
 
-  // ── Identify same-block rows ──
   const sameBlockRows = subjectBlockNo
     ? allRows.filter((row) => extractBlockNumber(row.address) === subjectBlockNo)
     : []
 
-  // ── How fresh is the most recent same-block transaction? ──
   const mostRecentSameBlock = getMostRecentDate(sameBlockRows)
   const now = Date.now()
   const daysSinceSameBlock = mostRecentSameBlock
     ? (now - mostRecentSameBlock.getTime()) / (1000 * 60 * 60 * 24)
     : Infinity
 
-  // ── Nearby rows with similar completion year (±5 years) ──
   const nearbyWithSimilarAge = subjectCompletionYear
     ? allRows.filter((row) => {
         if (extractBlockNumber(row.address) === subjectBlockNo) return false
@@ -343,17 +327,11 @@ function buildHdbCandidate(
   let method: string
 
   if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 180) {
-    // ── Scenario 1: Same-block data is fresh (within 6 months) ──
     valuationPool = sameBlockRows
     method = 'hdb_same_block_fresh'
 
   } else if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
-    // ── Scenario 2: Same-block data is 6–12 months old ──
-    // Use same-block as anchor PSF, compute market drift from nearby same-age blocks
-    // then apply drift to same-block PSF
     if (nearbyWithSimilarAge.length >= 3) {
-      // Compute weighted PSF from nearby same-age blocks at two time slices:
-      // "recent" (last 6 months) and "older" (6–12 months ago)
       const sixMonthsAgo = now - 180 * 24 * 60 * 60 * 1000
       const recentNearby = nearbyWithSimilarAge.filter(
         (r) => r.transaction_date && new Date(r.transaction_date).getTime() >= sixMonthsAgo
@@ -374,10 +352,8 @@ function buildHdbCandidate(
           ? avgRecent / avgOlder
           : 1.0
 
-      // Clamp drift to ±10% to avoid extreme corrections
       const clampedDrift = Math.max(0.90, Math.min(1.10, driftMultiplier))
 
-      // Apply drift to same-block PSF
       const sameBlockAvgPsm =
         sameBlockRows.reduce((s, r) => s + r.pricePerSqm, 0) / sameBlockRows.length
       const adjustedPsm = sameBlockAvgPsm * clampedDrift
@@ -401,24 +377,20 @@ function buildHdbCandidate(
       }
     }
 
-    // Not enough nearby same-age data for drift — just use same-block directly
     valuationPool = sameBlockRows
     method = 'hdb_same_block_stale'
 
   } else if (nearbyWithSimilarAge.length >= 3) {
-    // ── Scenario 3: No usable same-block data — use nearby same completion year ──
     valuationPool = nearbyWithSimilarAge
     method = 'hdb_nearby_same_age'
 
   } else {
-    // ── Scenario 4: No same-age nearby — use all nearby with recency weighting ──
     valuationPool = allRows
     method = 'hdb_nearby_all'
   }
 
   if (valuationPool.length === 0) return null
 
-  // ── Trim outliers ──
   const trimmed = trimRowsByMetric(valuationPool, (row) => row.pricePerSqm)
   if (trimmed.length === 0) return null
 
@@ -429,7 +401,6 @@ function buildHdbCandidate(
     const sizeWeight = 1 / Math.max(sizeDiff, 5)
     const recencyWeight = getRecencyWeight(row.transaction_date, 'hdb')
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
-    // Same-block rows get extra weight even in mixed pools
     const blockWeight = extractBlockNumber(row.address) === subjectBlockNo ? 3.0 : 1.0
     return distanceWeight * sizeWeight * recencyWeight * floorWeight * blockWeight
   })
@@ -1311,6 +1282,57 @@ function buildLandedFallback(
   }
 }
 
+// ─── Cache helpers ────────────────────────────────────────────────────────────
+
+async function readCache(cacheKey: string): Promise<CandidateResult | null> {
+  try {
+    const { data, error } = await supabase
+      .from('valuation_cache')
+      .select('estimated, low, high, comparables, radius, method')
+      .eq('cache_key', cacheKey)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle()
+
+    if (error || !data) return null
+
+    return {
+      estimated: Number(data.estimated),
+      low: Number(data.low),
+      high: Number(data.high),
+      comparables: Number(data.comparables),
+      radius: Number(data.radius),
+      method: data.method ?? undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function writeCache(cacheKey: string, result: CandidateResult): Promise<void> {
+  try {
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    await supabase
+      .from('valuation_cache')
+      .upsert(
+        {
+          cache_key: cacheKey,
+          estimated: result.estimated,
+          low: result.low,
+          high: result.high,
+          comparables: result.comparables,
+          radius: result.radius,
+          method: result.method ?? null,
+          expires_at: expiresAt,
+        },
+        { onConflict: 'cache_key' }
+      )
+  } catch {
+    // Cache write failure is non-fatal — silently ignore
+  }
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
 export async function getValuation({
   lat,
   lon,
@@ -1327,11 +1349,19 @@ export async function getValuation({
   subjectAddress,
   subjectBlockNo,
   subjectCompletionYearHdb,
+  cacheKey,
 }: ValuationParams) {
+
+  // ── Cache read ──────────────────────────────────────────────────────────────
+  if (cacheKey) {
+    const cached = await readCache(cacheKey)
+    if (cached) return cached
+  }
+
   const searchRadius = getSearchRadius(propertyCategory)
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // HDB: dedicated same-block priority logic
+  // HDB
   // ═══════════════════════════════════════════════════════════════════════════
   if (propertyCategory === 'hdb') {
     const blockNo = subjectBlockNo || extractBlockNumber(subjectAddress)
@@ -1401,9 +1431,12 @@ export async function getValuation({
       }
     }
 
-    if (bestCandidate) return bestCandidate
+    if (bestCandidate) {
+      if (cacheKey) await writeCache(cacheKey, bestCandidate)
+      return bestCandidate
+    }
 
-    // HDB fallback — use broadest radius
+    // HDB fallback
     const { data, error } = await fetchRowsForRadius(
       lat,
       lon,
@@ -1417,7 +1450,9 @@ export async function getValuation({
     const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
     if (fallbackRows.length === 0) return null
 
-    return buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear)
+    const fallbackResult = buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear)
+    if (fallbackResult && cacheKey) await writeCache(cacheKey, fallbackResult)
+    return fallbackResult
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1485,7 +1520,7 @@ export async function getValuation({
         landSizeSqm,
         builtUpSqm,
         propertyType,
-        subjectTenureBucket
+        getSubjectTenureBucket(tenure)
       )
 
       if (!candidate) continue
@@ -1522,7 +1557,10 @@ export async function getValuation({
       }
     }
 
-    if (bestCandidate) return bestCandidate
+    if (bestCandidate) {
+      if (cacheKey) await writeCache(cacheKey, bestCandidate)
+      return bestCandidate
+    }
 
     const { data, error } = await fetchRowsForRadius(
       lat,
@@ -1535,7 +1573,9 @@ export async function getValuation({
     if (error || !data || data.length === 0) return null
 
     const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
-    return buildLandedFallback(fallbackRows, landSizeSqm, propertyType, tenure, subjectIsStrata)
+    const fallbackResult = buildLandedFallback(fallbackRows, landSizeSqm, propertyType, tenure, subjectIsStrata)
+    if (fallbackResult && cacheKey) await writeCache(cacheKey, fallbackResult)
+    return fallbackResult
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1618,8 +1658,12 @@ export async function getValuation({
     }
   }
 
-  if (bestCandidate) return bestCandidate
+  if (bestCandidate) {
+    if (cacheKey) await writeCache(cacheKey, bestCandidate)
+    return bestCandidate
+  }
 
+  // Condo/EC fallback
   const fallbackRadius = 3000
   const { data, error } = await fetchRowsForRadius(
     lat,
@@ -1643,7 +1687,7 @@ export async function getValuation({
 
   const subjectTenureBucket = getSubjectTenureBucket(tenure)
 
-  return buildCondoEcFallback(
+  const fallbackResult = buildCondoEcFallback(
     fallbackRows,
     floorAreaSqm,
     propertyCategory,
@@ -1652,4 +1696,6 @@ export async function getValuation({
     subjectCompletionYear,
     subjectTenureBucket
   )
+  if (fallbackResult && cacheKey) await writeCache(cacheKey, fallbackResult)
+  return fallbackResult
 }
