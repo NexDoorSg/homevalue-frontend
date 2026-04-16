@@ -116,22 +116,22 @@ export default function WoodlandsValuationPage() {
 
             <ul className="mt-2 space-y-1 text-sm">
               <li>
-                <a href="/hdb-valuation-tampines" className="underline">
+                <a href="/hdb-valuation-tampines" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Tampines
                 </a>
               </li>
               <li>
-                <a href="/hdb-valuation-yishun" className="underline">
+                <a href="/hdb-valuation-yishun" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Yishun
                 </a>
               </li>
               <li>
-                <a href="/hdb-valuation-woodlands" className="underline">
+                <a href="/hdb-valuation-woodlands" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Woodlands
                 </a>
               </li>
               <li>
-                <a href="/hdb-valuation-jurong-west" className="underline">
+                <a href="/hdb-valuation-jurong-west" className="underline text-[#8b6b52] hover:text-[#6f5440]">
                   HDB Valuation Jurong West
                 </a>
               </li>
