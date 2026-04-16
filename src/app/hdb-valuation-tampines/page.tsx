@@ -79,18 +79,14 @@ export default function TampinesValuationPage() {
             </p>
           </section>
 
-          <div className="mt-12 border-t border-[#e5e0da] pt-6 text-center">
+          <section className="mt-12 border-t border-[#e5e0da] pt-6 text-center">
             <p className="text-sm text-[#5f666d]">
               Looking for a broader estimate across Singapore?{" "}
               <a href="/hdb-valuation-singapore" className="underline font-medium text-[#1e2226]">
                 Check HDB valuation Singapore
               </a>.
             </p>
-          </div>
-          
-          <div className="mt-12 border-t border-[#e5e0da]" />
-
-          <div className="mt-16 border-t border-[#e5e0da]" />
+          </section>
 
           <section className="mt-12">
             <h2 className="text-2xl font-semibold text-[#1e2226]">
