@@ -1,3 +1,9 @@
+export const metadata = {
+  title: "HDB Valuation Tampines (2026) – Check Your Flat Value Instantly | HomeValue",
+  description:
+    "Find out how much your HDB flat in Tampines is worth using real recent transactions. Get an instant, data-driven valuation in seconds – free and no obligation.",
+}
+
 export default function TampinesValuationPage() {
   return (
     <main className="min-h-screen bg-[#f7f4ef] px-6 py-12 md:px-12 lg:px-20">
