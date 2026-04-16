@@ -2256,7 +2256,8 @@ export default function Home() {
               for HDB, Condo, EC &amp; Landed Homes
             </h1>
             <p className="mt-5 text-base leading-7 text-[#7a8289]">
-              Instant estimates from real Singapore transactions — no agents, no guesswork.
+              Get an instant estimated value for your HDB, condo, EC or landed property
+              using recent Singapore transaction data from HDB and URA.
             </p>
             <div className="mt-10 border-t border-[#e8ddd2] pt-8 flex flex-col gap-4">
               <div className="flex items-center gap-3">
@@ -2288,6 +2289,10 @@ export default function Home() {
                 <h2 className="mt-2 text-xl font-semibold text-[#2d3135]">
                   Free Property Valuation in Singapore
                 </h2>
+                <p className="mt-2 text-sm leading-6 text-[#7a8289]">
+                  Get an instant estimated value for your HDB, condo, EC or landed property
+                  using recent Singapore transaction data from HDB and URA.
+                </p>
               </div>
 
               <div className="grid gap-4">
