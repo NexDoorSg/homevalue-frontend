@@ -160,11 +160,6 @@ export default function HowPropertyValuationWorksSingaporePage() {
                   Condo Valuation Singapore
                 </a>
               </li>
-              <li>
-                <a href="/hdb-valuation-tampines" className="underline text-[#8b6b52]">
-                  HDB Valuation Tampines
-                </a>
-              </li>
             </ul>
           </section>
 
