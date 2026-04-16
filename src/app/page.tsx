@@ -653,6 +653,7 @@ export default function Home() {
   const [selectedLon, setSelectedLon] = useState<number | null>(null)
   const [selectedStreetName, setSelectedStreetName] = useState<string | null>(null)
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null)
+  const [selectedPostal, setSelectedPostal] = useState<string | null>(null)
   const [lookupCandidates, setLookupCandidates] = useState<string[]>([])
 
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
@@ -864,6 +865,7 @@ export default function Home() {
     setSelectedLon(null)
     setSelectedStreetName(null)
     setSelectedProjectName(null)
+    setSelectedPostal(null)
     setLookupCandidates([])
     resetResults()
 
@@ -886,6 +888,7 @@ export default function Home() {
         ? item.BUILDING.toUpperCase().trim()
         : null
     )
+    setSelectedPostal(item.POSTAL || null)
     
     setLookupCandidates(buildLookupCandidates(item))
     resetResults()
@@ -1139,6 +1142,13 @@ export default function Home() {
           }
         }
       }
+
+      const unitNumber = (floorLevel.trim() && stackNumber.trim())
+        ? `${floorLevel.trim()}-${stackNumber.trim()}`
+        : ''
+      const cacheKey = selectedPostal
+        ? `${selectedPostal}|${unitNumber}|${propertyCategory}`.toLowerCase()
+        : null
   
       const result = await getValuation({
         lat: resolved.lat,
@@ -1167,6 +1177,7 @@ export default function Home() {
           ? (resolved.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\s/)?.[1] || ''
           : undefined,
         subjectCompletionYearHdb: propertyCategory === 'hdb' ? subjectCompletionYear : undefined,
+        cacheKey: cacheKey ?? undefined,
       })
   
       if (!result) {
