@@ -139,6 +139,35 @@ function StatCards() {
 }
 
 // ─── FAQ accordion ────────────────────────────────────────────────────────────
+
+function AboutHomeValueSection() {
+  return (
+    <section className="bg-[#f7f4ef]">
+      <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-6 md:px-10">
+        <div className="rounded-[32px] border border-[#eadfd6] bg-white/90 p-6 shadow-[0_20px_60px_rgba(54,69,79,0.08)] sm:p-8">
+          <div className="max-w-4xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">About HomeValue</p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#2d3135] sm:text-3xl">
+              Understand your property’s estimated value before you sell
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[#5f666d] sm:text-base">
+              HomeValue by NexDoor is a free property valuation tool for homeowners in
+              Singapore. It uses recent HDB and URA transaction data to generate an
+              estimated value for HDB flats, condos, ECs and landed homes.
+            </p>
+            <p className="mt-4 text-sm leading-7 text-[#5f666d] sm:text-base">
+              This gives you a useful starting point before deciding on your asking
+              price, marketing strategy or next move. While it is not a formal bank or
+              HDB valuation, it helps you understand where your home may sit in today’s
+              market based on recent comparable transactions.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function FaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
@@ -2256,8 +2285,7 @@ export default function Home() {
               for HDB, Condo, EC &amp; Landed Homes
             </h1>
             <p className="mt-5 text-base leading-7 text-[#7a8289]">
-              Get an instant estimated value for your HDB, condo, EC or landed property
-              using recent Singapore transaction data from HDB and URA.
+              Instant estimates from real Singapore transactions — no agents, no guesswork.
             </p>
             <div className="mt-10 border-t border-[#e8ddd2] pt-8 flex flex-col gap-4">
               <div className="flex items-center gap-3">
@@ -2289,10 +2317,6 @@ export default function Home() {
                 <h2 className="mt-2 text-xl font-semibold text-[#2d3135]">
                   Free Property Valuation in Singapore
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-[#7a8289]">
-                  Get an instant estimated value for your HDB, condo, EC or landed property
-                  using recent Singapore transaction data from HDB and URA.
-                </p>
               </div>
 
               <div className="grid gap-4">
@@ -2693,6 +2717,7 @@ export default function Home() {
       )}
 
       {/* CHANGE: FAQ section — always shown */}
+      {!isGenerating && <AboutHomeValueSection />}
       {!isGenerating && <FaqSection />}
       {showMismatchModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
