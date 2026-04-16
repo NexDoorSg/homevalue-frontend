@@ -2251,7 +2251,9 @@ export default function Home() {
               HomeValue by NexDoor
             </p>
             <h1 className="mt-5 text-5xl font-semibold leading-[1.15] tracking-tight text-[#2d3135] xl:text-6xl">
-              What is your home<br />worth right now?
+              Free Property Valuation in Singapore
+              <br />
+              for HDB, Condo, EC &amp; Landed Homes
             </h1>
             <p className="mt-5 text-base leading-7 text-[#7a8289]">
               Instant estimates from real Singapore transactions — no agents, no guesswork.
@@ -2283,7 +2285,9 @@ export default function Home() {
               {/* Mobile-only compact header above form */}
               <div className="mb-6 lg:hidden">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">HomeValue by NexDoor</p>
-                <h2 className="mt-2 text-xl font-semibold text-[#2d3135]">What is your home worth?</h2>
+                <h2 className="mt-2 text-xl font-semibold text-[#2d3135]">
+                  Free Property Valuation in Singapore
+                </h2>
               </div>
 
               <div className="grid gap-4">
