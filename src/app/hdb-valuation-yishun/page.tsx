@@ -112,6 +112,21 @@ export default function YishunValuationPage() {
             </div>
           </section>
 
+          <div className="mt-12 border-t border-[#e5e0da]" />
+          
+          <div className="mt-8">
+            <p className="text-sm text-[#5f666d]">
+              Looking at other areas? Explore:
+            </p>
+          
+            <ul className="mt-2 space-y-1 text-sm">
+              <li><a href="/hdb-valuation-tampines" className="underline">HDB Valuation Tampines</a></li>
+              <li><a href="/hdb-valuation-yishun" className="underline">HDB Valuation Yishun</a></li>
+              <li><a href="/hdb-valuation-woodlands" className="underline">HDB Valuation Woodlands</a></li>
+              <li><a href="/hdb-valuation-jurong-west" className="underline">HDB Valuation Jurong West</a></li>
+            </ul>
+          </div>
+
         </div>
       </div>
     </main>
