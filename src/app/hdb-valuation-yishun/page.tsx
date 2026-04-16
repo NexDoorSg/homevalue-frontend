@@ -69,7 +69,7 @@ export default function YishunValuationPage() {
 
           <div className="mt-12 border-t border-[#e5e0da]" />
 
-          <section className="mt-10">
+          <section className="py-6 text-center">
             <p className="text-sm text-[#5f666d]">
               Looking for a broader estimate across Singapore?{" "}
               <a href="/hdb-valuation-singapore" className="underline font-medium text-[#1e2226]">
@@ -77,8 +77,8 @@ export default function YishunValuationPage() {
               </a>.
             </p>
           </section>
-
-          <div className="mt-16 border-t border-[#e5e0da]" />
+          
+          <div className="border-t border-[#e5e0da]" />
 
           <section className="mt-12">
             <h2 className="text-2xl font-semibold text-[#1e2226]">
