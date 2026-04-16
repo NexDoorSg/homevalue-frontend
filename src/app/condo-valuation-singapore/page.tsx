@@ -88,16 +88,18 @@ export default function CondoValuationSingaporePage() {
             </p>
           </section>
 
-          <div className="mt-12 border-t border-[#e5e0da] pt-6 text-center">
+          <div className="mt-12 text-center">
+            <div className="border-t border-[#e5e0da] mb-6" />
+          
             <p className="text-sm text-[#5f666d]">
               Looking for HDB valuations instead?{" "}
               <a href="/hdb-valuation-singapore" className="underline font-medium text-[#1e2226]">
                 Check HDB valuation Singapore
               </a>.
             </p>
+          
+            <div className="border-t border-[#e5e0da] mt-6" />
           </div>
-
-          <div className="mt-8 border-t border-[#e5e0da]" />
 
           {/* FAQ */}
           <section className="mt-12">
