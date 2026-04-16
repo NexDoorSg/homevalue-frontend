@@ -183,6 +183,30 @@ export default function HdbValuationSingaporePage() {
           </section>
         </div>
       </div>
-    </main>
+    
+          <div className="mt-16 border-t border-[#e5e0da]" />
+
+          <section className="mt-12">
+            <h2 className="text-2xl font-semibold text-[#1e2226]">
+              Explore Other Valuation Pages
+            </h2>
+
+            <ul className="mt-6 space-y-2 text-sm">
+
+              <li>
+                <a href="/condo-valuation-singapore" className="underline text-[#8b6b52]">
+                  Condo Valuation Singapore
+                </a>
+              </li>
+
+              <li>
+                <a href="/landed-valuation-singapore" className="underline text-[#8b6b52]">
+                  Landed Valuation Singapore
+                </a>
+              </li>
+
+            </ul>
+          </section>
+</main>
   )
 }
