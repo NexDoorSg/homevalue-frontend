@@ -2248,7 +2248,52 @@ export default function Home() {
   )
 
   return (
-    <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: [
+              {
+                '@type': 'Question',
+                name: 'How is property valuation calculated in Singapore?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Property valuation is estimated using recent transaction data, comparable sales, property type, size and location. This tool uses HDB and URA data to provide an indicative value.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'How accurate is an online property valuation?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Online property valuations provide an estimated range based on recent market transactions. They are useful as a starting point but may differ from formal bank or HDB valuations.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'Can I sell my property above valuation in Singapore?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Yes, properties in Singapore can be sold above valuation depending on market demand, location and buyer interest. This is commonly known as Cash Over Valuation (COV).',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'Does this work for HDB, condo and landed property?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Yes, this valuation tool covers HDB flats, private condominiums, executive condominiums and landed properties across Singapore.',
+                },
+              },
+            ],
+          }),
+        }}
+      />
+
+      <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
       <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-between px-6 py-3 md:px-10">
           <div
@@ -2898,6 +2943,7 @@ export default function Home() {
           </div>
         </div>
       )}
-    </main>
+      </main>
+    </>
   )
 }
