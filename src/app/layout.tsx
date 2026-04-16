@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HomeValue by NexDoor",
+  title: "Free Property Valuation Singapore | HDB, Condo & Landed | NexDoor",
   description:
-    "Find out what your property is really worth using real 2026 transaction data in Singapore.",
+    "Get a free instant property valuation in Singapore using recent HDB and URA transaction data. Estimate the value of your HDB, condo, EC or landed home before you sell.",
   icons: {
     icon: "/favicon.png",
   },
