@@ -4,13 +4,15 @@ export default function TampinesValuationPage() {
       <div className="mx-auto max-w-4xl">
         <div className="bg-white rounded-2xl p-8 shadow-sm">
           <h1 className="text-3xl font-semibold tracking-tight text-[#1e2226] md:text-4xl">
-            HDB Valuation in Tampines (Free Estimate Based on Recent Transactions)
+            HDB Valuation Tampines – How Much Is Your HDB Worth?
           </h1>
 
           <p className="mt-4 text-base leading-7 text-[#4a4f55]">
-            Looking to find out how much your HDB flat in Tampines is worth?
-            This page gives you an overview of Tampines HDB prices based on recent
-            transactions, and you can use our free valuation tool to get an instant estimate.
+            Wondering how much your HDB flat in Tampines is worth? This page helps you
+            estimate your HDB valuation in Tampines using recent resale transactions,
+            nearby comparable units, and current market trends. Whether you are planning
+            to sell or just exploring your options, you can also use our free HDB valuation
+            tool to get an instant estimate based on real data in Singapore.
           </p>
 
           <div className="mt-6">
@@ -26,10 +28,13 @@ export default function TampinesValuationPage() {
 
           <section className="mt-12">
             <h2 className="text-xl font-semibold text-[#1e2226]">
-              Tampines HDB Prices and Market Trends
+              Tampines HDB Prices – What Is Your Flat Worth Today?
             </h2>
             <p className="mt-4 text-base leading-7 text-[#4a4f55]">
-              Tampines is one of the largest and most mature HDB estates in Singapore, with strong demand from both families and upgraders. Prices vary depending on flat type, floor level, proximity to MRT stations, and renovation condition.
+              Tampines is one of the largest and most mature HDB estates in Singapore,
+              with strong demand from both families and upgraders. Prices vary depending
+              on flat type, floor level, proximity to MRT stations, and renovation
+              condition.
             </p>
           </section>
 
@@ -59,6 +64,13 @@ export default function TampinesValuationPage() {
               to get a data-driven valuation based on recent HDB transactions across Singapore.
             </p>
 
+            <p className="mt-4 text-base leading-7 text-[#4a4f55]">
+              Many homeowners search for terms like "HDB valuation Tampines",
+              "how much is my HDB worth in Tampines", or "HDB resale value Singapore".
+              Instead of relying on rough estimates, our tool gives you a fast and
+              data-driven valuation based on real nearby transactions.
+            </p>
+
             <p className="mt-4 text-sm text-[#5f666d]">
               Want a more accurate estimate?{" "}
               <a href="/" className="underline font-medium text-[#1e2226]">
@@ -77,8 +89,10 @@ export default function TampinesValuationPage() {
               </a>.
             </p>
           </section>
-          
+
           <div className="border-t border-[#e5e0da]" />
+
+          <div className="mt-16 border-t border-[#e5e0da]" />
 
           <section className="mt-12">
             <h2 className="text-2xl font-semibold text-[#1e2226]">
@@ -88,7 +102,7 @@ export default function TampinesValuationPage() {
             <div className="mt-6 space-y-4">
               <div>
                 <h3 className="font-medium text-[#1e2226]">
-                  How much are HDB flats in Tampines worth?
+                  How much is my HDB flat worth in Tampines?
                 </h3>
                 <p className="text-sm text-[#5f666d]">
                   Prices vary depending on flat type, location and condition, but Tampines
