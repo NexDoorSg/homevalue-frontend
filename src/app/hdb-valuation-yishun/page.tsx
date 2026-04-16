@@ -67,6 +67,17 @@ export default function YishunValuationPage() {
             </p>
           </section>
 
+          <div className="mt-12 border-t border-[#e5e0da]" />
+
+          <section className="mt-10">
+            <p className="text-sm text-[#5f666d]">
+              Looking for a broader estimate across Singapore?{" "}
+              <a href="/hdb-valuation-singapore" className="underline font-medium text-[#1e2226]">
+                Check HDB valuation Singapore
+              </a>.
+            </p>
+          </section>
+
           <div className="mt-16 border-t border-[#e5e0da]" />
 
           <section className="mt-12">
