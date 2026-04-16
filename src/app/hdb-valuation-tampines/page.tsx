@@ -4,7 +4,6 @@ export default function TampinesValuationPage() {
       
       <div className="mx-auto max-w-4xl">
         
-        {/* ✅ CARD WRAPPER */}
         <div className="bg-white rounded-2xl p-8 shadow-sm">
         
           {/* Title */}
@@ -19,7 +18,7 @@ export default function TampinesValuationPage() {
             transactions, and you can use our free valuation tool to get an instant estimate.
           </p>
 
-          {/* CTA */}
+          {/* ✅ SINGLE MAIN CTA */}
           <div className="mt-6">
             <a
               href="/"
@@ -74,14 +73,13 @@ export default function TampinesValuationPage() {
               to get a data-driven valuation based on recent HDB transactions across Singapore.
             </p>
 
-            <div className="mt-6">
-              <a
-                href="/"
-                className="inline-block rounded-full bg-[#1e2226] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
-              >
-                Check Your HDB Value Now
-              </a>
-            </div>
+            {/* ✅ SOFT CTA (not a button) */}
+            <p className="mt-4 text-sm text-[#5f666d]">
+              Want a more accurate estimate?{" "}
+              <a href="/" className="underline font-medium text-[#1e2226]">
+                Check your HDB value now
+              </a>.
+            </p>
           </section>
 
           {/* Divider */}
