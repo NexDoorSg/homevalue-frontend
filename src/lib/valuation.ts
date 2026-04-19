@@ -19,7 +19,7 @@ type ValuationParams = {
   subjectStreetName?: string | null
   subjectBlockNo?: string | null
   subjectCompletionYearHdb?: number | null
-  cacheKey?: string // NEW
+  cacheKey?: string
 }
 
 type TransactionRow = {
@@ -294,14 +294,14 @@ function applyFloorAdjustment(
   }
 
   if (propertyCategory === 'ec') {
-    const adjustment = floorsAboveBase * 0.010
-    const capped = Math.min(0.20, adjustment)
+    const adjustment = floorsAboveBase * 0.0025
+    const capped = Math.min(0.05, adjustment)
     return estimate * (1 + capped)
   }
 
   // condo
-  const adjustment = floorsAboveBase * 0.012
-  const capped = Math.min(0.20, adjustment)
+  const adjustment = floorsAboveBase * 0.003
+  const capped = Math.min(0.06, adjustment)
   return estimate * (1 + capped)
 }
 
@@ -592,6 +592,30 @@ function filterByAreaRatio(
   })
 }
 
+function getCondoEcAreaBands(subjectAreaSqm: number) {
+  if (subjectAreaSqm <= 60) {
+    return {
+      strict: { min: 0.92, max: 1.08 },
+      medium: { min: 0.88, max: 1.12 },
+      wide: { min: 0.85, max: 1.15 },
+    }
+  }
+
+  if (subjectAreaSqm <= 90) {
+    return {
+      strict: { min: 0.90, max: 1.10 },
+      medium: { min: 0.85, max: 1.15 },
+      wide: { min: 0.80, max: 1.20 },
+    }
+  }
+
+  return {
+    strict: { min: 0.85, max: 1.15 },
+    medium: { min: 0.80, max: 1.20 },
+    wide: { min: 0.75, max: 1.25 },
+  }
+}
+
 function trimCondoEcOutliers(rows: CleanedRow[]) {
   if (rows.length < 5) return rows
 
@@ -622,7 +646,7 @@ function getCondoEcProjectWeight(
   const rowProject = normalizeText(row.project_name)
 
   if (!subject || !rowProject) return 1
-  if (rowProject === subject) return 5.5
+  if (rowProject === subject) return 2.2
 
   return 1
 }
@@ -655,6 +679,26 @@ function getCondoEcTenureWeight(
   return 0.82
 }
 
+function splitRowsByRecency(rows: CleanedRow[]) {
+  const fresh: CleanedRow[] = []
+  const moderate: CleanedRow[] = []
+  const stale: CleanedRow[] = []
+
+  for (const row of rows) {
+    const daysOld = getDaysOld(row.transaction_date)
+
+    if (daysOld === null || daysOld <= 180) {
+      fresh.push(row)
+    } else if (daysOld <= 365) {
+      moderate.push(row)
+    } else {
+      stale.push(row)
+    }
+  }
+
+  return { fresh, moderate, stale }
+}
+
 function selectCondoEcComparablePool(
   rows: CleanedRow[],
   floorAreaSqm: number,
@@ -663,6 +707,7 @@ function selectCondoEcComparablePool(
   subjectTenureBucket?: string
 ) {
   const normalizedSubjectProject = normalizeText(subjectProjectName)
+  const areaBands = getCondoEcAreaBands(floorAreaSqm)
 
   const sameProjectRows = normalizedSubjectProject
     ? rows.filter(
@@ -670,24 +715,45 @@ function selectCondoEcComparablePool(
       )
     : []
 
+  let preferredSameProjectRows: CleanedRow[] = []
+
   if (sameProjectRows.length >= 2) {
-    const sameProjectTight = filterByAreaRatio(
+    const sameProjectStrict = filterByAreaRatio(
       sameProjectRows,
       floorAreaSqm,
-      0.85,
-      1.15
+      areaBands.strict.min,
+      areaBands.strict.max
     )
-    if (sameProjectTight.length >= 2) return sameProjectTight
-
     const sameProjectMedium = filterByAreaRatio(
       sameProjectRows,
       floorAreaSqm,
-      0.75,
-      1.25
+      areaBands.medium.min,
+      areaBands.medium.max
     )
-    if (sameProjectMedium.length >= 2) return sameProjectMedium
+    const sameProjectWide = filterByAreaRatio(
+      sameProjectRows,
+      floorAreaSqm,
+      areaBands.wide.min,
+      areaBands.wide.max
+    )
 
-    return sameProjectRows
+    const sameProjectCandidates =
+      sameProjectStrict.length >= 2
+        ? sameProjectStrict
+        : sameProjectMedium.length >= 2
+        ? sameProjectMedium
+        : sameProjectWide.length >= 2
+        ? sameProjectWide
+        : []
+
+    if (sameProjectCandidates.length >= 2) {
+      const { fresh, moderate } = splitRowsByRecency(sameProjectCandidates)
+
+      if (fresh.length >= 2) return fresh
+      if (fresh.length + moderate.length >= 2) {
+        preferredSameProjectRows = [...fresh, ...moderate]
+      }
+    }
   }
 
   let pool = [...rows]
@@ -732,24 +798,39 @@ function selectCondoEcComparablePool(
     }
   }
 
-  const tight = filterByAreaRatio(pool, floorAreaSqm, 0.85, 1.15)
+  const tight = filterByAreaRatio(
+    pool,
+    floorAreaSqm,
+    areaBands.strict.min,
+    areaBands.strict.max
+  )
   if (tight.length >= 3) {
     pool = tight
   } else {
-    const medium = filterByAreaRatio(pool, floorAreaSqm, 0.75, 1.25)
+    const medium = filterByAreaRatio(
+      pool,
+      floorAreaSqm,
+      areaBands.medium.min,
+      areaBands.medium.max
+    )
     if (medium.length >= 3) {
       pool = medium
     } else {
-      const broad = filterByAreaRatio(pool, floorAreaSqm, 0.65, 1.35)
+      const broad = filterByAreaRatio(
+        pool,
+        floorAreaSqm,
+        areaBands.wide.min,
+        areaBands.wide.max
+      )
       if (broad.length >= 3) {
         pool = broad
       }
     }
   }
 
-  if (sameProjectRows.length > 0) {
-    const sameProjectKeys = new Set(
-      sameProjectRows.map(
+  if (preferredSameProjectRows.length > 0) {
+    const preferredKeys = new Set(
+      preferredSameProjectRows.map(
         (row) =>
           `${row.address}|${row.transaction_date}|${row.transaction_price}`
       )
@@ -757,10 +838,10 @@ function selectCondoEcComparablePool(
 
     const others = pool.filter((row) => {
       const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
-      return !sameProjectKeys.has(key)
+      return !preferredKeys.has(key)
     })
 
-    return [...sameProjectRows, ...others]
+    return [...preferredSameProjectRows, ...others]
   }
 
   return pool
@@ -795,11 +876,13 @@ function buildCondoEcCandidate(
 
     const areaRatio = row.floor_area_sqm / floorAreaSqm
     const sizeWeight =
-      areaRatio >= 0.9 && areaRatio <= 1.1
-        ? 1.2
-        : areaRatio >= 0.8 && areaRatio <= 1.2
-        ? 1.08
-        : 0.92
+      areaRatio >= 0.95 && areaRatio <= 1.05
+        ? 1.22
+        : areaRatio >= 0.9 && areaRatio <= 1.1
+        ? 1.14
+        : areaRatio >= 0.85 && areaRatio <= 1.15
+        ? 1.06
+        : 0.9
 
     const projectWeight = getCondoEcProjectWeight(row, subjectProjectName)
     const ageWeight = getCondoEcAgeWeight(row, subjectCompletionYear)
@@ -885,11 +968,13 @@ function buildCondoEcFallback(
 
     const areaRatio = row.floor_area_sqm / floorAreaSqm
     const sizeWeight =
-      areaRatio >= 0.85 && areaRatio <= 1.15
-        ? 1.15
-        : areaRatio >= 0.75 && areaRatio <= 1.25
-        ? 1.05
-        : 0.9
+      areaRatio >= 0.9 && areaRatio <= 1.1
+        ? 1.16
+        : areaRatio >= 0.85 && areaRatio <= 1.15
+        ? 1.08
+        : areaRatio >= 0.8 && areaRatio <= 1.2
+        ? 1
+        : 0.88
 
     const projectWeight = getCondoEcProjectWeight(row, subjectProjectName)
     const ageWeight = getCondoEcAgeWeight(row, subjectCompletionYear)
@@ -1383,7 +1468,6 @@ export async function getValuation({
   cacheKey,
 }: ValuationParams) {
 
-  // ── Cache read ──────────────────────────────────────────────────────────────
   if (cacheKey) {
     const cached = await readCache(cacheKey)
     if (cached) return cached
@@ -1391,9 +1475,6 @@ export async function getValuation({
 
   const searchRadius = getSearchRadius(propertyCategory)
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // HDB
-  // ═══════════════════════════════════════════════════════════════════════════
   if (propertyCategory === 'hdb') {
     const blockNo = subjectBlockNo || extractBlockNumber(subjectAddress)
     const completionYear = subjectCompletionYearHdb ?? subjectCompletionYear ?? null
@@ -1467,7 +1548,6 @@ export async function getValuation({
       return bestCandidate
     }
 
-    // HDB fallback
     const { data, error } = await fetchRowsForRadius(
       lat,
       lon,
@@ -1486,9 +1566,6 @@ export async function getValuation({
     return fallbackResult
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // LANDED
-  // ═══════════════════════════════════════════════════════════════════════════
   if (propertyCategory === 'landed') {
     if (!landSizeSqm || !builtUpSqm) {
       console.log('Missing landed land size or built-up size.')
@@ -1609,9 +1686,6 @@ export async function getValuation({
     return fallbackResult
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CONDO / EC
-  // ═══════════════════════════════════════════════════════════════════════════
   let bestCandidate: CandidateResult | null = null
 
   for (const radius of searchRadius) {
@@ -1694,7 +1768,6 @@ export async function getValuation({
     return bestCandidate
   }
 
-  // Condo/EC fallback
   const fallbackRadius = 3000
   const { data, error } = await fetchRowsForRadius(
     lat,
