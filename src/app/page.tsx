@@ -305,7 +305,7 @@ function sqmToSqft(value: number | string | null) {
 }
 
 function formatTeaserMoney(value: number | null) {
-  if (!value) return '$45X,XXX'
+  if (!value) return '$4XX,XXX'
 
   const rounded = Math.round(value).toLocaleString()
   let digitsShown = 0
@@ -314,7 +314,7 @@ function formatTeaserMoney(value: number | null) {
     .split('')
     .map((char) => {
       if (!/\d/.test(char)) return char
-      if (digitsShown < 2) {
+      if (digitsShown < 1) {
         digitsShown += 1
         return char
       }
