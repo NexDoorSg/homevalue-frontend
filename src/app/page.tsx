@@ -305,17 +305,17 @@ function sqmToSqft(value: number | string | null) {
 }
 
 function formatTeaserMoney(value: number | null) {
-  if (!value) return '$4XX,XXX'
+  if (!value) return '$45X,XXX'
 
   const rounded = Math.round(value).toLocaleString()
-  let seenFirstDigit = false
+  let digitsShown = 0
 
   const masked = rounded
     .split('')
     .map((char) => {
       if (!/\d/.test(char)) return char
-      if (!seenFirstDigit) {
-        seenFirstDigit = true
+      if (digitsShown < 2) {
+        digitsShown += 1
         return char
       }
       return 'X'
@@ -691,6 +691,7 @@ export default function Home() {
   const [numOfComps, setNumOfComps] = useState<number | null>(null)
   const [radiusUsedM, setRadiusUsedM] = useState<number | null>(null)
   const [subjectCompletionYearState, setSubjectCompletionYearState] = useState<number | null>(null)
+  const [subjectIsStrataState, setSubjectIsStrataState] = useState<boolean | null>(null)
   const [recentComparables, setRecentComparables] = useState<
     Array<{
       transaction_date: string | null
@@ -714,7 +715,10 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'same' | 'nearby'>('same')
 
   const [leadFormMessage, setLeadFormMessage] = useState('')
+  const [hasTeaser, setHasTeaser] = useState(false)
   const [hasReport, setHasReport] = useState(false)
+  const [showUnlockModal, setShowUnlockModal] = useState(false)
+  const [isUnlockingReport, setIsUnlockingReport] = useState(false)
 
   const [leadName, setLeadName] = useState('')
   const [leadPhone, setLeadPhone] = useState('')
@@ -880,12 +884,23 @@ export default function Home() {
 
   const resetResults = () => {
     setFormMessage('')
+    setLeadFormMessage('')
     setEstimatedPrice(null)
     setEstimatedLow(null)
     setEstimatedHigh(null)
     setNumOfComps(null)
     setRadiusUsedM(null)
+    setSubjectCompletionYearState(null)
+    setSubjectIsStrataState(null)
     setRecentComparables([])
+    setHasTeaser(false)
+    setHasReport(false)
+    setShowUnlockModal(false)
+    setLeadId(null)
+    setShowPlanPopup(false)
+    setPlanPopupDismissed(false)
+    setPlanPopupInteracted(false)
+    setPlanPopupStep('question')
   }
 
   const handleAddressChange = (value: string) => {
@@ -991,6 +1006,10 @@ export default function Home() {
 
   const handleGenerateReport = async (bypassMismatch = false) => {
     setFormMessage('')
+    setLeadFormMessage('')
+    setShowUnlockModal(false)
+    setHasTeaser(false)
+    setHasReport(false)
     setRecentComparables([])
   
     if (!address.trim()) {
@@ -1028,31 +1047,6 @@ export default function Home() {
         setFormMessage('Please enter a valid floor area first.')
         return
       }
-    }
-  
-    if (!leadName.trim()) {
-      setFormMessage('Please enter your name.')
-      return
-    }
-  
-    if (!leadPhone.trim()) {
-      setFormMessage('Please enter your phone number.')
-      return
-    }
-  
-    if (!isValidPhone(leadPhone)) {
-      setFormMessage('Please enter a valid phone number.')
-      return
-    }
-  
-    if (!leadEmail.trim()) {
-      setFormMessage('Please enter your email.')
-      return
-    }
-  
-    if (!isValidEmail(leadEmail)) {
-      setFormMessage('Please enter a valid email address.')
-      return
     }
   
     try {
@@ -1216,6 +1210,7 @@ export default function Home() {
         setNumOfComps(null)
         setRadiusUsedM(null)
         setFormMessage('Not enough comparable transactions found for this property yet.')
+        setHasTeaser(false)
         setHasReport(false)
         return
       }
@@ -1226,49 +1221,11 @@ export default function Home() {
       setNumOfComps(result.comparables)
       setRadiusUsedM(result.radius)
       setSubjectCompletionYearState(subjectCompletionYear)
-      setHasReport(true)
-
-      const leadPayload = {
-        ...buildLeadPayload(leadName, leadPhone, leadEmail),
-        estimated_price: result.estimated,
-        estimated_low: result.low,
-        estimated_high: result.high,
-        num_of_comps: result.comparables,
-        radius_used_m: result.radius,
-      }
-      
-      const { data: insertedLeads, error: leadInsertError } = await supabase
-        .from('leads')
-        .insert([leadPayload])
-        .select('id')
-
-      if (leadInsertError) {
-        console.error('Valuation lead save error:', leadInsertError)
-        setFormMessage(`Lead save failed: ${leadInsertError.message}`)
-      } else {
-        if (insertedLeads && insertedLeads[0]?.id) setLeadId(insertedLeads[0].id)
-
-        const emailResult = await sendLeadEmail(leadPayload)
-        if (!emailResult.ok) {
-          console.error('Lead saved but email notification failed:', emailResult.error)
-        }
-      }
-  
-      const comparables = await fetchRecentComparables(
-        resolved.lat,
-        resolved.lon,
-        propertyType,
-        propertyCategory,
-        result.radius,
-        subjectIsStrata
-      )
-  
-      setRecentComparables(comparables)
-
-      setTimeout(() => {
-        setPlanPopupStep('question')
-        setShowPlanPopup(true)
-      }, 4000)
+      setSubjectIsStrataState(subjectIsStrata)
+      setHasTeaser(true)
+      setHasReport(false)
+      setLeadFormMessage('')
+      setShowUnlockModal(false)
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -1307,7 +1264,7 @@ export default function Home() {
     return {
       name: name.trim(),
       phone: phone.trim(),
-      email: normalizedEmail,
+      email: normalizedEmail || null,
       address: propertyContextExists ? address.trim() || null : null,
       unit_number: propertyContextExists ? fullUnitNumber : null,
       unit_type: propertyContextExists ? propertyType || null : null,
@@ -1319,6 +1276,102 @@ export default function Home() {
           : null,
       tenure: propertyContextExists && propertyCategory === 'landed' ? tenure : null,
       plan: extra?.plan ?? null,
+    }
+  }
+
+  const handleUnlockFullReport = async () => {
+    setLeadFormMessage('')
+
+    if (!leadName.trim()) {
+      setLeadFormMessage('Please enter your name.')
+      return
+    }
+
+    if (!leadPhone.trim()) {
+      setLeadFormMessage('Please enter your phone number.')
+      return
+    }
+
+    if (!isValidPhone(leadPhone)) {
+      setLeadFormMessage('Please enter a valid phone number.')
+      return
+    }
+
+    if (leadEmail.trim() && !isValidEmail(leadEmail)) {
+      setLeadFormMessage('Please enter a valid email address.')
+      return
+    }
+
+    if (!estimatedPrice || !estimatedLow || !estimatedHigh || !radiusUsedM) {
+      setLeadFormMessage('Could not unlock the full report. Please try again.')
+      return
+    }
+
+    const lat = selectedLat
+    const lon = selectedLon
+
+    if (lat === null || lon === null) {
+      setLeadFormMessage('Could not match this address. Please try selecting the address again.')
+      return
+    }
+
+    try {
+      setIsUnlockingReport(true)
+
+      const leadPayload = {
+        ...buildLeadPayload(leadName, leadPhone, leadEmail),
+        estimated_price: estimatedPrice,
+        estimated_low: estimatedLow,
+        estimated_high: estimatedHigh,
+        num_of_comps: numOfComps,
+        radius_used_m: radiusUsedM,
+      }
+
+      const { data: insertedLeads, error: leadInsertError } = await supabase
+        .from('leads')
+        .insert([leadPayload])
+        .select('id')
+
+      if (leadInsertError) {
+        console.error('Valuation lead save error:', leadInsertError)
+        setLeadFormMessage(`Lead save failed: ${leadInsertError.message}`)
+        return
+      }
+
+      if (insertedLeads && insertedLeads[0]?.id) setLeadId(insertedLeads[0].id)
+
+      const emailResult = await sendLeadEmail(leadPayload)
+      if (!emailResult.ok) {
+        console.error('Lead saved but email notification failed:', emailResult.error)
+      }
+
+      const comparables = await fetchRecentComparables(
+        lat,
+        lon,
+        propertyType,
+        propertyCategory,
+        radiusUsedM,
+        subjectIsStrataState
+      )
+
+      setRecentComparables(comparables)
+      setHasReport(true)
+      setShowUnlockModal(false)
+
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+
+      setTimeout(() => {
+        setPlanPopupStep('question')
+        setPlanPopupDismissed(false)
+        setShowPlanPopup(true)
+      }, 4000)
+    } catch (error) {
+      console.error(error)
+      setLeadFormMessage('Could not unlock your full report right now. Please try again.')
+    } finally {
+      setIsUnlockingReport(false)
     }
   }
 
@@ -1434,12 +1487,7 @@ export default function Home() {
       return
     }
 
-    if (!leadEmail.trim()) {
-      setLeadFormMessage('Please enter your email.')
-      return
-    }
-
-    if (!isValidEmail(leadEmail)) {
+    if (leadEmail.trim() && !isValidEmail(leadEmail)) {
       setLeadFormMessage('Please enter a valid email address.')
       return
     }
@@ -2534,47 +2582,6 @@ export default function Home() {
                   </div>
                 )}
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      value={leadName}
-                      onChange={(e) => setLeadName(e.target.value)}
-                      placeholder="Your name"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
-                
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Phone number
-                    </label>
-                    <input
-                      type="text"
-                      value={leadPhone}
-                      onChange={(e) => setLeadPhone(e.target.value)}
-                      placeholder="Your phone number"
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={leadEmail}
-                    onChange={(e) => setLeadEmail(e.target.value)}
-                    placeholder="Your email"
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                  />
-                </div>
-                
                 <button
                   type="button"
                   onClick={() => handleGenerateReport()}
@@ -2607,6 +2614,38 @@ export default function Home() {
       )}
 
       {/* CHANGE 4: Removed top padding (py-12 → pt-2 pb-12) to close the gap */}
+
+      {!isGenerating && hasTeaser && !hasReport && (
+        <section className="bg-[#f7f4ef]">
+          <div
+            ref={resultRef}
+            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
+          >
+            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+                Estimated Home Value
+              </p>
+              <p className="mt-4 text-4xl font-semibold text-[#2d3135] md:text-5xl">
+                {formatTeaserMoney(estimatedPrice)}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[#6a727a]">
+                This is a preview based on your property details. Unlock your full result to see the exact estimated value, valuation range and comparable transactions.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLeadFormMessage('')
+                  setShowUnlockModal(true)
+                }}
+                className="mt-6 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
+              >
+                Unlock Full Home Value
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {!isGenerating && hasReport && (
         <section className="bg-[#f7f4ef]">
           <div
@@ -2764,6 +2803,86 @@ export default function Home() {
       {/* CHANGE: FAQ section — always shown */}
       {!isGenerating && <AboutHomeValueSection />}
       {!isGenerating && <FaqSection />}
+
+      {showUnlockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-[#2d3135]">
+                  Your full home value is ready
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#67707a]">
+                  Enter your details to reveal the exact estimated value and full valuation range.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowUnlockModal(false)}
+                className="rounded-full border border-[#e5dbcf] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#f8f4ef]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={leadName}
+                  onChange={(e) => setLeadName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                  Phone number
+                </label>
+                <input
+                  type="text"
+                  value={leadPhone}
+                  onChange={(e) => setLeadPhone(e.target.value)}
+                  placeholder="Your phone number"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                  Email (optional)
+                </label>
+                <input
+                  type="email"
+                  value={leadEmail}
+                  onChange={(e) => setLeadEmail(e.target.value)}
+                  placeholder="Your email"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleUnlockFullReport}
+                disabled={isUnlockingReport}
+                className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isUnlockingReport ? 'Unlocking...' : 'Show My Full Valuation'}
+              </button>
+
+              {leadFormMessage && (
+                <p className="text-sm text-[#8b6b52]">{leadFormMessage}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showMismatchModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
