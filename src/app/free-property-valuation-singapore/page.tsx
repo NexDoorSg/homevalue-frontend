@@ -2298,10 +2298,10 @@ export default function Home() {
   return (
     <>
       <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
-        <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-center px-6 py-4 md:px-10">
+        <header className="border-b border-[#ece2d7] bg-white/95">
+          <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-center px-6 py-3 md:px-10 md:py-3.5">
             <div
-              className="text-3xl tracking-tight text-black md:text-4xl"
+              className="text-[32px] tracking-tight text-black md:text-[38px]"
               style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
             >
               NexDoor.
@@ -2310,49 +2310,54 @@ export default function Home() {
         </header>
 
         <section className="border-b border-[#ede3d8] bg-[#f7f4ef]">
-          <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 py-8 md:px-10 md:py-12">
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-start lg:gap-10">
-              <div className="max-w-2xl pt-2 md:pt-4">
-                <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
+          <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 py-6 md:px-10 md:py-10">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_500px] lg:items-start lg:gap-10">
+              <div className="max-w-[620px] pt-1 md:pt-2">
+                <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
 
-                <h1 className="mt-5 text-4xl font-semibold leading-[1.02] tracking-tight text-[#23282d] sm:text-5xl lg:text-6xl">
+                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:text-[60px]">
                   How much is your home really worth?
                 </h1>
 
-                <p className="mt-4 max-w-xl text-base leading-7 text-[#5e6770] sm:text-lg">
+                <p className="mt-4 max-w-xl text-[15px] leading-7 text-[#5e6770] sm:text-[18px]">
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
-                <p className="mt-4 text-sm font-medium text-[#5e6770]">
-                  For HDB, condo, EC and landed homes.
-                </p>
-
-                <div className="mt-5 inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3.5 py-2 text-sm text-[#5e6770]">
-                  <span className="font-medium text-[#23282d]">Indicative estimate</span>
-                  <span className="mx-2 text-[#b5967c]">•</span>
-                  <span>No obligation</span>
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] font-medium text-[#5e6770] sm:text-sm">
+                  <span>HDB</span>
+                  <span className="text-[#b5967c]">•</span>
+                  <span>Condo</span>
+                  <span className="text-[#b5967c]">•</span>
+                  <span>EC</span>
+                  <span className="text-[#b5967c]">•</span>
+                  <span>Landed</span>
                 </div>
 
-                <p className="mt-4 max-w-xl text-sm leading-6 text-[#737b84]">
-                  A useful starting point before deciding whether to sell, refinance or speak to an agent.
-                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[#6e767f] sm:text-[13px]">
+                  <span className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 font-medium text-[#49515a]">
+                    Indicative estimate
+                  </span>
+                  <span>No obligation</span>
+                  <span className="hidden text-[#b5967c] sm:inline">•</span>
+                  <span>Useful before deciding whether to sell or refinance</span>
+                </div>
               </div>
 
               <div
                 id="valuation-form-card"
-                className="rounded-[28px] border border-[#e4d7ca] bg-white p-6 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-8"
+                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7"
               >
-                <div className="mb-6">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+                <div className="mb-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
                     Start your valuation
                   </p>
-                  <h2 className="mt-2 text-[30px] font-semibold leading-tight text-[#23282d] md:text-[32px]">
-                    Enter your property details
+                  <h2 className="mt-2 text-[28px] font-semibold leading-tight text-[#23282d] md:text-[30px]">
+                    Start with your property details
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-[#6a727a]">
-                    Start with the basics below to get an indicative estimate.
+                    Enter the basics below to get an indicative estimate based on recent comparable sales.
                   </p>
                 </div>
 
@@ -2542,17 +2547,17 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-8 md:mt-10">
+            <div className="mt-7 md:mt-8">
               <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6">
                 <div className="max-w-2xl">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                     What you'll get
                   </p>
-                  <h3 className="mt-2 text-2xl font-semibold text-[#23282d]">
-                    Three things to help you benchmark your next move
+                  <h3 className="mt-2 text-[26px] font-semibold leading-tight text-[#23282d]">
+                    A clearer benchmark before you decide your next move
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[#6a727a]">
-                    A fast estimate, an indicative range and recent nearby sales for context.
+                    See an estimated value, a realistic range and recent nearby sales for context.
                   </p>
                 </div>
 
@@ -2562,7 +2567,7 @@ export default function Home() {
                       Estimated value
                     </p>
                     <p className="mt-3 text-3xl font-semibold text-[#23282d]">$8XX,XXX</p>
-                    <p className="mt-3 text-sm leading-6 text-[#6a727a]">
+                    <p className="mt-2 text-sm leading-6 text-[#6a727a]">
                       A data-backed estimate based on recent comparable sales.
                     </p>
                   </div>
@@ -2574,7 +2579,7 @@ export default function Home() {
                     <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
                       $8XX,XXX –<br />$9XX,XXX
                     </p>
-                    <p className="mt-3 text-sm leading-6 text-[#6a727a]">
+                    <p className="mt-2 text-sm leading-6 text-[#6a727a]">
                       A realistic pricing band to help frame expectations.
                     </p>
                   </div>
@@ -2586,8 +2591,8 @@ export default function Home() {
                     <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
                       Recent real sales
                     </p>
-                    <p className="mt-3 text-sm leading-6 text-[#6a727a]">
-                      Nearby transaction context before speaking to an agent or bank.
+                    <p className="mt-2 text-sm leading-6 text-[#6a727a]">
+                      Useful nearby sales context before speaking to an agent or bank.
                     </p>
                   </div>
                 </div>
