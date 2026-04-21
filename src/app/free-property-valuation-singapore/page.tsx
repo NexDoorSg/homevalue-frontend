@@ -2312,9 +2312,8 @@ export default function Home() {
         <section className="border-b border-[#ede3d8] bg-[#f7f4ef]">
           <div className="mx-auto max-w-[1440px] px-6 py-6 md:px-10 md:py-10 xl:py-12">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_560px] lg:items-center lg:gap-14 xl:grid-cols-[minmax(0,1.12fr)_600px] xl:gap-16">
-              <div className="relative max-w-[760px] pt-1 md:pt-2 lg:pr-8">
-                <div className="pointer-events-none absolute -left-10 top-1 hidden h-[420px] w-[560px] rounded-[40px] border border-[#ede3d8] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.96),_rgba(247,244,239,0.65)_55%,_rgba(247,244,239,0)_80%)] shadow-[0_24px_70px_rgba(37,42,46,0.04)] lg:block" />
-                <div className="relative z-10">
+              <div className="max-w-[760px] pt-1 md:pt-2 lg:pr-8">
+                <div>
                 <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
