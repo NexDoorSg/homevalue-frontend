@@ -23,7 +23,7 @@ export default function AngMoKioValuationPage() {
 
           <div className="mt-6">
             <a
-              href="/"
+              href="/free-property-valuation-singapore"
               className="inline-block rounded-full bg-[#8b6b52] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
             >
               Get Your Free Property Valuation
@@ -79,7 +79,7 @@ export default function AngMoKioValuationPage() {
 
             <p className="mt-4 text-sm text-[#5f666d]">
               Want a more accurate estimate?{" "}
-              <a href="/" className="underline font-medium text-[#1e2226]">
+              <a href="/free-property-valuation-singapore" className="underline font-medium text-[#1e2226]">
                 Check your HDB value now
               </a>.
             </p>
