@@ -2297,122 +2297,128 @@ export default function Home() {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: [
-              {
-                '@type': 'Question',
-                name: 'How is property valuation calculated in Singapore?',
-                acceptedAnswer: {
-                  '@type': 'Answer',
-                  text: 'Property valuation is estimated using recent transaction data, comparable sales, property type, size and location. This tool uses HDB and URA data to provide an indicative value.',
-                },
-              },
-              {
-                '@type': 'Question',
-                name: 'How accurate is an online property valuation?',
-                acceptedAnswer: {
-                  '@type': 'Answer',
-                  text: 'Online property valuations provide an estimated range based on recent market transactions. They are useful as a starting point but may differ from formal bank or HDB valuations.',
-                },
-              },
-              {
-                '@type': 'Question',
-                name: 'Can I sell my property above valuation in Singapore?',
-                acceptedAnswer: {
-                  '@type': 'Answer',
-                  text: 'Yes, properties in Singapore can be sold above valuation depending on market demand, location and buyer interest. This is commonly known as Cash Over Valuation (COV).',
-                },
-              },
-              {
-                '@type': 'Question',
-                name: 'Does this work for HDB, condo and landed property?',
-                acceptedAnswer: {
-                  '@type': 'Answer',
-                  text: 'Yes, this valuation tool covers HDB flats, private condominiums, executive condominiums and landed properties across Singapore.',
-                },
-              },
-            ],
-          }),
-        }}
-      />
-
       <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
-      <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-between px-6 py-3 md:px-10">
-          <div
-            className="text-3xl tracking-tight text-black md:text-4xl"
-            style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
-          >
-            NexDoor.
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowConsultationModal(true)}
-            className="rounded-full bg-[#2f3438] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
-          >
-            Free Consultation
-          </button>
-        </div>
-      </header>
-
-      <section className="relative overflow-hidden">
-        <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
-        <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
-
-        <div className="mx-auto grid max-w-7xl 2xl:max-w-screen-2xl grid-cols-1 gap-10 px-6 py-8 md:px-10 lg:grid-cols-[1fr_1fr] lg:items-center lg:py-12">
-          
-          {/* Hero copy — hidden on mobile, shown on desktop */}
-          <div className="hidden lg:block lg:order-1 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
-              HomeValue by NexDoor
-            </p>
-            <h1 className="mt-5 text-5xl font-semibold leading-[1.15] tracking-tight text-[#2d3135] xl:text-6xl">
-              Free Property Valuation in Singapore
-              <br />
-              for HDB, Condo, EC &amp; Landed Homes
-            </h1>
-            <p className="mt-5 text-base leading-7 text-[#7a8289]">
-              Instant estimates from real Singapore transactions — no agents, no guesswork.
-            </p>
-            <div className="mt-10 border-t border-[#e8ddd2] pt-8 flex flex-col gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Powered by HDB &amp; URA transaction data</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Covers HDB, condo, EC &amp; landed</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Updated with 2026 transactions</p>
-              </div>
-            </div>
-            {/* CHANGE 5: Desktop stat cards */}
-            <div className="mt-8">
-              <StatCards />
+        <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-center px-6 py-4 md:px-10">
+            <div
+              className="text-3xl tracking-tight text-black md:text-4xl"
+              style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
+            >
+              NexDoor.
             </div>
           </div>
+        </header>
 
-          {/* Form card */}
-          <div className="order-1 lg:order-2 relative">
-            <div className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
+        <section className="relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b from-[#fbf7f2] via-[#f7f4ef] to-transparent" />
+          <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
+          <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
 
-              {/* Mobile-only compact header above form */}
-              <div className="mb-6 lg:hidden">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">HomeValue by NexDoor</p>
-                <h2 className="mt-2 text-xl font-semibold text-[#2d3135]">
-                  Free Property Valuation in Singapore
-                </h2>
+          <div className="mx-auto grid max-w-7xl 2xl:max-w-screen-2xl grid-cols-1 gap-8 px-6 py-8 md:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-12">
+            <div className="order-1">
+              <div className="inline-flex items-center rounded-full border border-[#eadfd6] bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
+                Free Property Valuation Singapore
               </div>
 
-              <div className="grid gap-4">
+              <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-tight text-[#2d3135] sm:text-5xl xl:text-6xl">
+                How much is your home really worth?
+              </h1>
+
+              <p className="mt-4 max-w-2xl text-base leading-7 text-[#66707a] sm:text-lg">
+                Get a data-driven estimate based on recent Singapore property transactions.
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2 text-sm font-medium text-[#5d6670]">
+                <span className="rounded-full border border-[#e3d6c8] bg-white/80 px-3 py-1.5">HDB</span>
+                <span className="rounded-full border border-[#e3d6c8] bg-white/80 px-3 py-1.5">Condo</span>
+                <span className="rounded-full border border-[#e3d6c8] bg-white/80 px-3 py-1.5">EC</span>
+                <span className="rounded-full border border-[#e3d6c8] bg-white/80 px-3 py-1.5">Landed</span>
+              </div>
+
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    document.getElementById('valuation-form-card')?.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'start',
+                    })
+                  }}
+                  className="rounded-2xl bg-[#2f3438] px-6 py-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
+                >
+                  Check My Property Value
+                </button>
+                <p className="text-sm text-[#7a8289]">
+                  Fast, no-obligation estimate for Singapore homeowners
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-[#eadfd6] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.05)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                    Data-backed
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#5f666d]">
+                    Based on recent HDB &amp; URA transactions
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[#eadfd6] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.05)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                    Fast
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#5f666d]">
+                    Quick estimate without booking an appointment first
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[#eadfd6] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.05)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                    Useful
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#5f666d]">
+                    See your estimated value, range and nearby transactions
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 rounded-[28px] border border-[#eadfd6] bg-white/90 p-5 shadow-[0_18px_50px_rgba(37,42,46,0.07)] sm:p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
+                  What you'll get
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-[#faf7f2] p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">Estimated value</p>
+                    <p className="mt-2 text-2xl font-semibold text-[#2d3135]">$8XX,XXX</p>
+                  </div>
+                  <div className="rounded-2xl bg-[#faf7f2] p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">Estimated range</p>
+                    <p className="mt-2 text-base font-semibold text-[#2d3135]">$8XX,XXX – $9XX,XXX</p>
+                  </div>
+                  <div className="rounded-2xl bg-[#faf7f2] p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">Nearby comps</p>
+                    <p className="mt-2 text-base font-semibold text-[#2d3135]">Recent real transactions</p>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-[#6a727a]">
+                  Enter your property details below to generate your estimate.
+                </p>
+              </div>
+            </div>
+
+            <div className="order-2 relative">
+              <div id="valuation-form-card" className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
+                <div className="mb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+                    Start your valuation
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold text-[#2d3135]">
+                    Check your property value
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#6a727a]">
+                    Enter your details below to get an estimated value based on recent market transactions.
+                  </p>
+                </div>
+
+                <div className="grid gap-4">
                 <div className="relative">
                   <label className="mb-2 block text-sm font-medium text-[#4d555d]">
                     Full address
@@ -2591,20 +2597,15 @@ export default function Home() {
                   {isGenerating ? 'Generating...' : 'See My Home Value'}
                 </button>
 
-                {/* CHANGE 6: Mobile stat cards */}
-                <div className="lg:hidden mt-1">
-                  <StatCards />
-                </div>
-
                 {formMessage && (
                   <p className="text-sm text-[#8b6b52]">{formMessage}</p>
                 )}
-              </div>
 
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
       {/* CHANGE 1: Show skeleton while generating */}
       {isGenerating && (
@@ -2629,7 +2630,7 @@ export default function Home() {
                 {formatTeaserMoney(estimatedPrice)}
               </p>
               <p className="mt-3 text-sm leading-7 text-[#6a727a]">
-                This is a preview based on your property details. Unlock your full result to see the exact estimated value, valuation range and comparable transactions.
+                This is a preview based on your property details. Enter your contact details to see the exact estimated value, valuation range and comparable transactions.
               </p>
               <button
                 type="button"
@@ -2639,7 +2640,7 @@ export default function Home() {
                 }}
                 className="mt-6 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
               >
-                Unlock Full Home Value
+                See Full Home Value
               </button>
             </div>
           </div>
@@ -2799,11 +2800,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      {/* CHANGE: FAQ section — always shown */}
-      {!isGenerating && <AboutHomeValueSection />}
-      {!isGenerating && <FaqSection />}
-
       {showUnlockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
@@ -3062,6 +3058,15 @@ export default function Home() {
           </div>
         </div>
       )}
+        {!isGenerating && (
+          <section className="bg-[#f7f4ef]">
+            <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-14 md:px-10">
+              <div className="rounded-2xl border border-[#eadfd6] bg-white p-5 text-sm leading-7 text-[#6a727a] shadow-sm">
+                Estimates are indicative only and based on recent comparable transactions. They do not replace a formal valuation by HDB, a bank, or a licensed valuer.
+              </div>
+            </div>
+          </section>
+        )}
       </main>
     </>
   )
