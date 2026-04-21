@@ -2600,7 +2600,8 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
       {/* CHANGE 1: Show skeleton while generating */}
       {isGenerating && (
