@@ -2309,297 +2309,296 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-[360px] bg-gradient-to-b from-[#fbf7f2] via-[#f7f4ef] to-transparent" />
-          <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
-          <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
-
-          <div className="mx-auto max-w-6xl px-6 py-8 md:px-10 lg:py-12">
-            <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-start lg:gap-10">
-              <div className="max-w-xl">
-                <div className="inline-flex items-center rounded-full border border-[#eadfd6] bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
+        <section className="border-b border-[#ede3d8] bg-[#f7f4ef]">
+          <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 py-8 md:px-10 md:py-12">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-start lg:gap-10">
+              <div className="max-w-2xl pt-2 md:pt-4">
+                <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
 
-                <h1 className="mt-5 text-4xl font-semibold leading-[1.02] tracking-tight text-[#2d3135] sm:text-5xl lg:text-[60px]">
+                <h1 className="mt-5 text-4xl font-semibold leading-[1.02] tracking-tight text-[#23282d] sm:text-5xl lg:text-6xl">
                   How much is your home really worth?
                 </h1>
 
-                <p className="mt-4 max-w-xl text-base leading-7 text-[#66707a] sm:text-lg">
+                <p className="mt-4 max-w-xl text-base leading-7 text-[#5e6770] sm:text-lg">
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
-                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#5f666d]">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
-                    HDB
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
-                    Condo
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
-                    EC
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
-                    Landed
-                  </span>
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[#5e6770]">
+                  <span className="font-medium text-[#23282d]">HDB</span>
+                  <span className="text-[#b5967c]">•</span>
+                  <span className="font-medium text-[#23282d]">Condo</span>
+                  <span className="text-[#b5967c]">•</span>
+                  <span className="font-medium text-[#23282d]">EC</span>
+                  <span className="text-[#b5967c]">•</span>
+                  <span className="font-medium text-[#23282d]">Landed</span>
                 </div>
 
-                <div className="mt-6 rounded-[24px] border border-[#eadfd6] bg-white/90 p-5 shadow-[0_18px_50px_rgba(37,42,46,0.06)]">
+                <div className="mt-6 inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3.5 py-2 text-sm text-[#5e6770]">
+                  <span className="font-semibold text-[#8b6b52]">Based on recent HDB &amp; URA transactions</span>
+                </div>
+
+                <p className="mt-4 max-w-xl text-sm leading-6 text-[#737b84]">
+                  Useful before speaking to an agent or bank. No obligation. Indicative estimate only.
+                </p>
+              </div>
+
+              <div
+                id="valuation-form-card"
+                className="rounded-[28px] border border-[#e4d7ca] bg-white p-6 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-8"
+              >
+                <div className="mb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+                    Start your valuation
+                  </p>
+                  <h2 className="mt-2 text-[30px] font-semibold leading-tight text-[#23282d] md:text-[32px]">
+                    Check your property value
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#6a727a]">
+                    Fill in your property details below to get your estimate.
+                  </p>
+                </div>
+
+                <div className="grid gap-4">
+                  <div className="relative">
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Full address
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 419 Woodlands Street 41"
+                      value={address}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    />
+
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-[#ddd3c7] bg-white shadow-[0_14px_40px_rgba(37,42,46,0.12)]">
+                        {suggestions.map((item, index) => (
+                          <button
+                            key={`${item.ADDRESS}-${index}`}
+                            type="button"
+                            onClick={() => handleSelectAddress(item)}
+                            className="block w-full border-b border-[#f1ebe4] px-4 py-3 text-left text-sm text-[#2d3135] hover:bg-[#f8f4ef] last:border-b-0"
+                          >
+                            <div className="font-medium">{item.ADDRESS}</div>
+                            {item.POSTAL && (
+                              <div className="mt-1 text-xs text-[#7a8289]">
+                                Singapore {item.POSTAL}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedLat && selectedLon && (
+                    <p className="text-sm font-medium text-green-600">
+                      Address matched successfully.
+                    </p>
+                  )}
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                      Property type
+                    </label>
+                    <select
+                      value={propertyType}
+                      onChange={(e) => setPropertyType(e.target.value)}
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    >
+                      <option value="" disabled>Select a property type</option>
+                      <optgroup label="HDB">
+                        <option value="2 ROOM">2 Room</option>
+                        <option value="3 ROOM">3 Room</option>
+                        <option value="4 ROOM">4 Room</option>
+                        <option value="5 ROOM">5 Room</option>
+                        <option value="EXECUTIVE">Executive</option>
+                      </optgroup>
+                      <optgroup label="Condominium">
+                        <option value="1 BEDROOM">Condo 1 Bed</option>
+                        <option value="2 BEDROOM">Condo 2 Bed</option>
+                        <option value="3 BEDROOM">Condo 3 Bed</option>
+                        <option value="4 BEDROOM">Condo 4 Bed</option>
+                        <option value="5 BEDROOM">Condo 5 Bed+</option>
+                        <option value="PENTHOUSE">Penthouse</option>
+                      </optgroup>
+                      <optgroup label="EC / Privatised EC">
+                        <option value="2 BEDROOM EC">EC 2 Bed</option>
+                        <option value="3 BEDROOM EC">EC 3 Bed</option>
+                        <option value="4 BEDROOM EC">EC 4 Bed</option>
+                        <option value="5 BEDROOM EC">EC 5 Bed+</option>
+                      </optgroup>
+                      <optgroup label="Landed">
+                        <option value="TERRACE HOUSE">Terrace</option>
+                        <option value="SEMI-DETACHED HOUSE">Semi-D</option>
+                        <option value="DETACHED HOUSE">Detached</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  {propertyCategory === 'landed' ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                            Land size (sqft)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 3200"
+                            value={landSizeSqm}
+                            onChange={(e) => setLandSizeSqm(e.target.value)}
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                            Built-up size (sqft)
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 4500"
+                            value={builtUpSqm}
+                            onChange={(e) => setBuiltUpSqm(e.target.value)}
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                          Tenure
+                        </label>
+                        <select
+                          value={tenure}
+                          onChange={(e) => setTenure(e.target.value)}
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        >
+                          {TENURE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                          Floor area (sqft)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 990"
+                          value={floorAreaSqm}
+                          onChange={(e) => setFloorAreaSqm(e.target.value)}
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                            Floor level <span className="text-[#9aa0a6]">(optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 11"
+                            value={floorLevel}
+                            onChange={(e) => setFloorLevel(e.target.value)}
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-[#4d555d]">
+                            Stack number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 389"
+                            value={stackNumber}
+                            onChange={(e) => setStackNumber(e.target.value)}
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateReport()}
+                    disabled={isGenerating}
+                    className="mt-2 w-full rounded-2xl bg-[#2f3438] px-5 py-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isGenerating ? 'Generating...' : 'See My Home Value'}
+                  </button>
+
+                  {formMessage && (
+                    <p className="text-sm text-[#8b6b52]">{formMessage}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 md:mt-10">
+              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6">
+                <div className="max-w-2xl">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
                     What you'll get
                   </p>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-[#faf7f2] p-4 min-h-[148px]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
-                        Estimated value
-                      </p>
-                      <p className="mt-3 text-2xl font-semibold leading-none text-[#2d3135]">
-                        $8XX,XXX
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-[#66707a]">
-                        A data-backed estimate for your property.
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-[#faf7f2] p-4 min-h-[148px]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
-                        Indicative range
-                      </p>
-                      <p className="mt-3 text-lg font-semibold leading-tight text-[#2d3135]">
-                        $8XX,XXX –<br />$9XX,XXX
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-[#66707a]">
-                        A realistic pricing band based on comparable sales.
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-[#faf7f2] p-4 min-h-[148px]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
-                        Nearby transactions
-                      </p>
-                      <p className="mt-3 text-lg font-semibold leading-tight text-[#2d3135]">
-                        Recent real<br />transactions
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-[#66707a]">
-                        Useful context before speaking to an agent or bank.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative">
-                <div
-                  id="valuation-form-card"
-                  className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8"
-                >
-                  <div className="mb-6">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
-                      Start your valuation
-                    </p>
-                    <h2 className="mt-2 text-2xl font-semibold text-[#2d3135]">
-                      Check your property value
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-[#6a727a]">
-                      Enter your details below to get an estimated value based on recent market transactions.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-4">
-                <div className="relative">
-                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                    Full address
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 419 Woodlands Street 41"
-                    value={address}
-                    onChange={(e) => handleAddressChange(e.target.value)}
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                  />
-
-                  {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-[#ddd3c7] bg-white shadow-[0_14px_40px_rgba(37,42,46,0.12)]">
-                      {suggestions.map((item, index) => (
-                        <button
-                          key={`${item.ADDRESS}-${index}`}
-                          type="button"
-                          onClick={() => handleSelectAddress(item)}
-                          className="block w-full border-b border-[#f1ebe4] px-4 py-3 text-left text-sm text-[#2d3135] hover:bg-[#f8f4ef] last:border-b-0"
-                        >
-                          <div className="font-medium">{item.ADDRESS}</div>
-                          {item.POSTAL && (
-                            <div className="mt-1 text-xs text-[#7a8289]">
-                              Singapore {item.POSTAL}
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {selectedLat && selectedLon && (
-                  <p className="text-sm font-medium text-green-600">
-                    Address matched successfully.
+                  <h3 className="mt-2 text-2xl font-semibold text-[#23282d]">
+                    A clearer starting point before you make your next move
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-[#6a727a]">
+                    Enter your details to view a fast estimate built from nearby comparable sales.
                   </p>
-                )}
-                
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                    Property type
-                  </label>
-                  <select
-                    value={propertyType}
-                    onChange={(e) => setPropertyType(e.target.value)}
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                  >
-                    <option value="" disabled>Select a property type</option>
-                    <optgroup label="HDB">
-                      <option value="2 ROOM">2 Room</option>
-                      <option value="3 ROOM">3 Room</option>
-                      <option value="4 ROOM">4 Room</option>
-                      <option value="5 ROOM">5 Room</option>
-                      <option value="EXECUTIVE">Executive</option>
-                    </optgroup>
-                    <optgroup label="Condominium">
-                      <option value="1 BEDROOM">Condo 1 Bed</option>
-                      <option value="2 BEDROOM">Condo 2 Bed</option>
-                      <option value="3 BEDROOM">Condo 3 Bed</option>
-                      <option value="4 BEDROOM">Condo 4 Bed</option>
-                      <option value="5 BEDROOM">Condo 5 Bed+</option>
-                      <option value="PENTHOUSE">Penthouse</option>
-                    </optgroup>
-                    <optgroup label="EC / Privatised EC">
-                      <option value="2 BEDROOM EC">EC 2 Bed</option>
-                      <option value="3 BEDROOM EC">EC 3 Bed</option>
-                      <option value="4 BEDROOM EC">EC 4 Bed</option>
-                      <option value="5 BEDROOM EC">EC 5 Bed+</option>
-                    </optgroup>
-                    <optgroup label="Landed">
-                      <option value="TERRACE HOUSE">Terrace</option>
-                      <option value="SEMI-DETACHED HOUSE">Semi-D</option>
-                      <option value="DETACHED HOUSE">Detached</option>
-                    </optgroup>
-                  </select>
                 </div>
-                
-                {propertyCategory !== 'landed' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                        Floor level
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 11"
-                        value={floorLevel}
-                        onChange={(e) => setFloorLevel(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                        Stack number
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 389"
-                        value={stackNumber}
-                        onChange={(e) => setStackNumber(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                      />
-                    </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                      Estimated value
+                    </p>
+                    <p className="mt-3 text-3xl font-semibold text-[#23282d]">$8XX,XXX</p>
+                    <p className="mt-3 text-sm leading-6 text-[#6a727a]">
+                      A data-backed estimate based on recent comparable transactions.
+                    </p>
                   </div>
-                )}
 
-                {propertyCategory === 'landed' ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                          Land size (sqft)
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 3200"
-                          value={landSizeSqm}
-                          onChange={(e) => setLandSizeSqm(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                        />
-                      </div>
-                
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                          Built-up size (sqft)
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 4500"
-                          value={builtUpSqm}
-                          onChange={(e) => setBuiltUpSqm(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                        />
-                      </div>
-                    </div>
-                
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                        Tenure
-                      </label>
-                      <select
-                        value={tenure}
-                        onChange={(e) => setTenure(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                      >
-                        {TENURE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                      Floor area (sqft)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 990"
-                      value={floorAreaSqm}
-                      onChange={(e) => setFloorAreaSqm(e.target.value)}
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
-                    />
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                      Indicative range
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
+                      $8XX,XXX –<br />$9XX,XXX
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-[#6a727a]">
+                      A realistic pricing band to help you benchmark expectations.
+                    </p>
                   </div>
-                )}
-                
-                <button
-                  type="button"
-                  onClick={() => handleGenerateReport()}
-                  disabled={isGenerating}
-                  className="mt-2 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isGenerating ? 'Generating...' : 'See My Home Value'}
-                </button>
 
-                {formMessage && (
-                  <p className="text-sm text-[#8b6b52]">{formMessage}</p>
-                )}
-
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                      Nearby transactions
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
+                      Recent real sales
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-[#6a727a]">
+                      Useful context before speaking to an agent or bank.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
+        </section>
       {/* CHANGE 1: Show skeleton while generating */}
       {isGenerating && (
         <div ref={resultRef}>
