@@ -2325,22 +2325,18 @@ export default function Home() {
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
-                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[#5e6770]">
-                  <span className="font-medium text-[#23282d]">HDB</span>
-                  <span className="text-[#b5967c]">•</span>
-                  <span className="font-medium text-[#23282d]">Condo</span>
-                  <span className="text-[#b5967c]">•</span>
-                  <span className="font-medium text-[#23282d]">EC</span>
-                  <span className="text-[#b5967c]">•</span>
-                  <span className="font-medium text-[#23282d]">Landed</span>
-                </div>
+                <p className="mt-4 text-sm font-medium text-[#5e6770]">
+                  For HDB, condo, EC and landed homes.
+                </p>
 
-                <div className="mt-6 inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3.5 py-2 text-sm text-[#5e6770]">
-                  <span className="font-semibold text-[#8b6b52]">Based on recent HDB &amp; URA transactions</span>
+                <div className="mt-5 inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3.5 py-2 text-sm text-[#5e6770]">
+                  <span className="font-medium text-[#23282d]">Indicative estimate</span>
+                  <span className="mx-2 text-[#b5967c]">•</span>
+                  <span>No obligation</span>
                 </div>
 
                 <p className="mt-4 max-w-xl text-sm leading-6 text-[#737b84]">
-                  Useful before speaking to an agent or bank. No obligation. Indicative estimate only.
+                  A useful starting point before deciding whether to sell, refinance or speak to an agent.
                 </p>
               </div>
 
@@ -2353,10 +2349,10 @@ export default function Home() {
                     Start your valuation
                   </p>
                   <h2 className="mt-2 text-[30px] font-semibold leading-tight text-[#23282d] md:text-[32px]">
-                    Check your property value
+                    Enter your property details
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-[#6a727a]">
-                    Fill in your property details below to get your estimate.
+                    Start with the basics below to get an indicative estimate.
                   </p>
                 </div>
 
@@ -2553,10 +2549,10 @@ export default function Home() {
                     What you'll get
                   </p>
                   <h3 className="mt-2 text-2xl font-semibold text-[#23282d]">
-                    A clearer starting point before you make your next move
+                    Three things to help you benchmark your next move
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[#6a727a]">
-                    Enter your details to view a fast estimate built from nearby comparable sales.
+                    A fast estimate, an indicative range and recent nearby sales for context.
                   </p>
                 </div>
 
@@ -2567,7 +2563,7 @@ export default function Home() {
                     </p>
                     <p className="mt-3 text-3xl font-semibold text-[#23282d]">$8XX,XXX</p>
                     <p className="mt-3 text-sm leading-6 text-[#6a727a]">
-                      A data-backed estimate based on recent comparable transactions.
+                      A data-backed estimate based on recent comparable sales.
                     </p>
                   </div>
 
@@ -2579,7 +2575,7 @@ export default function Home() {
                       $8XX,XXX –<br />$9XX,XXX
                     </p>
                     <p className="mt-3 text-sm leading-6 text-[#6a727a]">
-                      A realistic pricing band to help you benchmark expectations.
+                      A realistic pricing band to help frame expectations.
                     </p>
                   </div>
 
@@ -2591,7 +2587,7 @@ export default function Home() {
                       Recent real sales
                     </p>
                     <p className="mt-3 text-sm leading-6 text-[#6a727a]">
-                      Useful context before speaking to an agent or bank.
+                      Nearby transaction context before speaking to an agent or bank.
                     </p>
                   </div>
                 </div>
@@ -3054,7 +3050,7 @@ export default function Home() {
           <section className="bg-[#f7f4ef]">
             <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-14 md:px-10">
               <div className="rounded-2xl border border-[#eadfd6] bg-white p-5 text-sm leading-7 text-[#6a727a] shadow-sm">
-                Estimates are indicative only and based on recent comparable transactions. They do not replace a formal valuation by HDB, a bank, or a licensed valuer.
+                Estimates are indicative only and based on recent comparable transactions. They do not replace a formal valuation by HDB, a bank or a licensed valuer.
               </div>
             </div>
           </section>
