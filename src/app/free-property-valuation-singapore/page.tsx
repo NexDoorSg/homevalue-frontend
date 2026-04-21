@@ -2309,19 +2309,23 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="border-b border-[#ede3d8] bg-[#f7f4ef]">
-          <div className="mx-auto max-w-7xl 2xl:max-w-[1480px] px-6 py-6 md:px-10 md:py-10 lg:py-14">
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,680px)_460px] lg:items-center lg:justify-between lg:gap-16">
-              <div className="max-w-[620px] pt-1 md:pt-2 lg:max-w-[680px] lg:pt-4">
+        <section className="relative overflow-hidden border-b border-[#ede3d8] bg-[#f7f4ef]">
+          <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-[58%] lg:block">
+            <div className="absolute left-[12%] top-10 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,_rgba(233,222,210,0.55)_0%,_rgba(247,244,239,0)_72%)]" />
+            <div className="absolute bottom-0 left-[24%] h-[260px] w-[420px] rounded-full bg-[radial-gradient(circle,_rgba(255,255,255,0.9)_0%,_rgba(247,244,239,0)_75%)]" />
+          </div>
+          <div className="relative mx-auto max-w-7xl px-6 py-6 md:px-10 md:py-10 lg:max-w-[1580px] lg:py-16 2xl:max-w-[1680px]">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,760px)_540px] lg:items-start lg:justify-between lg:gap-20 xl:grid-cols-[minmax(0,820px)_560px] xl:gap-24">
+              <div className="max-w-[620px] pt-1 md:pt-2 lg:max-w-[760px] lg:pt-8">
                 <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
 
-                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:max-w-[640px] lg:text-[68px]">
+                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:max-w-[720px] lg:text-[76px] xl:text-[82px]">
                   How much is your home really worth?
                 </h1>
 
-                <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-[#5e6770] sm:text-[18px] lg:text-[19px]">
+                <p className="mt-5 max-w-[620px] text-[15px] leading-7 text-[#5e6770] sm:text-[18px] lg:text-[20px] lg:leading-8">
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
@@ -2335,7 +2339,7 @@ export default function Home() {
                   <span>Landed</span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[#6e767f] sm:text-[13px]">
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[#6e767f] sm:text-[13px] lg:text-[14px]">
                   <span className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 font-medium text-[#49515a]">
                     Indicative estimate
                   </span>
@@ -2343,11 +2347,26 @@ export default function Home() {
                   <span className="hidden text-[#b5967c] sm:inline">•</span>
                   <span>Useful before deciding whether to sell or refinance</span>
                 </div>
+
+                <div className="mt-7 hidden lg:grid lg:max-w-[700px] lg:grid-cols-3 lg:gap-4">
+                  <div className="rounded-2xl border border-[#eadfd3] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.04)] backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Data-backed</p>
+                    <p className="mt-2 text-sm leading-6 text-[#5e6770]">Based on recent HDB and URA comparable sales.</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#eadfd3] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.04)] backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Fast start</p>
+                    <p className="mt-2 text-sm leading-6 text-[#5e6770]">Enter the basics first and get your estimate flow started quickly.</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#eadfd3] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.04)] backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Useful context</p>
+                    <p className="mt-2 text-sm leading-6 text-[#5e6770]">See a value range and nearby sales before your next move.</p>
+                  </div>
+                </div>
               </div>
 
               <div
                 id="valuation-form-card"
-                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:p-8"
+                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:sticky lg:top-8 lg:p-8 xl:p-9"
               >
                 <div className="mb-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
@@ -2547,9 +2566,9 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-7 md:mt-8 lg:mt-10">
-              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 lg:px-7 lg:py-6">
-                <div className="max-w-2xl">
+            <div className="mt-7 md:mt-8 lg:mt-12">
+              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 lg:px-8 lg:py-7">
+                <div className="max-w-3xl lg:max-w-[860px]">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                     What you'll get
                   </p>
@@ -2561,7 +2580,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-3 lg:gap-4">
+                <div className="mt-6 grid gap-3 md:grid-cols-3 lg:gap-5">
                   <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Estimated value
