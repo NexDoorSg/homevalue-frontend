@@ -1022,8 +1022,8 @@ export default function Home() {
       return
     }
   
-    if (propertyCategory !== 'landed' && !stackNumber.trim()) {
-      setFormMessage('Please enter your stack number.')
+    if (propertyCategory !== 'landed' && !floorLevel.trim()) {
+      setFormMessage('Please enter your floor level.')
       return
     }
   
@@ -2507,7 +2507,7 @@ export default function Home() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="mb-2 block text-sm font-medium text-[#4d555d]">
-                            Floor level <span className="text-[#9aa0a6]">(optional)</span>
+                            Floor level
                           </label>
                           <input
                             type="text"
