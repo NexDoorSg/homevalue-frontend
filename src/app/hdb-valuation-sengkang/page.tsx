@@ -79,7 +79,7 @@ export default function SengkangValuationPage() {
 
             <p className="mt-4 text-sm text-[#5f666d]">
               Want a more accurate estimate?{" "}
-              <a href="/" className="underline font-medium text-[#1e2226]">
+              <a href="/free-property-valuation-singapore" className="underline font-medium text-[#1e2226]">
                 Check your HDB value now
               </a>.
             </p>
