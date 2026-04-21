@@ -2310,22 +2310,23 @@ export default function Home() {
         </header>
 
         <section className="relative overflow-hidden border-b border-[#ede3d8] bg-[#f7f4ef]">
-          <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-[58%] lg:block">
-            <div className="absolute left-[12%] top-10 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,_rgba(233,222,210,0.55)_0%,_rgba(247,244,239,0)_72%)]" />
-            <div className="absolute bottom-0 left-[24%] h-[260px] w-[420px] rounded-full bg-[radial-gradient(circle,_rgba(255,255,255,0.9)_0%,_rgba(247,244,239,0)_75%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-[440px] lg:block">
+            <div className="absolute left-[8%] top-10 h-64 w-64 rounded-full bg-[#efe3d7]/70 blur-3xl" />
+            <div className="absolute left-[30%] top-24 h-56 w-56 rounded-full bg-white/80 blur-3xl" />
           </div>
-          <div className="relative mx-auto max-w-7xl px-6 py-6 md:px-10 md:py-10 lg:max-w-[1580px] lg:py-16 2xl:max-w-[1680px]">
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,760px)_540px] lg:items-start lg:justify-between lg:gap-20 xl:grid-cols-[minmax(0,820px)_560px] xl:gap-24">
-              <div className="max-w-[620px] pt-1 md:pt-2 lg:max-w-[760px] lg:pt-8">
+
+          <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 py-6 md:px-10 md:py-10">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_560px] lg:items-start lg:gap-12 xl:grid-cols-[minmax(0,1.15fr)_600px] xl:gap-14">
+              <div className="relative max-w-[620px] pt-1 md:pt-2 lg:max-w-[760px] lg:pt-4">
                 <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
 
-                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:max-w-[720px] lg:text-[76px] xl:text-[82px]">
+                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:max-w-[12ch] lg:text-[64px] xl:text-[72px]">
                   How much is your home really worth?
                 </h1>
 
-                <p className="mt-5 max-w-[620px] text-[15px] leading-7 text-[#5e6770] sm:text-[18px] lg:text-[20px] lg:leading-8">
+                <p className="mt-4 max-w-xl text-[15px] leading-7 text-[#5e6770] sm:text-[18px] lg:max-w-[36rem] lg:text-[19px]">
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
@@ -2339,7 +2340,7 @@ export default function Home() {
                   <span>Landed</span>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[#6e767f] sm:text-[13px] lg:text-[14px]">
+                <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[#6e767f] sm:text-[13px]">
                   <span className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 font-medium text-[#49515a]">
                     Indicative estimate
                   </span>
@@ -2348,25 +2349,50 @@ export default function Home() {
                   <span>Useful before deciding whether to sell or refinance</span>
                 </div>
 
-                <div className="mt-7 hidden lg:grid lg:max-w-[700px] lg:grid-cols-3 lg:gap-4">
-                  <div className="rounded-2xl border border-[#eadfd3] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.04)] backdrop-blur-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Data-backed</p>
-                    <p className="mt-2 text-sm leading-6 text-[#5e6770]">Based on recent HDB and URA comparable sales.</p>
+                <div className="mt-7 hidden lg:grid lg:max-w-[560px] lg:grid-cols-[1.1fr_0.9fr] lg:gap-4">
+                  <div className="rounded-[24px] border border-[#e4d7ca] bg-white/90 p-5 shadow-[0_16px_40px_rgba(37,42,46,0.06)] backdrop-blur-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                        Sample preview
+                      </p>
+                      <span className="rounded-full bg-[#f7f4ef] px-2.5 py-1 text-[11px] font-medium text-[#6e767f]">
+                        Desktop view
+                      </span>
+                    </div>
+
+                    <div className="mt-4 rounded-[20px] border border-[#efe6dc] bg-[#fbf8f3] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                        Estimated value
+                      </p>
+                      <p className="mt-2 text-[34px] font-semibold leading-none text-[#23282d]">$8XX,XXX</p>
+                      <p className="mt-3 text-sm leading-6 text-[#6a727a]">
+                        Indicative range and nearby transactions appear below once the valuation is generated.
+                      </p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl border border-[#eadfd3] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.04)] backdrop-blur-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Fast start</p>
-                    <p className="mt-2 text-sm leading-6 text-[#5e6770]">Enter the basics first and get your estimate flow started quickly.</p>
-                  </div>
-                  <div className="rounded-2xl border border-[#eadfd3] bg-white/85 p-4 shadow-[0_10px_30px_rgba(37,42,46,0.04)] backdrop-blur-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Useful context</p>
-                    <p className="mt-2 text-sm leading-6 text-[#5e6770]">See a value range and nearby sales before your next move.</p>
+
+                  <div className="rounded-[24px] border border-[#e8ddd2] bg-[#fbf8f3] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                      Before you start
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl border border-[#efe6dc] bg-white px-4 py-3 text-sm text-[#4f5760]">
+                        Full address
+                      </div>
+                      <div className="rounded-2xl border border-[#efe6dc] bg-white px-4 py-3 text-sm text-[#4f5760]">
+                        Property type
+                      </div>
+                      <div className="rounded-2xl border border-[#efe6dc] bg-white px-4 py-3 text-sm text-[#4f5760]">
+                        Floor area
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div
                 id="valuation-form-card"
-                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:sticky lg:top-8 lg:p-8 xl:p-9"
+                className="relative rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:mt-2 lg:p-8"
               >
                 <div className="mb-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
@@ -2566,36 +2592,36 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-7 md:mt-8 lg:mt-12">
-              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 lg:px-8 lg:py-7">
-                <div className="max-w-3xl lg:max-w-[860px]">
+            <div className="mt-7 md:mt-8 lg:mt-9">
+              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 lg:p-7">
+                <div className="max-w-2xl lg:max-w-3xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                     What you'll get
                   </p>
-                  <h3 className="mt-2 text-[26px] font-semibold leading-tight text-[#23282d]">
+                  <h3 className="mt-2 text-[26px] font-semibold leading-tight text-[#23282d] lg:text-[30px]">
                     A clearer benchmark before you decide your next move
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#6a727a]">
+                  <p className="mt-2 text-sm leading-6 text-[#6a727a] lg:text-[15px]">
                     See an estimated value, a realistic range and recent nearby sales for context.
                   </p>
                 </div>
 
-                <div className="mt-6 grid gap-3 md:grid-cols-3 lg:gap-5">
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
+                <div className="mt-5 grid gap-3 md:grid-cols-3 lg:gap-4">
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5 lg:p-6">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Estimated value
                     </p>
-                    <p className="mt-3 text-3xl font-semibold text-[#23282d]">$8XX,XXX</p>
+                    <p className="mt-3 text-3xl font-semibold text-[#23282d] lg:text-[34px]">$8XX,XXX</p>
                     <p className="mt-2 text-sm leading-6 text-[#6a727a]">
                       A data-backed estimate based on recent comparable sales.
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5 lg:p-6">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Indicative range
                     </p>
-                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
+                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d] lg:text-[30px]">
                       $8XX,XXX –<br />$9XX,XXX
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[#6a727a]">
@@ -2603,11 +2629,11 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5 lg:p-6">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Nearby transactions
                     </p>
-                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
+                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d] lg:text-[30px]">
                       Recent real sales
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[#6a727a]">
