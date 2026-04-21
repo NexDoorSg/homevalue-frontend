@@ -2309,111 +2309,108 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="relative border-b border-[#eee5dc] bg-[linear-gradient(180deg,#fffdf9_0%,#f8f3ec_100%)]">
-          <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 py-8 md:px-10 md:py-12">
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)] lg:items-start">
-              <div className="order-2 lg:order-1">
-                <div className="inline-flex items-center rounded-full border border-[#e5d9cc] bg-white px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52] shadow-sm">
+        <section className="relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-[360px] bg-gradient-to-b from-[#fbf7f2] via-[#f7f4ef] to-transparent" />
+          <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
+          <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
+
+          <div className="mx-auto max-w-6xl px-6 py-8 md:px-10 lg:py-12">
+            <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-start lg:gap-10">
+              <div className="max-w-xl">
+                <div className="inline-flex items-center rounded-full border border-[#eadfd6] bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
 
-                <h1 className="mt-6 max-w-3xl text-[40px] font-semibold leading-[1.02] tracking-[-0.03em] text-[#1f2529] sm:text-5xl xl:text-[64px]">
+                <h1 className="mt-5 text-4xl font-semibold leading-[1.02] tracking-tight text-[#2d3135] sm:text-5xl lg:text-[60px]">
                   How much is your home really worth?
                 </h1>
 
-                <p className="mt-5 max-w-2xl text-base leading-7 text-[#5f666d] sm:text-lg">
+                <p className="mt-4 max-w-xl text-base leading-7 text-[#66707a] sm:text-lg">
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
-                <div className="mt-6 flex flex-wrap gap-2.5 text-sm font-medium text-[#525a61]">
-                  {['HDB', 'Condo', 'EC', 'Landed'].map((label) => (
-                    <span key={label} className="rounded-full border border-[#e5d9cc] bg-white px-4 py-2 shadow-sm">
-                      {label}
-                    </span>
-                  ))}
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#5f666d]">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
+                    HDB
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
+                    Condo
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
+                    EC
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#b97a56]" />
+                    Landed
+                  </span>
                 </div>
 
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      document.getElementById('valuation-form-card')?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start',
-                      })
-                    }}
-                    className="inline-flex items-center justify-center rounded-2xl bg-[#2f3438] px-6 py-4 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
-                  >
-                    Check My Property Value
-                  </button>
-                  <p className="text-sm text-[#6d757d]">
-                    Fast, no-obligation estimate for Singapore homeowners
+                <div className="mt-6 rounded-[24px] border border-[#eadfd6] bg-white/90 p-5 shadow-[0_18px_50px_rgba(37,42,46,0.06)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">
+                    What you'll get
                   </p>
-                </div>
 
-                <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-3xl border border-[#e7ddd4] bg-white p-5 shadow-[0_10px_28px_rgba(37,42,46,0.05)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Data-backed</p>
-                    <p className="mt-2 text-sm leading-6 text-[#5f666d]">Based on recent HDB &amp; URA transactions</p>
-                  </div>
-                  <div className="rounded-3xl border border-[#e7ddd4] bg-white p-5 shadow-[0_10px_28px_rgba(37,42,46,0.05)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Fast</p>
-                    <p className="mt-2 text-sm leading-6 text-[#5f666d]">Quick estimate without booking an appointment first</p>
-                  </div>
-                  <div className="rounded-3xl border border-[#e7ddd4] bg-white p-5 shadow-[0_10px_28px_rgba(37,42,46,0.05)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">What you get</p>
-                    <p className="mt-2 text-sm leading-6 text-[#5f666d]">Estimated value, range and nearby comparable sales</p>
-                  </div>
-                </div>
-
-                <div className="mt-8 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                  <div className="rounded-[28px] border border-[#e7ddd4] bg-white p-6 shadow-[0_16px_40px_rgba(37,42,46,0.06)] sm:p-7">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">What you'll get</p>
-                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl bg-[#faf6f1] p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">Estimated value</p>
-                        <p className="mt-2 text-2xl font-semibold text-[#1f2529]">$8XX,XXX</p>
-                      </div>
-                      <div className="rounded-2xl bg-[#faf6f1] p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">Valuation range</p>
-                        <p className="mt-2 text-sm font-semibold text-[#1f2529] sm:text-base">$8XX,XXX – $9XX,XXX</p>
-                      </div>
-                      <div className="rounded-2xl bg-[#faf6f1] p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">Nearby comps</p>
-                        <p className="mt-2 text-sm font-semibold text-[#1f2529] sm:text-base">Recent real transactions</p>
-                      </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-[#faf7f2] p-4 min-h-[148px]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                        Estimated value
+                      </p>
+                      <p className="mt-3 text-2xl font-semibold leading-none text-[#2d3135]">
+                        $8XX,XXX
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-[#66707a]">
+                        A data-backed estimate for your property.
+                      </p>
                     </div>
-                    <p className="mt-4 text-sm leading-6 text-[#6a727a]">
-                      Enter your property details to generate your estimate in under a minute.
-                    </p>
-                  </div>
 
-                  <div className="rounded-[28px] border border-[#e7ddd4] bg-[#fffaf4] p-6 shadow-[0_16px_40px_rgba(37,42,46,0.05)] sm:p-7">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">Why people use this</p>
-                    <ul className="mt-4 space-y-3 text-sm leading-6 text-[#5f666d]">
-                      <li className="flex gap-3"><span className="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-[#b77a57]" />Get a clearer sense of your asking price before selling</li>
-                      <li className="flex gap-3"><span className="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-[#b77a57]" />Check how your home compares with nearby recent sales</li>
-                      <li className="flex gap-3"><span className="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-[#b77a57]" />Useful starting point before speaking to an agent or bank</li>
-                    </ul>
+                    <div className="rounded-2xl bg-[#faf7f2] p-4 min-h-[148px]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                        Indicative range
+                      </p>
+                      <p className="mt-3 text-lg font-semibold leading-tight text-[#2d3135]">
+                        $8XX,XXX –<br />$9XX,XXX
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-[#66707a]">
+                        A realistic pricing band based on comparable sales.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-[#faf7f2] p-4 min-h-[148px]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                        Nearby transactions
+                      </p>
+                      <p className="mt-3 text-lg font-semibold leading-tight text-[#2d3135]">
+                        Recent real<br />transactions
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-[#66707a]">
+                        Useful context before speaking to an agent or bank.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="order-1 relative lg:order-2 lg:sticky lg:top-6">
-              <div id="valuation-form-card" className="rounded-[32px] border border-[#e3d6c8] bg-white p-6 shadow-[0_26px_80px_rgba(37,42,46,0.12)] md:p-8">
-                <div className="mb-6 border-b border-[#f0e7de] pb-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
-                    Start your valuation
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold text-[#2d3135]">
-                    Check your property value
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-[#6a727a]">
-                    Enter your property details below to get an estimated value based on recent market transactions.
-                  </p>
-                </div>
+              <div className="relative">
+                <div
+                  id="valuation-form-card"
+                  className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8"
+                >
+                  <div className="mb-6">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+                      Start your valuation
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-[#2d3135]">
+                      Check your property value
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-[#6a727a]">
+                      Enter your details below to get an estimated value based on recent market transactions.
+                    </p>
+                  </div>
 
-                <div className="grid gap-4">
+                  <div className="grid gap-4">
                 <div className="relative">
                   <label className="mb-2 block text-sm font-medium text-[#4d555d]">
                     Full address
@@ -2423,7 +2420,7 @@ export default function Home() {
                     placeholder="e.g. 419 Woodlands Street 41"
                     value={address}
                     onChange={(e) => handleAddressChange(e.target.value)}
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                   />
 
                   {showSuggestions && suggestions.length > 0 && (
@@ -2460,7 +2457,7 @@ export default function Home() {
                   <select
                     value={propertyType}
                     onChange={(e) => setPropertyType(e.target.value)}
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                   >
                     <option value="" disabled>Select a property type</option>
                     <optgroup label="HDB">
@@ -2503,7 +2500,7 @@ export default function Home() {
                         placeholder="e.g. 11"
                         value={floorLevel}
                         onChange={(e) => setFloorLevel(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                       />
                     </div>
                     <div>
@@ -2515,7 +2512,7 @@ export default function Home() {
                         placeholder="e.g. 389"
                         value={stackNumber}
                         onChange={(e) => setStackNumber(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                       />
                     </div>
                   </div>
@@ -2533,7 +2530,7 @@ export default function Home() {
                           placeholder="e.g. 3200"
                           value={landSizeSqm}
                           onChange={(e) => setLandSizeSqm(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                         />
                       </div>
                 
@@ -2546,7 +2543,7 @@ export default function Home() {
                           placeholder="e.g. 4500"
                           value={builtUpSqm}
                           onChange={(e) => setBuiltUpSqm(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                         />
                       </div>
                     </div>
@@ -2558,7 +2555,7 @@ export default function Home() {
                       <select
                         value={tenure}
                         onChange={(e) => setTenure(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                       >
                         {TENURE_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -2578,7 +2575,7 @@ export default function Home() {
                       placeholder="e.g. 990"
                       value={floorAreaSqm}
                       onChange={(e) => setFloorAreaSqm(e.target.value)}
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
                     />
                   </div>
                 )}
@@ -2587,7 +2584,7 @@ export default function Home() {
                   type="button"
                   onClick={() => handleGenerateReport()}
                   disabled={isGenerating}
-                  className="mt-3 rounded-2xl bg-[#2f3438] px-5 py-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="mt-2 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isGenerating ? 'Generating...' : 'See My Home Value'}
                 </button>
@@ -2600,8 +2597,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
       {/* CHANGE 1: Show skeleton while generating */}
       {isGenerating && (
@@ -2616,7 +2612,7 @@ export default function Home() {
         <section className="bg-[#f7f4ef]">
           <div
             ref={resultRef}
-            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-6 pb-12 md:px-10"
+            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
           >
             <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
@@ -2647,7 +2643,7 @@ export default function Home() {
         <section className="bg-[#f7f4ef]">
           <div
             ref={resultRef}
-            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-6 pb-12 md:px-10"
+            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
           >
             {/* Valuation Summary */}
             <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
