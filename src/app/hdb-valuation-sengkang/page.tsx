@@ -23,7 +23,7 @@ export default function SengkangValuationPage() {
 
           <div className="mt-6">
             <a
-              href="/"
+              href="/free-property-valuation-singapore"
               className="inline-block rounded-full bg-[#8b6b52] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
             >
               Get Your Free Property Valuation
