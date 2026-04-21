@@ -2300,12 +2300,20 @@ export default function Home() {
       <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
         <header className="border-b border-[#ece2d7] bg-white/95">
           <div className="mx-auto flex max-w-[1440px] items-center justify-center px-6 py-3 md:px-10 md:py-3.5">
-            <div
-              className="text-[32px] tracking-tight text-black md:text-[38px]"
-              style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
+            <a
+              href="https://www.nexdoor.sg"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block"
+              aria-label="Visit NexDoor website"
             >
-              NexDoor.
-            </div>
+              <div
+                className="cursor-pointer text-[32px] tracking-tight text-black md:text-[38px]"
+                style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
+              >
+                NexDoor.
+              </div>
+            </a>
           </div>
         </header>
 
