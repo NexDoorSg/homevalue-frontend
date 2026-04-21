@@ -143,7 +143,7 @@ function StatCards() {
 function AboutHomeValueSection() {
   return (
     <section className="bg-[#f7f4ef]">
-      <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-6 md:px-10">
+      <div className="mx-auto max-w-[1440px] px-6 pb-6 md:px-10">
         <div className="rounded-[32px] border border-[#eadfd6] bg-white/90 p-6 shadow-[0_20px_60px_rgba(54,69,79,0.08)] sm:p-8">
           <div className="max-w-4xl">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">About HomeValue</p>
@@ -173,7 +173,7 @@ function FaqSection() {
 
   return (
     <section className="bg-[#f7f4ef]">
-      <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-16 md:px-10">
+      <div className="mx-auto max-w-[1440px] px-6 pb-16 md:px-10">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">FAQ</p>
         <h2 className="text-2xl font-semibold text-[#1e2226] mb-8 md:text-3xl">Frequently asked questions</h2>
         <div className="rounded-2xl border border-[#e5dbcf] bg-white px-6 md:px-8">
@@ -581,7 +581,7 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
           width: 0%;
         }
       `}</style>
-      <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-6 pb-12 md:px-10">
+      <div className="mx-auto max-w-[1440px] px-6 pt-6 pb-12 md:px-10">
         {/* Loading bar */}
         <div className="flex flex-col items-center mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">
@@ -2299,7 +2299,7 @@ export default function Home() {
     <>
       <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
         <header className="border-b border-[#ece2d7] bg-white/95">
-          <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-center px-6 py-3 md:px-10 md:py-3.5">
+          <div className="mx-auto flex max-w-[1440px] items-center justify-center px-6 py-3 md:px-10 md:py-3.5">
             <div
               className="text-[32px] tracking-tight text-black md:text-[38px]"
               style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
@@ -2309,24 +2309,21 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="relative overflow-hidden border-b border-[#ede3d8] bg-[#f7f4ef]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-[440px] lg:block">
-            <div className="absolute left-[8%] top-10 h-64 w-64 rounded-full bg-[#efe3d7]/70 blur-3xl" />
-            <div className="absolute left-[30%] top-24 h-56 w-56 rounded-full bg-white/80 blur-3xl" />
-          </div>
-
-          <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 py-6 md:px-10 md:py-10">
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_560px] lg:items-start lg:gap-12 xl:grid-cols-[minmax(0,1.15fr)_600px] xl:gap-14">
-              <div className="relative max-w-[620px] pt-1 md:pt-2 lg:max-w-[760px] lg:pt-4">
+        <section className="border-b border-[#ede3d8] bg-[#f7f4ef]">
+          <div className="mx-auto max-w-[1440px] px-6 py-6 md:px-10 md:py-10 xl:py-12">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_560px] lg:items-center lg:gap-14 xl:grid-cols-[minmax(0,1.12fr)_600px] xl:gap-16">
+              <div className="relative max-w-[760px] pt-1 md:pt-2 lg:pr-8">
+                <div className="pointer-events-none absolute -left-10 top-1 hidden h-[420px] w-[560px] rounded-[40px] border border-[#ede3d8] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.96),_rgba(247,244,239,0.65)_55%,_rgba(247,244,239,0)_80%)] shadow-[0_24px_70px_rgba(37,42,46,0.04)] lg:block" />
+                <div className="relative z-10">
                 <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
 
-                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:max-w-[12ch] lg:text-[64px] xl:text-[72px]">
+                <h1 className="mt-4 max-w-[12ch] text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:text-[68px] xl:text-[76px]">
                   How much is your home really worth?
                 </h1>
 
-                <p className="mt-4 max-w-xl text-[15px] leading-7 text-[#5e6770] sm:text-[18px] lg:max-w-[36rem] lg:text-[19px]">
+                <p className="mt-4 max-w-[34rem] text-[15px] leading-7 text-[#5e6770] sm:text-[18px] lg:text-[19px]">
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
@@ -2341,58 +2338,19 @@ export default function Home() {
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[#6e767f] sm:text-[13px]">
-                  <span className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 font-medium text-[#49515a]">
+                  <span className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 font-medium text-[#49515a] shadow-[0_6px_16px_rgba(37,42,46,0.04)]">
                     Indicative estimate
                   </span>
                   <span>No obligation</span>
                   <span className="hidden text-[#b5967c] sm:inline">•</span>
                   <span>Useful before deciding whether to sell or refinance</span>
                 </div>
-
-                <div className="mt-7 hidden lg:grid lg:max-w-[560px] lg:grid-cols-[1.1fr_0.9fr] lg:gap-4">
-                  <div className="rounded-[24px] border border-[#e4d7ca] bg-white/90 p-5 shadow-[0_16px_40px_rgba(37,42,46,0.06)] backdrop-blur-sm">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
-                        Sample preview
-                      </p>
-                      <span className="rounded-full bg-[#f7f4ef] px-2.5 py-1 text-[11px] font-medium text-[#6e767f]">
-                        Desktop view
-                      </span>
-                    </div>
-
-                    <div className="mt-4 rounded-[20px] border border-[#efe6dc] bg-[#fbf8f3] p-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
-                        Estimated value
-                      </p>
-                      <p className="mt-2 text-[34px] font-semibold leading-none text-[#23282d]">$8XX,XXX</p>
-                      <p className="mt-3 text-sm leading-6 text-[#6a727a]">
-                        Indicative range and nearby transactions appear below once the valuation is generated.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[24px] border border-[#e8ddd2] bg-[#fbf8f3] p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
-                      Before you start
-                    </p>
-                    <div className="mt-4 space-y-3">
-                      <div className="rounded-2xl border border-[#efe6dc] bg-white px-4 py-3 text-sm text-[#4f5760]">
-                        Full address
-                      </div>
-                      <div className="rounded-2xl border border-[#efe6dc] bg-white px-4 py-3 text-sm text-[#4f5760]">
-                        Property type
-                      </div>
-                      <div className="rounded-2xl border border-[#efe6dc] bg-white px-4 py-3 text-sm text-[#4f5760]">
-                        Floor area
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
 
               <div
                 id="valuation-form-card"
-                className="relative rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:mt-2 lg:p-8"
+                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:p-8 xl:p-9"
               >
                 <div className="mb-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
@@ -2592,36 +2550,36 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-7 md:mt-8 lg:mt-9">
-              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 lg:p-7">
-                <div className="max-w-2xl lg:max-w-3xl">
+            <div className="mt-6 md:mt-7 xl:mt-8">
+              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 xl:p-7">
+                <div className="max-w-2xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                     What you'll get
                   </p>
-                  <h3 className="mt-2 text-[26px] font-semibold leading-tight text-[#23282d] lg:text-[30px]">
+                  <h3 className="mt-2 text-[26px] font-semibold leading-tight text-[#23282d]">
                     A clearer benchmark before you decide your next move
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#6a727a] lg:text-[15px]">
+                  <p className="mt-2 text-sm leading-6 text-[#6a727a]">
                     See an estimated value, a realistic range and recent nearby sales for context.
                   </p>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-3 lg:gap-4">
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5 lg:p-6">
+                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Estimated value
                     </p>
-                    <p className="mt-3 text-3xl font-semibold text-[#23282d] lg:text-[34px]">$8XX,XXX</p>
+                    <p className="mt-3 text-3xl font-semibold text-[#23282d]">$8XX,XXX</p>
                     <p className="mt-2 text-sm leading-6 text-[#6a727a]">
                       A data-backed estimate based on recent comparable sales.
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5 lg:p-6">
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Indicative range
                     </p>
-                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d] lg:text-[30px]">
+                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
                       $8XX,XXX –<br />$9XX,XXX
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[#6a727a]">
@@ -2629,11 +2587,11 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5 lg:p-6">
+                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Nearby transactions
                     </p>
-                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d] lg:text-[30px]">
+                    <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
                       Recent real sales
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[#6a727a]">
@@ -2658,7 +2616,7 @@ export default function Home() {
         <section className="bg-[#f7f4ef]">
           <div
             ref={resultRef}
-            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
+            className="mx-auto max-w-[1440px] px-6 pt-2 pb-12 md:px-10"
           >
             <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
@@ -2689,7 +2647,7 @@ export default function Home() {
         <section className="bg-[#f7f4ef]">
           <div
             ref={resultRef}
-            className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
+            className="mx-auto max-w-[1440px] px-6 pt-2 pb-12 md:px-10"
           >
             {/* Valuation Summary */}
             <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
@@ -3098,7 +3056,7 @@ export default function Home() {
       )}
         {!isGenerating && (
           <section className="bg-[#f7f4ef]">
-            <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-14 md:px-10">
+            <div className="mx-auto max-w-[1440px] px-6 pb-14 md:px-10">
               <div className="rounded-2xl border border-[#eadfd6] bg-white p-5 text-sm leading-7 text-[#6a727a] shadow-sm">
                 Estimates are indicative only and based on recent comparable transactions. They do not replace a formal valuation by HDB, a bank or a licensed valuer.
               </div>
