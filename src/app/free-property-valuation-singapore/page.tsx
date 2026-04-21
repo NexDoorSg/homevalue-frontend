@@ -2310,18 +2310,18 @@ export default function Home() {
         </header>
 
         <section className="border-b border-[#ede3d8] bg-[#f7f4ef]">
-          <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 py-6 md:px-10 md:py-10">
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_500px] lg:items-start lg:gap-10">
-              <div className="max-w-[620px] pt-1 md:pt-2">
+          <div className="mx-auto max-w-7xl 2xl:max-w-[1480px] px-6 py-6 md:px-10 md:py-10 lg:py-14">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,680px)_460px] lg:items-center lg:justify-between lg:gap-16">
+              <div className="max-w-[620px] pt-1 md:pt-2 lg:max-w-[680px] lg:pt-4">
                 <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                   Free Property Valuation Singapore
                 </div>
 
-                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:text-[60px]">
+                <h1 className="mt-4 text-[40px] font-semibold leading-[0.98] tracking-tight text-[#23282d] sm:text-[52px] lg:max-w-[640px] lg:text-[68px]">
                   How much is your home really worth?
                 </h1>
 
-                <p className="mt-4 max-w-xl text-[15px] leading-7 text-[#5e6770] sm:text-[18px]">
+                <p className="mt-5 max-w-[560px] text-[15px] leading-7 text-[#5e6770] sm:text-[18px] lg:text-[19px]">
                   Get a fast, data-driven estimate based on recent HDB and URA transactions in Singapore.
                 </p>
 
@@ -2347,7 +2347,7 @@ export default function Home() {
 
               <div
                 id="valuation-form-card"
-                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7"
+                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:p-8"
               >
                 <div className="mb-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
@@ -2547,8 +2547,8 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-7 md:mt-8">
-              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6">
+            <div className="mt-7 md:mt-8 lg:mt-10">
+              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 lg:px-7 lg:py-6">
                 <div className="max-w-2xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
                     What you'll get
@@ -2561,7 +2561,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="mt-5 grid gap-3 md:grid-cols-3 lg:gap-4">
                   <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
                       Estimated value
