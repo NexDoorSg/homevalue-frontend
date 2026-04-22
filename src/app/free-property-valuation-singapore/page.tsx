@@ -4,6 +4,12 @@ import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
 
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void
+  }
+}
+
 type OneMapResult = {
   ADDRESS: string
   LATITUDE: string
@@ -18,13 +24,6 @@ type PropertyTypeOption = {
   label: string
   value: string
   category: 'hdb' | 'condo' | 'ec' | 'landed'
-}
-
-
-declare global {
-  interface Window {
-    fbq?: (...args: unknown[]) => void
-  }
 }
 
 type ComparableRow = {
@@ -209,6 +208,13 @@ function FaqSection() {
   )
 }
 
+
+function trackMetaLead() {
+  if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+    window.fbq('track', 'Lead')
+  }
+}
+
 function getPropertyCategoryFromType(
   propertyType: string
 ): 'hdb' | 'condo' | 'ec' | 'landed' {
@@ -292,13 +298,6 @@ function buildLookupCandidates(item: OneMapResult) {
   }
 
   return Array.from(candidates).filter(Boolean)
-}
-
-function trackMetaLead() {
-  if (typeof window === 'undefined') return
-  if (typeof window.fbq !== 'function') return
-
-  window.fbq('track', 'Lead')
 }
 
 function formatMoney(value: number | null) {
