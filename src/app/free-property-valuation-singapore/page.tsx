@@ -3054,13 +3054,6 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={handlePopupDismiss}
-                  className="mt-5 w-full text-center text-xs text-[#9aa0a6] underline underline-offset-2"
-                >
-                  Maybe later
-                </button>
               </>
             ) : (
               /* CHANGE 3: Confirmation card with close button */
