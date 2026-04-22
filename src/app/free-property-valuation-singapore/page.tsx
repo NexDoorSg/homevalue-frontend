@@ -20,6 +20,13 @@ type PropertyTypeOption = {
   category: 'hdb' | 'condo' | 'ec' | 'landed'
 }
 
+
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void
+  }
+}
+
 type ComparableRow = {
   address: string | null
   street_name?: string | null
@@ -285,6 +292,13 @@ function buildLookupCandidates(item: OneMapResult) {
   }
 
   return Array.from(candidates).filter(Boolean)
+}
+
+function trackMetaLead() {
+  if (typeof window === 'undefined') return
+  if (typeof window.fbq !== 'function') return
+
+  window.fbq('track', 'Lead')
 }
 
 function formatMoney(value: number | null) {
@@ -1340,6 +1354,8 @@ export default function Home() {
 
       if (insertedLeads && insertedLeads[0]?.id) setLeadId(insertedLeads[0].id)
 
+      trackMetaLead()
+
       const emailResult = await sendLeadEmail(leadPayload)
       if (!emailResult.ok) {
         console.error('Lead saved but email notification failed:', emailResult.error)
@@ -1450,6 +1466,8 @@ export default function Home() {
       return
     }
 
+    trackMetaLead()
+
     const emailResult = await sendLeadEmail({
       ...leadPayload,
       source: 'consultation',
@@ -1508,6 +1526,8 @@ export default function Home() {
       setLeadFormMessage('Could not save your details right now. Please try again.')
       return
     }
+
+    trackMetaLead()
 
     const emailResult = await sendLeadEmail(leadPayload)
 
