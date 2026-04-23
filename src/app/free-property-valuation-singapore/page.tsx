@@ -737,6 +737,7 @@ export default function Home() {
   const [leadPhone, setLeadPhone] = useState('')
   const [leadEmail, setLeadEmail] = useState('')
   const [leadId, setLeadId] = useState<number | null>(null)
+  const [partialLeadSaved, setPartialLeadSaved] = useState(false)
   const [showPlanPopup, setShowPlanPopup] = useState(false)
   const [planPopupStep, setPlanPopupStep] = useState<'question' | 'confirm'>('question')
   const [planPopupInteracted, setPlanPopupInteracted] = useState(false)
@@ -910,6 +911,7 @@ export default function Home() {
     setHasReport(false)
     setShowUnlockModal(false)
     setLeadId(null)
+    setPartialLeadSaved(false)
     setShowPlanPopup(false)
     setPlanPopupDismissed(false)
     setPlanPopupInteracted(false)
@@ -1272,6 +1274,14 @@ export default function Home() {
       setHasReport(false)
       setLeadFormMessage('')
       setShowUnlockModal(false)
+
+      void savePartialLead({
+        estimated_price: result.estimated,
+        estimated_low: result.low,
+        estimated_high: result.high,
+        num_of_comps: result.comparables,
+        radius_used_m: result.radius,
+      })
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -1322,6 +1332,63 @@ export default function Home() {
           : null,
       tenure: propertyContextExists && propertyCategory === 'landed' ? tenure : null,
       plan: extra?.plan ?? null,
+    }
+  }
+
+
+  const buildPartialLeadPayload = (values: {
+    estimated_price: number
+    estimated_low: number
+    estimated_high: number
+    num_of_comps: number
+    radius_used_m: number
+  }) => {
+    const fullUnitNumber =
+      floorLevel.trim() && stackNumber.trim()
+        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
+        : null
+
+    return {
+      source_page: '/free-property-valuation-singapore',
+      address: address.trim() || null,
+      unit_number: fullUnitNumber,
+      unit_type: propertyType || null,
+      floor_area_sqm:
+        propertyCategory === 'landed'
+          ? Number(sqftToSqm(builtUpSqm)) || null
+          : Number(sqftToSqm(floorAreaSqm)) || null,
+      tenure: propertyCategory === 'landed' ? tenure : null,
+      estimated_price: values.estimated_price,
+      estimated_low: values.estimated_low,
+      estimated_high: values.estimated_high,
+      num_of_comps: values.num_of_comps,
+      radius_used_m: values.radius_used_m,
+      status: 'partial',
+    }
+  }
+
+  const savePartialLead = async (values: {
+    estimated_price: number
+    estimated_low: number
+    estimated_high: number
+    num_of_comps: number
+    radius_used_m: number
+  }) => {
+    if (partialLeadSaved) return
+
+    try {
+      const partialLeadPayload = buildPartialLeadPayload(values)
+
+      const { error } = await supabase.from('partial_leads').insert([partialLeadPayload])
+
+      if (error) {
+        console.error('Partial lead save error:', error)
+        return
+      }
+
+      setPartialLeadSaved(true)
+    } catch (error) {
+      console.error('Partial lead save error:', error)
     }
   }
 
