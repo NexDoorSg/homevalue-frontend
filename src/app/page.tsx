@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Head from 'next/head'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
 
@@ -118,48 +119,26 @@ const FAQ_ITEMS = [
 ]
 
 // ─── Stat cards ───────────────────────────────────────────────────────────────
-function StatCards() {
-  return (
-    <div className="flex gap-0 border-t border-[#e8ddd2] pt-6">
-      <div className="flex-1 pr-6 border-r border-[#e8ddd2]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Team Experience</p>
-        <p className="mt-1.5 text-3xl font-semibold leading-none text-[#2d3135]">600+</p>
-        <p className="mt-1.5 text-[11px] text-[#9aa0a6]">Transactions combined</p>
-      </div>
-      <div className="flex-1 pl-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Limited Offer</p>
-        <p className="mt-1.5 text-3xl font-semibold leading-none text-[#2d3135]">0% GST</p>
-        <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#f5c4b3] bg-[#fff3f0] px-2 py-0.5 text-[10px] font-semibold text-[#c0442a]">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c0442a]" />
-          Slots running out fast
-        </span>
-      </div>
-    </div>
-  )
-}
-
 // ─── FAQ accordion ────────────────────────────────────────────────────────────
 
 function AboutHomeValueSection() {
   return (
-    <section className="bg-[#f7f4ef]">
+    <section className="bg-[#f8f1e7]">
       <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-6 md:px-10">
-        <div className="rounded-[32px] border border-[#eadfd6] bg-white/90 p-6 shadow-[0_20px_60px_rgba(54,69,79,0.08)] sm:p-8">
+        <div className="rounded-[32px] border border-[#ead7c6] bg-[#fffaf5] p-6 shadow-[0_20px_60px_rgba(73,47,28,0.08)] sm:p-8">
           <div className="max-w-4xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">About HomeValue</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b76633]">About HomeValue</p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#2d3135] sm:text-3xl">
-              Understand your property’s estimated value before you sell
+              A faster way to understand your home’s estimated value
             </h2>
             <p className="mt-4 text-sm leading-7 text-[#5f666d] sm:text-base">
-              HomeValue by NexDoor is a free property valuation tool for homeowners in
-              Singapore. It uses recent HDB and URA transaction data to generate an
-              estimated value for HDB flats, condos, ECs and landed homes.
+              HomeValue by NexDoor is a free property valuation tool for homeowners in Singapore.
+              It uses recent HDB and URA transaction data to estimate values for HDB flats,
+              condos, ECs and landed homes.
             </p>
             <p className="mt-4 text-sm leading-7 text-[#5f666d] sm:text-base">
-              This gives you a useful starting point before deciding on your asking
-              price, marketing strategy or next move. While it is not a formal bank or
-              HDB valuation, it helps you understand where your home may sit in today’s
-              market based on recent comparable transactions.
+              Use it as a starting point before deciding whether to sell, refinance or simply
+              understand where your property may sit in today’s market.
             </p>
           </div>
         </div>
@@ -172,20 +151,20 @@ function FaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <section className="bg-[#f7f4ef]">
+    <section className="bg-[#f8f1e7]">
       <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pb-16 md:px-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">FAQ</p>
-        <h2 className="text-2xl font-semibold text-[#1e2226] mb-8 md:text-3xl">Frequently asked questions</h2>
-        <div className="rounded-2xl border border-[#e5dbcf] bg-white px-6 md:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b76633] mb-3">FAQ</p>
+        <h2 className="text-2xl font-semibold text-[#1e2226] mb-8 md:text-3xl">Questions homeowners often ask</h2>
+        <div className="rounded-2xl border border-[#ead7c6] bg-white px-6 md:px-8">
           {FAQ_ITEMS.map((item, i) => (
-            <div key={i} className="border-b border-[#e8ddd2] last:border-b-0">
+            <div key={i} className="border-b border-[#ead7c6] last:border-b-0">
               <button
                 type="button"
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
                 className="flex w-full items-center justify-between gap-4 py-5 text-left"
               >
                 <span className="text-sm font-semibold text-[#1e2226] leading-snug md:text-base">{item.q}</span>
-                <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] text-sm transition-colors ${openIndex === i ? 'border-[#8b6b52] bg-[#8b6b52] text-white' : 'border-[#b09880] text-[#8b6b52]'}`}>
+                <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] text-sm transition-colors ${openIndex === i ? 'border-[#b76633] bg-[#b76633] text-white' : 'border-[#b09880] text-[#b76633]'}`}>
                   {openIndex === i ? '−' : '+'}
                 </span>
               </button>
@@ -548,7 +527,7 @@ type EmailResult = {
 // ─── Loading skeleton component ───────────────────────────────────────────────
 function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'landed' }) {
   return (
-    <section className="bg-[#f7f4ef]">
+    <section className="bg-[#f8f1e7]">
       <style>{`
         @keyframes shimmer {
           0% { background-position: -600px 0; }
@@ -575,7 +554,7 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
         .load-bar-fill {
           height: 100%;
           border-radius: 99px;
-          background: linear-gradient(90deg, #8b6b52, #b08060, #8b6b52);
+          background: linear-gradient(90deg, #b76633, #b08060, #b76633);
           background-size: 400px 100%;
           animation: loadbar 4s ease-out forwards, barshine 1.2s linear infinite;
           width: 0%;
@@ -584,26 +563,26 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
       <div className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-6 pb-12 md:px-10">
         {/* Loading bar */}
         <div className="flex flex-col items-center mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b76633] mb-3">
             Analysing transactions
           </p>
-          <div className="w-full max-w-sm h-1.5 bg-[#e8ddd2] rounded-full overflow-hidden">
+          <div className="w-full max-w-sm h-1.5 bg-[#ead7c6] rounded-full overflow-hidden">
             <div className="load-bar-fill" />
           </div>
           <LoadingStatusMessage />
         </div>
 
         {/* Skeleton summary card */}
-        <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8 mb-10">
+        <div className="rounded-2xl border border-[#ead7c6] bg-white p-6 shadow-sm md:p-8 mb-10">
           <div className="sk w-36 h-3 mb-5" />
           <div className="sk w-64 h-12 rounded-xl mb-3" />
           <div className="sk w-48 h-3.5 mb-8" />
-          <div className="flex gap-8 border-t border-[#e8ddd2] pt-6">
-            <div className="border-l border-[#e8ddd2] pl-6">
+          <div className="flex gap-8 border-t border-[#ead7c6] pt-6">
+            <div className="border-l border-[#ead7c6] pl-6">
               <div className="sk w-16 h-2.5 mb-2" />
               <div className="sk w-24 h-7 rounded-md" />
             </div>
-            <div className="border-l border-[#e8ddd2] pl-6">
+            <div className="border-l border-[#ead7c6] pl-6">
               <div className="sk w-28 h-2.5 mb-2" />
               <div className="sk w-14 h-7 rounded-md" />
               <div className="sk w-20 h-2 mt-2" />
@@ -621,8 +600,8 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
         )}
 
         {/* Skeleton table */}
-        <div className="rounded-2xl border border-[#e5dbcf] bg-white overflow-hidden">
-          <div className="grid grid-cols-4 gap-0 px-5 py-3 border-b border-[#e8ddd2]">
+        <div className="rounded-2xl border border-[#ead7c6] bg-white overflow-hidden">
+          <div className="grid grid-cols-4 gap-0 px-5 py-3 border-b border-[#ead7c6]">
             {[36, 60, 32, 40].map((w, i) => (
               <div key={i} className="sk h-3" style={{ width: w }} />
             ))}
@@ -2275,21 +2254,21 @@ export default function Home() {
       </div>
       <div className="flex flex-wrap gap-1.5">
         <span className="text-xs font-medium text-[#2d3135] bg-[#f0ece6] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">Price: </span>{formatMoney(row.transaction_price)}
+          <span className="text-[#b76633] font-semibold">Price: </span>{formatMoney(row.transaction_price)}
         </span>
-        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">PSF: </span>${Math.round(row.psf).toLocaleString()}
+        <span className="text-xs text-[#67707a] bg-[#f8f1e7] rounded-md px-2 py-1">
+          <span className="text-[#b76633] font-semibold">PSF: </span>${Math.round(row.psf).toLocaleString()}
         </span>
-        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">Size: </span>{sqmToSqft(row.floor_area_sqm)} sqft
+        <span className="text-xs text-[#67707a] bg-[#f8f1e7] rounded-md px-2 py-1">
+          <span className="text-[#b76633] font-semibold">Size: </span>{sqmToSqft(row.floor_area_sqm)} sqft
         </span>
         {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
-          <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-            <span className="text-[#8b6b52] font-semibold">Tenure: </span>{formatTenure(row.tenure)}
+          <span className="text-xs text-[#67707a] bg-[#f8f1e7] rounded-md px-2 py-1">
+            <span className="text-[#b76633] font-semibold">Tenure: </span>{formatTenure(row.tenure)}
           </span>
         )}
-        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">Dist: </span>{Math.round(row.distance_m)}m
+        <span className="text-xs text-[#67707a] bg-[#f8f1e7] rounded-md px-2 py-1">
+          <span className="text-[#b76633] font-semibold">Dist: </span>{Math.round(row.distance_m)}m
         </span>
       </div>
     </div>
@@ -2297,6 +2276,13 @@ export default function Home() {
 
   return (
     <>
+      <Head>
+        <title>Free Property Valuation Singapore | HDB, Condo, EC & Landed | HomeValue by NexDoor</title>
+        <meta
+          name="description"
+          content="Get a fast, data-driven property valuation in Singapore using recent HDB and URA transaction data. Check estimated values for HDB, condo, EC and landed homes."
+        />
+      </Head>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -2341,20 +2327,23 @@ export default function Home() {
         }}
       />
 
-      <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
-      <header className="border-b border-[#e8ddd2] bg-white/90 backdrop-blur">
+      <main className="min-h-screen bg-[#f8f1e7] text-[#2f3438]">
+      <header className="border-b border-[#ead7c6] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-between px-6 py-3 md:px-10">
-          <div
-            className="text-3xl tracking-tight text-black md:text-4xl"
+          <a
+            href="https://www.nexdoor.sg"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-3xl tracking-tight text-black transition hover:opacity-80 md:text-4xl"
             style={{ fontFamily: '"Frank Ruehl BT", Georgia, "Times New Roman", serif' }}
           >
             NexDoor.
-          </div>
+          </a>
 
           <button
             type="button"
             onClick={() => setShowConsultationModal(true)}
-            className="rounded-full bg-[#2f3438] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
+            className="rounded-full bg-[#b76633] px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(183,102,51,0.22)] transition hover:bg-[#9f5629]"
           >
             Free Consultation
           </button>
@@ -2362,14 +2351,14 @@ export default function Home() {
       </header>
 
       <section className="relative overflow-hidden">
-        <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#d8c0a8]/20 blur-3xl" />
+        <div className="absolute left-[-120px] top-[-80px] h-72 w-72 rounded-full bg-[#e7b48b]/20 blur-3xl" />
         <div className="absolute right-[-80px] top-[60px] h-80 w-80 rounded-full bg-[#36454f]/10 blur-3xl" />
 
         <div className="mx-auto grid max-w-7xl 2xl:max-w-screen-2xl grid-cols-1 gap-10 px-6 py-8 md:px-10 lg:grid-cols-[1fr_1fr] lg:items-center lg:py-12">
           
           {/* Hero copy — hidden on mobile, shown on desktop */}
           <div className="hidden lg:block lg:order-1 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#b76633]">
               HomeValue by NexDoor
             </p>
             <h1 className="mt-5 text-5xl font-semibold leading-[1.15] tracking-tight text-[#2d3135] xl:text-6xl">
@@ -2378,35 +2367,31 @@ export default function Home() {
               for HDB, Condo, EC &amp; Landed Homes
             </h1>
             <p className="mt-5 text-base leading-7 text-[#7a8289]">
-              Instant estimates from real Singapore transactions — no agents, no guesswork.
+              Get a fast estimate based on recent HDB & URA transactions in Singapore.
             </p>
-            <div className="mt-10 border-t border-[#e8ddd2] pt-8 flex flex-col gap-4">
+            <div className="mt-10 border-t border-[#ead7c6] pt-8 flex flex-col gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Powered by HDB &amp; URA transaction data</p>
+                <div className="h-1.5 w-1.5 rounded-full bg-[#b76633] flex-shrink-0" />
+                <p className="text-sm text-[#67707a]">Powered by recent HDB &amp; URA data</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
+                <div className="h-1.5 w-1.5 rounded-full bg-[#b76633] flex-shrink-0" />
                 <p className="text-sm text-[#67707a]">Covers HDB, condo, EC &amp; landed</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#8b6b52] flex-shrink-0" />
-                <p className="text-sm text-[#67707a]">Updated with 2026 transactions</p>
+                <div className="h-1.5 w-1.5 rounded-full bg-[#b76633] flex-shrink-0" />
+                <p className="text-sm text-[#67707a]">Indicative estimate in minutes</p>
               </div>
-            </div>
-            {/* CHANGE 5: Desktop stat cards */}
-            <div className="mt-8">
-              <StatCards />
             </div>
           </div>
 
           {/* Form card */}
           <div className="order-1 lg:order-2 relative">
-            <div className="rounded-[28px] border border-[#e3d6c8] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
+            <div className="rounded-[28px] border border-[#ead7c6] bg-white/95 p-6 shadow-[0_24px_70px_rgba(37,42,46,0.10)] backdrop-blur md:p-8">
 
               {/* Mobile-only compact header above form */}
               <div className="mb-6 lg:hidden">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">HomeValue by NexDoor</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b76633]">HomeValue by NexDoor</p>
                 <h2 className="mt-2 text-xl font-semibold text-[#2d3135]">
                   Free Property Valuation in Singapore
                 </h2>
@@ -2422,17 +2407,17 @@ export default function Home() {
                     placeholder="e.g. 419 Woodlands Street 41"
                     value={address}
                     onChange={(e) => handleAddressChange(e.target.value)}
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                   />
 
                   {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-[#ddd3c7] bg-white shadow-[0_14px_40px_rgba(37,42,46,0.12)]">
+                    <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-[#ead7c6] bg-white shadow-[0_14px_40px_rgba(37,42,46,0.12)]">
                       {suggestions.map((item, index) => (
                         <button
                           key={`${item.ADDRESS}-${index}`}
                           type="button"
                           onClick={() => handleSelectAddress(item)}
-                          className="block w-full border-b border-[#f1ebe4] px-4 py-3 text-left text-sm text-[#2d3135] hover:bg-[#f8f4ef] last:border-b-0"
+                          className="block w-full border-b border-[#f6ede4] px-4 py-3 text-left text-sm text-[#2d3135] hover:bg-[#fff6ec] last:border-b-0"
                         >
                           <div className="font-medium">{item.ADDRESS}</div>
                           {item.POSTAL && (
@@ -2459,7 +2444,7 @@ export default function Home() {
                   <select
                     value={propertyType}
                     onChange={(e) => setPropertyType(e.target.value)}
-                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                    className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                   >
                     <option value="" disabled>Select a property type</option>
                     <optgroup label="HDB">
@@ -2502,7 +2487,7 @@ export default function Home() {
                         placeholder="e.g. 11"
                         value={floorLevel}
                         onChange={(e) => setFloorLevel(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                       />
                     </div>
                     <div>
@@ -2514,7 +2499,7 @@ export default function Home() {
                         placeholder="e.g. 389"
                         value={stackNumber}
                         onChange={(e) => setStackNumber(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                       />
                     </div>
                   </div>
@@ -2532,7 +2517,7 @@ export default function Home() {
                           placeholder="e.g. 3200"
                           value={landSizeSqm}
                           onChange={(e) => setLandSizeSqm(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                         />
                       </div>
                 
@@ -2545,7 +2530,7 @@ export default function Home() {
                           placeholder="e.g. 4500"
                           value={builtUpSqm}
                           onChange={(e) => setBuiltUpSqm(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                         />
                       </div>
                     </div>
@@ -2557,7 +2542,7 @@ export default function Home() {
                       <select
                         value={tenure}
                         onChange={(e) => setTenure(e.target.value)}
-                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                        className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                       >
                         {TENURE_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -2577,7 +2562,7 @@ export default function Home() {
                       placeholder="e.g. 990"
                       value={floorAreaSqm}
                       onChange={(e) => setFloorAreaSqm(e.target.value)}
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                     />
                   </div>
                 )}
@@ -2591,13 +2576,8 @@ export default function Home() {
                   {isGenerating ? 'Generating...' : 'See My Home Value'}
                 </button>
 
-                {/* CHANGE 6: Mobile stat cards */}
-                <div className="lg:hidden mt-1">
-                  <StatCards />
-                </div>
-
                 {formMessage && (
-                  <p className="text-sm text-[#8b6b52]">{formMessage}</p>
+                  <p className="text-sm text-[#b76633]">{formMessage}</p>
                 )}
               </div>
 
@@ -2616,13 +2596,13 @@ export default function Home() {
       {/* CHANGE 4: Removed top padding (py-12 → pt-2 pb-12) to close the gap */}
 
       {!isGenerating && hasTeaser && !hasReport && (
-        <section className="bg-[#f7f4ef]">
+        <section className="bg-[#f8f1e7]">
           <div
             ref={resultRef}
             className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
           >
-            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+            <div className="rounded-2xl border border-[#ead7c6] bg-white p-6 shadow-sm md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b76633]">
                 Estimated Home Value
               </p>
               <p className="mt-4 text-4xl font-semibold text-[#2d3135] md:text-5xl">
@@ -2647,14 +2627,14 @@ export default function Home() {
       )}
 
       {!isGenerating && hasReport && (
-        <section className="bg-[#f7f4ef]">
+        <section className="bg-[#f8f1e7]">
           <div
             ref={resultRef}
             className="mx-auto max-w-7xl 2xl:max-w-screen-2xl px-6 pt-2 pb-12 md:px-10"
           >
             {/* Valuation Summary */}
-            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+            <div className="rounded-2xl border border-[#ead7c6] bg-white p-6 shadow-sm md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b76633]">
                 Valuation Summary
               </p>
             
@@ -2667,15 +2647,15 @@ export default function Home() {
                 </p>
               )}
             
-              <div className="mt-6 pt-6 border-t border-[#e8ddd2] grid grid-cols-2 md:grid-cols-3 gap-0">
+              <div className="mt-6 pt-6 border-t border-[#ead7c6] grid grid-cols-2 md:grid-cols-3 gap-0">
                 {estimatedPsf && (
-                  <div className="pr-6 border-r border-[#e8ddd2]">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Est. PSF</p>
+                  <div className="pr-6 border-r border-[#ead7c6]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#b76633]">Est. PSF</p>
                     <p className="mt-1 text-2xl font-semibold text-[#2d3135]">${estimatedPsf.toLocaleString()}</p>
                   </div>
                 )}
-                <div className={`${estimatedPsf ? 'px-6' : 'pr-6'} ${(propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && subjectCompletionYearState ? 'border-r border-[#e8ddd2]' : ''}`}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Transactions Used</p>
+                <div className={`${estimatedPsf ? 'px-6' : 'pr-6'} ${(propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && subjectCompletionYearState ? 'border-r border-[#ead7c6]' : ''}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#b76633]">Transactions Used</p>
                   <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{numOfComps || 0}</p>
                   {radiusUsedM && (
                     <p className="text-xs text-[#9aa0a6]">within {radiusUsedM}m</p>
@@ -2683,7 +2663,7 @@ export default function Home() {
                 </div>
                 {subjectCompletionYearState && (propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && (
                   <div className="pl-6 col-span-2 mt-4 md:col-span-1 md:mt-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#b76633]">
                       {propertyCategory === 'hdb' ? 'Est. Built' : 'TOP Year'}
                     </p>
                     <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{subjectCompletionYearState}</p>
@@ -2731,7 +2711,7 @@ export default function Home() {
               )}
 
               {/* CHANGE 2: Mobile = cards, desktop = table */}
-              <div className="mt-6 rounded-2xl border border-[#e5dbcf] bg-white overflow-hidden">
+              <div className="mt-6 rounded-2xl border border-[#ead7c6] bg-white overflow-hidden">
                 {(() => {
                   const tableRows = propertyCategory === 'landed'
                     ? recentComparables
@@ -2806,7 +2786,7 @@ export default function Home() {
 
       {showUnlockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
+          <div className="w-full max-w-lg rounded-[28px] border border-[#ead7c6] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-[#2d3135]">
@@ -2820,7 +2800,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setShowUnlockModal(false)}
-                className="rounded-full border border-[#e5dbcf] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#f8f4ef]"
+                className="rounded-full border border-[#ead7c6] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#fff6ec]"
               >
                 Close
               </button>
@@ -2836,7 +2816,7 @@ export default function Home() {
                   value={leadName}
                   onChange={(e) => setLeadName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
 
@@ -2849,7 +2829,7 @@ export default function Home() {
                   value={leadPhone}
                   onChange={(e) => setLeadPhone(e.target.value)}
                   placeholder="Your phone number"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
 
@@ -2862,7 +2842,7 @@ export default function Home() {
                   value={leadEmail}
                   onChange={(e) => setLeadEmail(e.target.value)}
                   placeholder="Your email"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
 
@@ -2876,7 +2856,7 @@ export default function Home() {
               </button>
 
               {leadFormMessage && (
-                <p className="text-sm text-[#8b6b52]">{leadFormMessage}</p>
+                <p className="text-sm text-[#b76633]">{leadFormMessage}</p>
               )}
             </div>
           </div>
@@ -2885,7 +2865,7 @@ export default function Home() {
 
       {showMismatchModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
+          <div className="w-full max-w-md rounded-[28px] border border-[#ead7c6] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
             <h2 className="text-xl font-semibold text-[#2d3135]">
               Double-check your property type
             </h2>
@@ -2911,7 +2891,7 @@ export default function Home() {
                   setMismatchMessage('')
                   await handleGenerateReport(true)
                 }}
-                className="w-full rounded-2xl border border-[#e3d6c8] px-5 py-3.5 text-sm font-semibold text-[#2d3135] transition hover:bg-[#f8f4ef]"
+                className="w-full rounded-2xl border border-[#ead7c6] px-5 py-3.5 text-sm font-semibold text-[#2d3135] transition hover:bg-[#fff6ec]"
               >
                 Proceed anyway
               </button>
@@ -2921,7 +2901,7 @@ export default function Home() {
       )}
       {showConsultationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
+          <div className="w-full max-w-lg rounded-[28px] border border-[#ead7c6] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-[#2d3135]">
@@ -2935,7 +2915,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setShowConsultationModal(false)}
-                className="rounded-full border border-[#e5dbcf] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#f8f4ef]"
+                className="rounded-full border border-[#ead7c6] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#fff6ec]"
               >
                 Close
               </button>
@@ -2951,7 +2931,7 @@ export default function Home() {
                   value={consultName}
                   onChange={(e) => setConsultName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
 
@@ -2964,7 +2944,7 @@ export default function Home() {
                   value={consultPhone}
                   onChange={(e) => setConsultPhone(e.target.value)}
                   placeholder="Your phone number"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
 
@@ -2977,7 +2957,7 @@ export default function Home() {
                   value={consultEmail}
                   onChange={(e) => setConsultEmail(e.target.value)}
                   placeholder="Your email"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
 
@@ -2990,7 +2970,7 @@ export default function Home() {
                   onChange={(e) => setConsultPlan(e.target.value)}
                   placeholder="e.g. Thinking of selling in the next 3 months"
                   rows={4}
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
 
@@ -3003,7 +2983,7 @@ export default function Home() {
               </button>
 
               {consultationMessage && (
-                <p className="text-sm text-[#8b6b52]">{consultationMessage}</p>
+                <p className="text-sm text-[#b76633]">{consultationMessage}</p>
               )}
             </div>
           </div>
@@ -3013,10 +2993,10 @@ export default function Home() {
       {/* Plan Popup */}
       {showPlanPopup && !planPopupDismissed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:max-w-lg md:p-10">
+          <div className="w-full max-w-md rounded-[28px] border border-[#ead7c6] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:max-w-lg md:p-10">
             {planPopupStep === 'question' ? (
               <>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b76633]">Quick question</p>
                 <h3 className="mt-3 text-xl font-semibold leading-snug text-[#2d3135] md:text-2xl">
                   Now that you know your home&apos;s value, what&apos;s your next move?
                 </h3>
@@ -3030,7 +3010,7 @@ export default function Home() {
                       key={option.value}
                       type="button"
                       onClick={() => handlePlanSelect(option.value)}
-                      className="w-full rounded-2xl border border-[#e3d6c8] bg-[#faf8f4] px-5 py-4 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#8b6b52] hover:bg-white md:text-base"
+                      className="w-full rounded-2xl border border-[#ead7c6] bg-[#faf8f4] px-5 py-4 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#b76633] hover:bg-white md:text-base"
                     >
                       {option.label}
                     </button>
