@@ -1053,65 +1053,93 @@ export default function Home() {
       let subjectCompletionYear: number | null = null
       let subjectIsStrata: boolean | null = null
       
-      // ─── Detect property type from address ───────────────────────────────────────
-      const addressLooksLikeHdb = await (async () => {
-        const addressUpper = (resolved.address || '').toUpperCase().trim()
-        const blkNoUpper = (resolved.blkNo || '').toUpperCase().trim()
-
-        const hasHdbStyleBlock =
-          !!blkNoUpper || /^\d+[A-Z]?\s/.test(addressUpper)
-
-        const { data: hdbRows } = await supabase
+      // ─── Detect likely property category from nearby evidence ───────────────────
+      const nearbyCategoryEvidence = await (async () => {
+        const { data: nearbyRows } = await supabase
           .from('property_transactions_v2')
-          .select('property_group')
-          .eq('property_group', 'hdb')
+          .select('property_group, property_subtype, project_name')
           .gte('latitude', resolved.lat - 0.0003)
           .lte('latitude', resolved.lat + 0.0003)
           .gte('longitude', resolved.lon - 0.0003)
           .lte('longitude', resolved.lon + 0.0003)
-          .limit(1)
+          .limit(200)
 
-        return hasHdbStyleBlock || !!(hdbRows && hdbRows.length > 0)
+        if (!nearbyRows || nearbyRows.length === 0) return null
+
+        const rawProjectKey = (resolved.projectName || '').toUpperCase().trim()
+        const counts: Record<PropertyCategory, number> = {
+          hdb: 0,
+          condo: 0,
+          ec: 0,
+          landed: 0,
+        }
+
+        for (const row of nearbyRows) {
+          let bucket: PropertyCategory | null = null
+
+          if (row.property_group === 'hdb') {
+            bucket = 'hdb'
+          } else if (row.property_subtype === 'condo') {
+            bucket = 'condo'
+          } else if (row.property_subtype === 'ec') {
+            bucket = 'ec'
+          } else if (
+            row.property_subtype === 'landed_strata' ||
+            row.property_subtype === 'landed_non_strata'
+          ) {
+            bucket = 'landed'
+          }
+
+          if (!bucket) continue
+
+          const rowProjectKey = (row.project_name || '').toUpperCase().trim()
+          const projectWeight =
+            rawProjectKey && rowProjectKey && rowProjectKey === rawProjectKey ? 3 : 1
+
+          counts[bucket] += projectWeight
+        }
+
+        const ordered = Object.entries(counts).sort((a, b) => b[1] - a[1])
+        const [topCategory, topScore] = ordered[0] as [PropertyCategory, number]
+        const secondScore = (ordered[1]?.[1] as number | undefined) ?? 0
+
+        if (topScore < 2) return null
+        if (topScore < secondScore * 1.5) return null
+
+        return {
+          detectedCategory: topCategory,
+        }
       })()
 
-      const addressLooksLikePrivate = await (async () => {
-        const addressUpper = (resolved.address || '').toUpperCase().trim()
-        const blkNoUpper = (resolved.blkNo || '').toUpperCase().trim()
+      if (!bypassMismatch && nearbyCategoryEvidence?.detectedCategory) {
+        const detected = nearbyCategoryEvidence.detectedCategory
 
-        const hasHdbStyleBlock =
-          !!blkNoUpper || /^\d+[A-Z]?\s/.test(addressUpper)
+        if (detected !== propertyCategory) {
+          const detectedLabel =
+            detected === 'hdb'
+              ? 'an HDB'
+              : detected === 'ec'
+              ? 'an EC'
+              : detected === 'condo'
+              ? 'a condo'
+              : 'a landed'
 
-        if (hasHdbStyleBlock) return false
+          const selectedLabel =
+            propertyCategory === 'hdb'
+              ? 'an HDB type'
+              : propertyCategory === 'ec'
+              ? 'an EC type'
+              : propertyCategory === 'condo'
+              ? 'a condo type'
+              : 'a landed type'
 
-        const { data: privateRows } = await supabase
-          .from('property_transactions_v2')
-          .select('property_group')
-          .neq('property_group', 'hdb')
-          .gte('latitude', resolved.lat - 0.0003)
-          .lte('latitude', resolved.lat + 0.0003)
-          .gte('longitude', resolved.lon - 0.0003)
-          .lte('longitude', resolved.lon + 0.0003)
-          .limit(1)
-
-        return !!(privateRows && privateRows.length > 0)
-      })()
-
-      if (!bypassMismatch && addressLooksLikeHdb && propertyCategory !== 'hdb') {
-        setMismatchMessage(
-          'This looks like an HDB address, but you selected a private property type. Please double-check your property type for an accurate estimate.'
-        )
-        setShowMismatchModal(true)
-        setIsGenerating(false)
-        return
-      }
-
-      if (!bypassMismatch && addressLooksLikePrivate && propertyCategory === 'hdb') {
-        setMismatchMessage(
-          'This looks like a private property address, but you selected an HDB type. Please double-check your property type for an accurate estimate.'
-        )
-        setShowMismatchModal(true)
-        setIsGenerating(false)
-        return
+          setMismatchMessage(
+            `This looks like ${detectedLabel} address, but you selected ${selectedLabel}. Please double-check your property type for an accurate estimate.`
+          )
+          setShowMismatchModal(true)
+          setIsGenerating(false)
+          return
+        }
       }
 
       if (
