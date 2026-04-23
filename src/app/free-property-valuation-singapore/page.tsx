@@ -126,14 +126,14 @@ const FAQ_ITEMS = [
 // ─── Stat cards ───────────────────────────────────────────────────────────────
 function StatCards() {
   return (
-    <div className="flex gap-0 border-t border-[#e8ddd2] pt-6">
-      <div className="flex-1 pr-6 border-r border-[#e8ddd2]">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Team Experience</p>
+    <div className="flex gap-0 border-t border-[#efddcc] pt-6">
+      <div className="flex-1 pr-6 border-r border-[#efddcc]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#bf6d34]">Team Experience</p>
         <p className="mt-1.5 text-3xl font-semibold leading-none text-[#2d3135]">600+</p>
         <p className="mt-1.5 text-[11px] text-[#9aa0a6]">Transactions combined</p>
       </div>
       <div className="flex-1 pl-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Limited Offer</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#bf6d34]">Limited Offer</p>
         <p className="mt-1.5 text-3xl font-semibold leading-none text-[#2d3135]">0% GST</p>
         <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#f5c4b3] bg-[#fff3f0] px-2 py-0.5 text-[10px] font-semibold text-[#c0442a]">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#c0442a]" />
@@ -148,11 +148,11 @@ function StatCards() {
 
 function AboutHomeValueSection() {
   return (
-    <section className="bg-[#f7f4ef]">
+    <section className="bg-[#fbf5ee]">
       <div className="mx-auto max-w-[1440px] px-6 pb-6 md:px-10">
-        <div className="rounded-[32px] border border-[#eadfd6] bg-white/90 p-6 shadow-[0_20px_60px_rgba(54,69,79,0.08)] sm:p-8">
+        <div className="rounded-[32px] border border-[#f0dfcf] bg-white/90 p-6 shadow-[0_20px_60px_rgba(54,69,79,0.08)] sm:p-8">
           <div className="max-w-4xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52]">About HomeValue</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#bf6d34]">About HomeValue</p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#2d3135] sm:text-3xl">
               Understand your property’s estimated value before you sell
             </h2>
@@ -178,20 +178,20 @@ function FaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <section className="bg-[#f7f4ef]">
+    <section className="bg-[#fbf5ee]">
       <div className="mx-auto max-w-[1440px] px-6 pb-16 md:px-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">FAQ</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#bf6d34] mb-3">FAQ</p>
         <h2 className="text-2xl font-semibold text-[#1e2226] mb-8 md:text-3xl">Frequently asked questions</h2>
-        <div className="rounded-2xl border border-[#e5dbcf] bg-white px-6 md:px-8">
+        <div className="rounded-2xl border border-[#eddccc] bg-white px-6 md:px-8">
           {FAQ_ITEMS.map((item, i) => (
-            <div key={i} className="border-b border-[#e8ddd2] last:border-b-0">
+            <div key={i} className="border-b border-[#efddcc] last:border-b-0">
               <button
                 type="button"
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
                 className="flex w-full items-center justify-between gap-4 py-5 text-left"
               >
                 <span className="text-sm font-semibold text-[#1e2226] leading-snug md:text-base">{item.q}</span>
-                <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] text-sm transition-colors ${openIndex === i ? 'border-[#8b6b52] bg-[#8b6b52] text-white' : 'border-[#b09880] text-[#8b6b52]'}`}>
+                <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-[1.5px] text-sm transition-colors ${openIndex === i ? 'border-[#bf6d34] bg-[#bf6d34] text-white' : 'border-[#c79267] text-[#bf6d34]'}`}>
                   {openIndex === i ? '−' : '+'}
                 </span>
               </button>
@@ -561,7 +561,7 @@ type EmailResult = {
 // ─── Loading skeleton component ───────────────────────────────────────────────
 function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'landed' }) {
   return (
-    <section className="bg-[#f7f4ef]">
+    <section className="bg-[#fbf5ee]">
       <style>{`
         @keyframes shimmer {
           0% { background-position: -600px 0; }
@@ -580,7 +580,7 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
           100% { background-position: 400px 0; }
         }
         .sk {
-          background: linear-gradient(90deg, #f0ece6 25%, #e8e2da 50%, #f0ece6 75%);
+          background: linear-gradient(90deg, #f6eee5 25%, #f0e4d6 50%, #f6eee5 75%);
           background-size: 600px 100%;
           animation: shimmer 1.4s infinite;
           border-radius: 8px;
@@ -588,7 +588,7 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
         .load-bar-fill {
           height: 100%;
           border-radius: 99px;
-          background: linear-gradient(90deg, #8b6b52, #b08060, #8b6b52);
+          background: linear-gradient(90deg, #bf6d34, #d58a4f, #bf6d34);
           background-size: 400px 100%;
           animation: loadbar 4s ease-out forwards, barshine 1.2s linear infinite;
           width: 0%;
@@ -597,26 +597,26 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
       <div className="mx-auto max-w-[1440px] px-6 pt-6 pb-12 md:px-10">
         {/* Loading bar */}
         <div className="flex flex-col items-center mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b6b52] mb-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#bf6d34] mb-3">
             Analysing transactions
           </p>
-          <div className="w-full max-w-sm h-1.5 bg-[#e8ddd2] rounded-full overflow-hidden">
+          <div className="w-full max-w-sm h-1.5 bg-[#efddcc] rounded-full overflow-hidden">
             <div className="load-bar-fill" />
           </div>
           <LoadingStatusMessage />
         </div>
 
         {/* Skeleton summary card */}
-        <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8 mb-10">
+        <div className="rounded-2xl border border-[#eddccc] bg-white p-6 shadow-sm md:p-8 mb-10">
           <div className="sk w-36 h-3 mb-5" />
           <div className="sk w-64 h-12 rounded-xl mb-3" />
           <div className="sk w-48 h-3.5 mb-8" />
-          <div className="flex gap-8 border-t border-[#e8ddd2] pt-6">
-            <div className="border-l border-[#e8ddd2] pl-6">
+          <div className="flex gap-8 border-t border-[#efddcc] pt-6">
+            <div className="border-l border-[#efddcc] pl-6">
               <div className="sk w-16 h-2.5 mb-2" />
               <div className="sk w-24 h-7 rounded-md" />
             </div>
-            <div className="border-l border-[#e8ddd2] pl-6">
+            <div className="border-l border-[#efddcc] pl-6">
               <div className="sk w-28 h-2.5 mb-2" />
               <div className="sk w-14 h-7 rounded-md" />
               <div className="sk w-20 h-2 mt-2" />
@@ -634,8 +634,8 @@ function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'lan
         )}
 
         {/* Skeleton table */}
-        <div className="rounded-2xl border border-[#e5dbcf] bg-white overflow-hidden">
-          <div className="grid grid-cols-4 gap-0 px-5 py-3 border-b border-[#e8ddd2]">
+        <div className="rounded-2xl border border-[#eddccc] bg-white overflow-hidden">
+          <div className="grid grid-cols-4 gap-0 px-5 py-3 border-b border-[#efddcc]">
             {[36, 60, 32, 40].map((w, i) => (
               <div key={i} className="sk h-3" style={{ width: w }} />
             ))}
@@ -2293,22 +2293,22 @@ export default function Home() {
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        <span className="text-xs font-medium text-[#2d3135] bg-[#f0ece6] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">Price: </span>{formatMoney(row.transaction_price)}
+        <span className="text-xs font-medium text-[#2d3135] bg-[#f6eee5] rounded-md px-2 py-1">
+          <span className="text-[#bf6d34] font-semibold">Price: </span>{formatMoney(row.transaction_price)}
         </span>
-        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">PSF: </span>${Math.round(row.psf).toLocaleString()}
+        <span className="text-xs text-[#67707a] bg-[#fbf5ee] rounded-md px-2 py-1">
+          <span className="text-[#bf6d34] font-semibold">PSF: </span>${Math.round(row.psf).toLocaleString()}
         </span>
-        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">Size: </span>{sqmToSqft(row.floor_area_sqm)} sqft
+        <span className="text-xs text-[#67707a] bg-[#fbf5ee] rounded-md px-2 py-1">
+          <span className="text-[#bf6d34] font-semibold">Size: </span>{sqmToSqft(row.floor_area_sqm)} sqft
         </span>
         {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
-          <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-            <span className="text-[#8b6b52] font-semibold">Tenure: </span>{formatTenure(row.tenure)}
+          <span className="text-xs text-[#67707a] bg-[#fbf5ee] rounded-md px-2 py-1">
+            <span className="text-[#bf6d34] font-semibold">Tenure: </span>{formatTenure(row.tenure)}
           </span>
         )}
-        <span className="text-xs text-[#67707a] bg-[#f7f4ef] rounded-md px-2 py-1">
-          <span className="text-[#8b6b52] font-semibold">Dist: </span>{Math.round(row.distance_m)}m
+        <span className="text-xs text-[#67707a] bg-[#fbf5ee] rounded-md px-2 py-1">
+          <span className="text-[#bf6d34] font-semibold">Dist: </span>{Math.round(row.distance_m)}m
         </span>
       </div>
     </div>
@@ -2316,8 +2316,8 @@ export default function Home() {
 
   return (
     <>
-      <main className="min-h-screen bg-[#f7f4ef] text-[#2f3438]">
-        <header className="border-b border-[#ece2d7] bg-white/95">
+      <main className="min-h-screen bg-[#fbf5ee] text-[#2f3438]">
+        <header className="border-b border-[#f1dfcf] bg-white/95">
           <div className="mx-auto flex max-w-[1440px] items-center justify-center px-6 py-3 md:px-10 md:py-3.5">
             <a
               href="https://www.nexdoor.sg"
@@ -2336,12 +2336,12 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="border-b border-[#ede3d8] bg-[#f7f4ef]">
+        <section className="border-b border-[#f2e0d0] bg-[#fbf5ee]">
           <div className="mx-auto max-w-[1440px] px-6 py-6 md:px-10 md:py-10 xl:py-12">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_560px] lg:items-center lg:gap-14 xl:grid-cols-[minmax(0,1.12fr)_600px] xl:gap-16">
               <div className="max-w-[760px] pt-1 md:pt-2 lg:pr-8">
                 <div>
-                <div className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+                <div className="inline-flex items-center rounded-full border border-[#ecd8c5] bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#bf6d34]">
                   Free Property Valuation Singapore
                 </div>
 
@@ -2364,7 +2364,7 @@ export default function Home() {
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[#6e767f] sm:text-[13px]">
-                  <span className="inline-flex items-center rounded-full border border-[#e6d8ca] bg-white px-3 py-1.5 font-medium text-[#49515a] shadow-[0_6px_16px_rgba(37,42,46,0.04)]">
+                  <span className="inline-flex items-center rounded-full border border-[#ecd8c5] bg-white px-3 py-1.5 font-medium text-[#49515a] shadow-[0_6px_16px_rgba(37,42,46,0.04)]">
                     Indicative estimate
                   </span>
                   <span>No obligation</span>
@@ -2376,10 +2376,10 @@ export default function Home() {
 
               <div
                 id="valuation-form-card"
-                className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:p-8 xl:p-9"
+                className="rounded-[28px] border border-[#ead8c6] bg-white p-5 shadow-[0_18px_50px_rgba(37,42,46,0.08)] md:p-7 lg:p-8 xl:p-9"
               >
                 <div className="mb-5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8b6b52]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#bf6d34]">
                     Start your valuation
                   </p>
                   <h2 className="mt-2 text-[28px] font-semibold leading-tight text-[#23282d] md:text-[30px]">
@@ -2400,7 +2400,7 @@ export default function Home() {
                       placeholder="e.g. 419 Woodlands Street 41"
                       value={address}
                       onChange={(e) => handleAddressChange(e.target.value)}
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                     />
 
                     {showSuggestions && suggestions.length > 0 && (
@@ -2410,7 +2410,7 @@ export default function Home() {
                             key={`${item.ADDRESS}-${index}`}
                             type="button"
                             onClick={() => handleSelectAddress(item)}
-                            className="block w-full border-b border-[#f1ebe4] px-4 py-3 text-left text-sm text-[#2d3135] hover:bg-[#f8f4ef] last:border-b-0"
+                            className="block w-full border-b border-[#f6ebe0] px-4 py-3 text-left text-sm text-[#2d3135] hover:bg-[#fcf6ef] last:border-b-0"
                           >
                             <div className="font-medium">{item.ADDRESS}</div>
                             {item.POSTAL && (
@@ -2437,7 +2437,7 @@ export default function Home() {
                     <select
                       value={propertyType}
                       onChange={(e) => setPropertyType(e.target.value)}
-                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                      className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                     >
                       <option value="" disabled>Select a property type</option>
                       <optgroup label="HDB">
@@ -2481,7 +2481,7 @@ export default function Home() {
                             placeholder="e.g. 3200"
                             value={landSizeSqm}
                             onChange={(e) => setLandSizeSqm(e.target.value)}
-                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                           />
                         </div>
 
@@ -2494,7 +2494,7 @@ export default function Home() {
                             placeholder="e.g. 4500"
                             value={builtUpSqm}
                             onChange={(e) => setBuiltUpSqm(e.target.value)}
-                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                           />
                         </div>
                       </div>
@@ -2506,7 +2506,7 @@ export default function Home() {
                         <select
                           value={tenure}
                           onChange={(e) => setTenure(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                         >
                           {TENURE_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -2527,7 +2527,7 @@ export default function Home() {
                           placeholder="e.g. 990"
                           value={floorAreaSqm}
                           onChange={(e) => setFloorAreaSqm(e.target.value)}
-                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                          className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                         />
                       </div>
 
@@ -2541,7 +2541,7 @@ export default function Home() {
                             placeholder="e.g. 11"
                             value={floorLevel}
                             onChange={(e) => setFloorLevel(e.target.value)}
-                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                           />
                         </div>
                         <div>
@@ -2553,7 +2553,7 @@ export default function Home() {
                             placeholder="e.g. 389"
                             value={stackNumber}
                             onChange={(e) => setStackNumber(e.target.value)}
-                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                            className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3.5 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                           />
                         </div>
                       </div>
@@ -2564,22 +2564,22 @@ export default function Home() {
                     type="button"
                     onClick={() => handleGenerateReport()}
                     disabled={isGenerating}
-                    className="mt-2 w-full rounded-2xl bg-[#2f3438] px-5 py-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="mt-2 w-full rounded-2xl bg-[#de741f] px-5 py-4 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(222,116,31,0.25)] transition hover:bg-[#c96314] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isGenerating ? 'Generating...' : 'See My Home Value'}
                   </button>
 
                   {formMessage && (
-                    <p className="text-sm text-[#8b6b52]">{formMessage}</p>
+                    <p className="text-sm text-[#bf6d34]">{formMessage}</p>
                   )}
                 </div>
               </div>
             </div>
 
             <div className="mt-6 md:mt-7 xl:mt-8">
-              <div className="rounded-[28px] border border-[#e4d7ca] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 xl:p-7">
+              <div className="rounded-[28px] border border-[#ead8c6] bg-white p-5 shadow-[0_14px_40px_rgba(37,42,46,0.06)] md:p-6 xl:p-7">
                 <div className="max-w-2xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#bf6d34]">
                     What you'll get
                   </p>
                   <h3 className="mt-2 text-[26px] font-semibold leading-tight text-[#23282d]">
@@ -2591,8 +2591,8 @@ export default function Home() {
                 </div>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                  <div className="rounded-2xl border border-[#f5e8da] bg-[#fff9f2] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#bf6d34]">
                       Estimated value
                     </p>
                     <p className="mt-3 text-3xl font-semibold text-[#23282d]">$8XX,XXX</p>
@@ -2601,8 +2601,8 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                  <div className="rounded-2xl border border-[#f5e8da] bg-[#fff9f2] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#bf6d34]">
                       Indicative range
                     </p>
                     <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
@@ -2613,8 +2613,8 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#efe6dc] bg-[#fbf8f3] p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b6b52]">
+                  <div className="rounded-2xl border border-[#f5e8da] bg-[#fff9f2] p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#bf6d34]">
                       Nearby transactions
                     </p>
                     <p className="mt-3 text-2xl font-semibold leading-snug text-[#23282d]">
@@ -2639,13 +2639,13 @@ export default function Home() {
       {/* CHANGE 4: Removed top padding (py-12 → pt-2 pb-12) to close the gap */}
 
       {!isGenerating && hasTeaser && !hasReport && (
-        <section className="bg-[#f7f4ef]">
+        <section className="bg-[#fbf5ee]">
           <div
             ref={resultRef}
             className="mx-auto max-w-[1440px] px-6 pt-2 pb-12 md:px-10"
           >
-            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+            <div className="rounded-2xl border border-[#eddccc] bg-white p-6 shadow-sm md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#bf6d34]">
                 Estimated Home Value
               </p>
               <p className="mt-4 text-4xl font-semibold text-[#2d3135] md:text-5xl">
@@ -2660,7 +2660,7 @@ export default function Home() {
                   setLeadFormMessage('')
                   setShowUnlockModal(true)
                 }}
-                className="mt-6 rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(47,52,56,0.18)] transition hover:bg-[#24292d]"
+                className="mt-6 rounded-2xl bg-[#de741f] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(222,116,31,0.25)] transition hover:bg-[#c96314]"
               >
                 See Full Home Value
               </button>
@@ -2670,14 +2670,14 @@ export default function Home() {
       )}
 
       {!isGenerating && hasReport && (
-        <section className="bg-[#f7f4ef]">
+        <section className="bg-[#fbf5ee]">
           <div
             ref={resultRef}
             className="mx-auto max-w-[1440px] px-6 pt-2 pb-12 md:px-10"
           >
             {/* Valuation Summary */}
-            <div className="rounded-2xl border border-[#e5dbcf] bg-white p-6 shadow-sm md:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">
+            <div className="rounded-2xl border border-[#eddccc] bg-white p-6 shadow-sm md:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#bf6d34]">
                 Valuation Summary
               </p>
             
@@ -2690,15 +2690,15 @@ export default function Home() {
                 </p>
               )}
             
-              <div className="mt-6 pt-6 border-t border-[#e8ddd2] grid grid-cols-2 md:grid-cols-3 gap-0">
+              <div className="mt-6 pt-6 border-t border-[#efddcc] grid grid-cols-2 md:grid-cols-3 gap-0">
                 {estimatedPsf && (
-                  <div className="pr-6 border-r border-[#e8ddd2]">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Est. PSF</p>
+                  <div className="pr-6 border-r border-[#efddcc]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#bf6d34]">Est. PSF</p>
                     <p className="mt-1 text-2xl font-semibold text-[#2d3135]">${estimatedPsf.toLocaleString()}</p>
                   </div>
                 )}
-                <div className={`${estimatedPsf ? 'px-6' : 'pr-6'} ${(propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && subjectCompletionYearState ? 'border-r border-[#e8ddd2]' : ''}`}>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">Transactions Used</p>
+                <div className={`${estimatedPsf ? 'px-6' : 'pr-6'} ${(propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && subjectCompletionYearState ? 'border-r border-[#efddcc]' : ''}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#bf6d34]">Transactions Used</p>
                   <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{numOfComps || 0}</p>
                   {radiusUsedM && (
                     <p className="text-xs text-[#9aa0a6]">within {radiusUsedM}m</p>
@@ -2706,7 +2706,7 @@ export default function Home() {
                 </div>
                 {subjectCompletionYearState && (propertyCategory === 'hdb' || propertyCategory === 'condo' || propertyCategory === 'ec') && (
                   <div className="pl-6 col-span-2 mt-4 md:col-span-1 md:mt-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b6b52]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#bf6d34]">
                       {propertyCategory === 'hdb' ? 'Est. Built' : 'TOP Year'}
                     </p>
                     <p className="mt-1 text-2xl font-semibold text-[#2d3135]">{subjectCompletionYearState}</p>
@@ -2727,7 +2727,7 @@ export default function Home() {
                     onClick={() => setActiveTab('same')}
                     className={`px-4 py-2 rounded-full text-sm ${
                       activeTab === 'same'
-                        ? 'bg-[#2f3438] text-white'
+                        ? 'bg-[#de741f] text-white'
                         : 'bg-white border border-[#ddd]'
                     }`}
                   >
@@ -2738,7 +2738,7 @@ export default function Home() {
                     onClick={() => setActiveTab('nearby')}
                     className={`px-4 py-2 rounded-full text-sm ${
                       activeTab === 'nearby'
-                        ? 'bg-[#2f3438] text-white'
+                        ? 'bg-[#de741f] text-white'
                         : 'bg-white border border-[#ddd]'
                     }`}
                   >
@@ -2754,7 +2754,7 @@ export default function Home() {
               )}
 
               {/* CHANGE 2: Mobile = cards, desktop = table */}
-              <div className="mt-6 rounded-2xl border border-[#e5dbcf] bg-white overflow-hidden">
+              <div className="mt-6 rounded-2xl border border-[#eddccc] bg-white overflow-hidden">
                 {(() => {
                   const tableRows = propertyCategory === 'landed'
                     ? recentComparables
@@ -2794,7 +2794,7 @@ export default function Home() {
                           </thead>
                           <tbody>
                             {tableRows.map((row, i) => (
-                              <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
+                              <tr key={i} className="border-t hover:bg-[#fff9f2] transition">
                                 <td className="px-5 py-4">{formatDate(row.transaction_date)}</td>
                                 <td className="px-5 py-4">
                                   {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
@@ -2824,7 +2824,7 @@ export default function Home() {
       )}
       {showUnlockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
+          <div className="w-full max-w-lg rounded-[28px] border border-[#ead5c1] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-[#2d3135]">
@@ -2838,7 +2838,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setShowUnlockModal(false)}
-                className="rounded-full border border-[#e5dbcf] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#f8f4ef]"
+                className="rounded-full border border-[#eddccc] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#fcf6ef]"
               >
                 Close
               </button>
@@ -2854,7 +2854,7 @@ export default function Home() {
                   value={leadName}
                   onChange={(e) => setLeadName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                 />
               </div>
 
@@ -2867,7 +2867,7 @@ export default function Home() {
                   value={leadPhone}
                   onChange={(e) => setLeadPhone(e.target.value)}
                   placeholder="Your phone number"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                 />
               </div>
 
@@ -2880,7 +2880,7 @@ export default function Home() {
                   value={leadEmail}
                   onChange={(e) => setLeadEmail(e.target.value)}
                   placeholder="Your email"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                 />
               </div>
 
@@ -2888,13 +2888,13 @@ export default function Home() {
                 type="button"
                 onClick={handleUnlockFullReport}
                 disabled={isUnlockingReport}
-                className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d] disabled:cursor-not-allowed disabled:opacity-70"
+                className="rounded-2xl bg-[#de741f] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#c96314] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isUnlockingReport ? 'Unlocking...' : 'Show My Full Valuation'}
               </button>
 
               {leadFormMessage && (
-                <p className="text-sm text-[#8b6b52]">{leadFormMessage}</p>
+                <p className="text-sm text-[#bf6d34]">{leadFormMessage}</p>
               )}
             </div>
           </div>
@@ -2903,7 +2903,7 @@ export default function Home() {
 
       {showMismatchModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
+          <div className="w-full max-w-md rounded-[28px] border border-[#ead5c1] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)]">
             <h2 className="text-xl font-semibold text-[#2d3135]">
               Double-check your property type
             </h2>
@@ -2918,7 +2918,7 @@ export default function Home() {
                   setMismatchMessage('')
                   window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
-                className="w-full rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d]"
+                className="w-full rounded-2xl bg-[#de741f] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#c96314]"
               >
                 Change property type
               </button>
@@ -2929,7 +2929,7 @@ export default function Home() {
                   setMismatchMessage('')
                   await handleGenerateReport(true)
                 }}
-                className="w-full rounded-2xl border border-[#e3d6c8] px-5 py-3.5 text-sm font-semibold text-[#2d3135] transition hover:bg-[#f8f4ef]"
+                className="w-full rounded-2xl border border-[#ead5c1] px-5 py-3.5 text-sm font-semibold text-[#2d3135] transition hover:bg-[#fcf6ef]"
               >
                 Proceed anyway
               </button>
@@ -2939,7 +2939,7 @@ export default function Home() {
       )}
       {showConsultationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-[28px] border border-[#e3d6c8] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
+          <div className="w-full max-w-lg rounded-[28px] border border-[#ead5c1] bg-white p-6 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-[#2d3135]">
@@ -2953,7 +2953,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setShowConsultationModal(false)}
-                className="rounded-full border border-[#e5dbcf] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#f8f4ef]"
+                className="rounded-full border border-[#eddccc] px-3 py-1 text-sm text-[#606971] transition hover:bg-[#fcf6ef]"
               >
                 Close
               </button>
@@ -2969,7 +2969,7 @@ export default function Home() {
                   value={consultName}
                   onChange={(e) => setConsultName(e.target.value)}
                   placeholder="Your name"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                 />
               </div>
 
@@ -2982,7 +2982,7 @@ export default function Home() {
                   value={consultPhone}
                   onChange={(e) => setConsultPhone(e.target.value)}
                   placeholder="Your phone number"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                 />
               </div>
 
@@ -2995,7 +2995,7 @@ export default function Home() {
                   value={consultEmail}
                   onChange={(e) => setConsultEmail(e.target.value)}
                   placeholder="Your email"
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                 />
               </div>
 
@@ -3008,20 +3008,20 @@ export default function Home() {
                   onChange={(e) => setConsultPlan(e.target.value)}
                   placeholder="e.g. Thinking of selling in the next 3 months"
                   rows={4}
-                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#8b6b52] focus:bg-white"
+                  className="w-full rounded-2xl border border-[#d7dde3] bg-[#fffaf4] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#bf6d34] focus:bg-white"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleConsultationSubmit}
-                className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d]"
+                className="rounded-2xl bg-[#de741f] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#c96314]"
               >
                 Submit
               </button>
 
               {consultationMessage && (
-                <p className="text-sm text-[#8b6b52]">{consultationMessage}</p>
+                <p className="text-sm text-[#bf6d34]">{consultationMessage}</p>
               )}
             </div>
           </div>
@@ -3031,10 +3031,10 @@ export default function Home() {
       {/* Plan Popup */}
       {showPlanPopup && !planPopupDismissed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-[28px] border border-[#e3d6c8] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:max-w-lg md:p-10">
+          <div className="w-full max-w-md rounded-[28px] border border-[#ead5c1] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:max-w-lg md:p-10">
             {planPopupStep === 'question' ? (
               <>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b6b52]">Quick question</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#bf6d34]">Quick question</p>
                 <h3 className="mt-3 text-xl font-semibold leading-snug text-[#2d3135] md:text-2xl">
                   Now that you know your home&apos;s value, what&apos;s your next move?
                 </h3>
@@ -3048,7 +3048,7 @@ export default function Home() {
                       key={option.value}
                       type="button"
                       onClick={() => handlePlanSelect(option.value)}
-                      className="w-full rounded-2xl border border-[#e3d6c8] bg-[#faf8f4] px-5 py-4 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#8b6b52] hover:bg-white md:text-base"
+                      className="w-full rounded-2xl border border-[#ead5c1] bg-[#fff9f2] px-5 py-4 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#bf6d34] hover:bg-white md:text-base"
                     >
                       {option.label}
                     </button>
@@ -3074,9 +3074,9 @@ export default function Home() {
         </div>
       )}
         {!isGenerating && (
-          <section className="bg-[#f7f4ef]">
+          <section className="bg-[#fbf5ee]">
             <div className="mx-auto max-w-[1440px] px-6 pb-14 md:px-10">
-              <div className="rounded-2xl border border-[#eadfd6] bg-white p-5 text-sm leading-7 text-[#6a727a] shadow-sm">
+              <div className="rounded-2xl border border-[#f0dfcf] bg-white p-5 text-sm leading-7 text-[#6a727a] shadow-sm">
                 Estimates are indicative only and based on recent comparable transactions. They do not replace a formal valuation by HDB, a bank or a licensed valuer.
               </div>
             </div>
