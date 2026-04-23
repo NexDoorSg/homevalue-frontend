@@ -703,7 +703,6 @@ export default function Home() {
   const [leadPhone, setLeadPhone] = useState('')
   const [leadEmail, setLeadEmail] = useState('')
   const [leadId, setLeadId] = useState<number | null>(null)
-  const [partialLeadSaved, setPartialLeadSaved] = useState(false)
   const [showPlanPopup, setShowPlanPopup] = useState(false)
   const [planPopupStep, setPlanPopupStep] = useState<'question' | 'confirm'>('question')
   const [planPopupInteracted, setPlanPopupInteracted] = useState(false)
@@ -877,7 +876,6 @@ export default function Home() {
     setHasReport(false)
     setShowUnlockModal(false)
     setLeadId(null)
-    setPartialLeadSaved(false)
     setShowPlanPopup(false)
     setPlanPopupDismissed(false)
     setPlanPopupInteracted(false)
@@ -924,12 +922,16 @@ export default function Home() {
 
   const resolveAddressForGeneration = async () => {
   if (selectedLat && selectedLon) {
+    const selectedBlkNo =
+      suggestions.find((item) => cleanAddress(item.ADDRESS || '') === cleanAddress(address))?.BLK_NO || null
+
     return {
       lat: selectedLat,
       lon: selectedLon,
       address: address,
       streetName: selectedStreetName,
       projectName: selectedProjectName,
+      blkNo: selectedBlkNo,
       lookupCandidates,
     }
   }
@@ -1051,7 +1053,13 @@ export default function Home() {
       
       // ─── Detect property type from address ───────────────────────────────────────
       const addressLooksLikeHdb = await (async () => {
-        const { data } = await supabase
+        const addressUpper = (resolved.address || '').toUpperCase().trim()
+        const blkNoUpper = (resolved.blkNo || '').toUpperCase().trim()
+
+        const hasHdbStyleBlock =
+          !!blkNoUpper || /^\d+[A-Z]?\s/.test(addressUpper)
+
+        const { data: hdbRows } = await supabase
           .from('property_transactions_v2')
           .select('property_group')
           .eq('property_group', 'hdb')
@@ -1060,9 +1068,32 @@ export default function Home() {
           .gte('longitude', resolved.lon - 0.0003)
           .lte('longitude', resolved.lon + 0.0003)
           .limit(1)
-        return !!(data && data.length > 0)
+
+        return hasHdbStyleBlock || !!(hdbRows && hdbRows.length > 0)
       })()
-      
+
+      const addressLooksLikePrivate = await (async () => {
+        const addressUpper = (resolved.address || '').toUpperCase().trim()
+        const blkNoUpper = (resolved.blkNo || '').toUpperCase().trim()
+
+        const hasHdbStyleBlock =
+          !!blkNoUpper || /^\d+[A-Z]?\s/.test(addressUpper)
+
+        if (hasHdbStyleBlock) return false
+
+        const { data: privateRows } = await supabase
+          .from('property_transactions_v2')
+          .select('property_group')
+          .neq('property_group', 'hdb')
+          .gte('latitude', resolved.lat - 0.0003)
+          .lte('latitude', resolved.lat + 0.0003)
+          .gte('longitude', resolved.lon - 0.0003)
+          .lte('longitude', resolved.lon + 0.0003)
+          .limit(1)
+
+        return !!(privateRows && privateRows.length > 0)
+      })()
+
       if (!bypassMismatch && addressLooksLikeHdb && propertyCategory !== 'hdb') {
         setMismatchMessage(
           'This looks like an HDB address, but you selected a private property type. Please double-check your property type for an accurate estimate.'
@@ -1071,8 +1102,8 @@ export default function Home() {
         setIsGenerating(false)
         return
       }
-      
-      if (!bypassMismatch && !addressLooksLikeHdb && propertyCategory === 'hdb') {
+
+      if (!bypassMismatch && addressLooksLikePrivate && propertyCategory === 'hdb') {
         setMismatchMessage(
           'This looks like a private property address, but you selected an HDB type. Please double-check your property type for an accurate estimate.'
         )
@@ -1080,7 +1111,7 @@ export default function Home() {
         setIsGenerating(false)
         return
       }
-      
+
       if (
         propertyCategory === 'condo' ||
         propertyCategory === 'ec' ||
@@ -1207,14 +1238,6 @@ export default function Home() {
       setHasReport(false)
       setLeadFormMessage('')
       setShowUnlockModal(false)
-
-      void savePartialLead({
-        estimated_price: result.estimated,
-        estimated_low: result.low,
-        estimated_high: result.high,
-        num_of_comps: result.comparables,
-        radius_used_m: result.radius,
-      })
     } catch (err) {
       console.error(err)
       setFormMessage('Error generating valuation.')
@@ -1265,63 +1288,6 @@ export default function Home() {
           : null,
       tenure: propertyContextExists && propertyCategory === 'landed' ? tenure : null,
       plan: extra?.plan ?? null,
-    }
-  }
-
-
-  const buildPartialLeadPayload = (values: {
-    estimated_price: number
-    estimated_low: number
-    estimated_high: number
-    num_of_comps: number
-    radius_used_m: number
-  }) => {
-    const fullUnitNumber =
-      floorLevel.trim() && stackNumber.trim()
-        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
-        : null
-
-    return {
-      source_page: '/',
-      address: address.trim() || null,
-      unit_number: fullUnitNumber,
-      unit_type: propertyType || null,
-      floor_area_sqm:
-        propertyCategory === 'landed'
-          ? Number(sqftToSqm(builtUpSqm)) || null
-          : Number(sqftToSqm(floorAreaSqm)) || null,
-      tenure: propertyCategory === 'landed' ? tenure : null,
-      estimated_price: values.estimated_price,
-      estimated_low: values.estimated_low,
-      estimated_high: values.estimated_high,
-      num_of_comps: values.num_of_comps,
-      radius_used_m: values.radius_used_m,
-      status: 'partial',
-    }
-  }
-
-  const savePartialLead = async (values: {
-    estimated_price: number
-    estimated_low: number
-    estimated_high: number
-    num_of_comps: number
-    radius_used_m: number
-  }) => {
-    if (partialLeadSaved) return
-
-    try {
-      const partialLeadPayload = buildPartialLeadPayload(values)
-
-      const { error } = await supabase.from('partial_leads').insert([partialLeadPayload])
-
-      if (error) {
-        console.error('Partial lead save error:', error)
-        return
-      }
-
-      setPartialLeadSaved(true)
-    } catch (error) {
-      console.error('Partial lead save error:', error)
     }
   }
 
