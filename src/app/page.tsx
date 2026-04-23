@@ -21,6 +21,8 @@ type PropertyTypeOption = {
   category: 'hdb' | 'condo' | 'ec' | 'landed'
 }
 
+type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
+
 type ComparableRow = {
   address: string | null
   street_name?: string | null
