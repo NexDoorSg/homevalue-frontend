@@ -294,14 +294,14 @@ function applyFloorAdjustment(
   }
 
   if (propertyCategory === 'ec') {
-    const adjustment = floorsAboveBase * 0.0025
-    const capped = Math.min(0.05, adjustment)
+    const adjustment = floorsAboveBase * 0.002
+    const capped = Math.min(0.035, adjustment)
     return estimate * (1 + capped)
   }
 
   // condo
-  const adjustment = floorsAboveBase * 0.003
-  const capped = Math.min(0.06, adjustment)
+  const adjustment = floorsAboveBase * 0.0025
+  const capped = Math.min(0.04, adjustment)
   return estimate * (1 + capped)
 }
 
