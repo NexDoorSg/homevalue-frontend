@@ -229,13 +229,46 @@ function calculateConditionRanges(estimated: number | null, low: number | null, 
   }
 
   return {
-    original_low: String(roundToNearest(renovatedLow * 0.9, 5000)),
-    original_high: String(roundToNearest(renovatedHigh * 0.9, 5000)),
+    original_low: String(roundToNearest(renovatedLow * 0.92, 5000)),
+    original_high: String(roundToNearest(renovatedHigh * 0.92, 5000)),
     renovated_low: String(renovatedLow),
     renovated_high: String(renovatedHigh),
-    well_renovated_low: String(roundToNearest(renovatedLow * 1.1, 5000)),
-    well_renovated_high: String(roundToNearest(renovatedHigh * 1.1, 5000)),
+    well_renovated_low: String(roundToNearest(renovatedLow * 1.08, 5000)),
+    well_renovated_high: String(roundToNearest(renovatedHigh * 1.08, 5000)),
   }
+}
+
+
+function isOldTenPercentConditionRange(report: any) {
+  const renovatedLow = Number(report.renovated_low)
+  const renovatedHigh = Number(report.renovated_high)
+  const originalLow = Number(report.original_low)
+  const originalHigh = Number(report.original_high)
+  const wellRenovatedLow = Number(report.well_renovated_low)
+  const wellRenovatedHigh = Number(report.well_renovated_high)
+
+  if (
+    !Number.isFinite(renovatedLow) ||
+    !Number.isFinite(renovatedHigh) ||
+    !Number.isFinite(originalLow) ||
+    !Number.isFinite(originalHigh) ||
+    !Number.isFinite(wellRenovatedLow) ||
+    !Number.isFinite(wellRenovatedHigh)
+  ) {
+    return false
+  }
+
+  const oldOriginalLow = roundToNearest(renovatedLow * 0.9, 5000)
+  const oldOriginalHigh = roundToNearest(renovatedHigh * 0.9, 5000)
+  const oldWellRenovatedLow = roundToNearest(renovatedLow * 1.1, 5000)
+  const oldWellRenovatedHigh = roundToNearest(renovatedHigh * 1.1, 5000)
+
+  return (
+    originalLow === oldOriginalLow &&
+    originalHigh === oldOriginalHigh &&
+    wellRenovatedLow === oldWellRenovatedLow &&
+    wellRenovatedHigh === oldWellRenovatedHigh
+  )
 }
 
 function normaliseListings(value: unknown): CompetingListing[] {
@@ -302,6 +335,15 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
 }
 
 function buildFormFromReport(report: any): ReportForm {
+  const shouldRecalculateRanges = isOldTenPercentConditionRange(report)
+  const recalculatedRanges = shouldRecalculateRanges
+    ? calculateConditionRanges(
+        toNumber(report.homevalue_estimated_price),
+        toNumber(report.homevalue_estimated_low),
+        toNumber(report.homevalue_estimated_high)
+      )
+    : null
+
   return {
     id: report.id || null,
     lead_id: report.lead_id || null,
@@ -313,7 +355,7 @@ function buildFormFromReport(report: any): ReportForm {
     property_address: report.property_address || '',
     unit_number: report.unit_number || '',
     property_type: report.property_type || '',
-    floor_area_sqm: toInputValue(report.floor_area_sqm),
+    floor_area_sqm: sqmToSqftInput(report.floor_area_sqm),
     floor_level: report.floor_level || getFloorCategoryFromUnitNumber(report.unit_number),
     tenure: report.tenure || inferTenureFromPropertyType(report.property_type),
     completion_year: toInputValue(report.completion_year),
@@ -324,12 +366,12 @@ function buildFormFromReport(report: any): ReportForm {
     homevalue_estimated_high: toInputValue(report.homevalue_estimated_high),
     radius_used_m: toInputValue(report.radius_used_m),
     num_of_comps: toInputValue(report.num_of_comps),
-    original_low: toInputValue(report.original_low),
-    original_high: toInputValue(report.original_high),
-    renovated_low: toInputValue(report.renovated_low),
-    renovated_high: toInputValue(report.renovated_high),
-    well_renovated_low: toInputValue(report.well_renovated_low),
-    well_renovated_high: toInputValue(report.well_renovated_high),
+    original_low: recalculatedRanges?.original_low ?? toInputValue(report.original_low),
+    original_high: recalculatedRanges?.original_high ?? toInputValue(report.original_high),
+    renovated_low: recalculatedRanges?.renovated_low ?? toInputValue(report.renovated_low),
+    renovated_high: recalculatedRanges?.renovated_high ?? toInputValue(report.renovated_high),
+    well_renovated_low: recalculatedRanges?.well_renovated_low ?? toInputValue(report.well_renovated_low),
+    well_renovated_high: recalculatedRanges?.well_renovated_high ?? toInputValue(report.well_renovated_high),
     competing_listings: normaliseListings(report.competing_listings),
     suggested_asking_price: toInputValue(report.suggested_asking_price),
     consultant_notes: report.consultant_notes || '',
@@ -803,7 +845,7 @@ export default function AgentReportDetailPage() {
         <section className="rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:p-8">
           <h2 className="text-xl font-semibold">4. Estimated Market Range</h2>
           <p className="mt-1 text-sm text-[#6F5C4E]">
-            Renovated is based on the HomeValue estimate with a tightened range. Original is 10% below. Well-renovated is 10% above.
+            Renovated is based on the HomeValue estimate with a tightened range. Original is 8% below. Well-renovated is 8% above.
           </p>
 
           <div className="mt-6 grid gap-5 md:grid-cols-3">
