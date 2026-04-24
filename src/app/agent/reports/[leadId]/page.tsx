@@ -35,12 +35,27 @@ type Lead = {
 
 type CompetingListing = {
   title: string
+  listing_url: string
   asking_price: string
   size_sqft: string
   psf: string
   condition: string
   source: string
   notes: string
+}
+
+type RecentTransaction = {
+  id: number | string
+  transaction_date: string
+  display_name: string
+  project_name: string
+  address: string
+  unit_type: string
+  floor_area_sqft: number
+  floor_level: string
+  transaction_price: number
+  price_psf: number
+  distance_m: number
 }
 
 type ReportForm = {
@@ -71,6 +86,7 @@ type ReportForm = {
   renovated_high: string
   well_renovated_low: string
   well_renovated_high: string
+  recent_transactions: RecentTransaction[]
   competing_listings: CompetingListing[]
   suggested_asking_price: string
   consultant_notes: string
@@ -91,6 +107,7 @@ const AGENT_NAME_BY_EMAIL: Record<string, string> = {
 
 const EMPTY_LISTING: CompetingListing = {
   title: '',
+  listing_url: '',
   asking_price: '',
   size_sqft: '',
   psf: '',
@@ -193,6 +210,162 @@ function formatCurrency(value: number | string | null | undefined) {
   }).format(numberValue)
 }
 
+function formatDate(value: string | null | undefined) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-SG', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatDistance(value: number | string | null | undefined) {
+  const distance = Number(value)
+  if (!Number.isFinite(distance)) return '—'
+  if (distance >= 1000) return `${(distance / 1000).toFixed(1)}km`
+  return `${Math.round(distance)}m`
+}
+
+function distanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const earthRadius = 6371000
+  const toRadians = (degree: number) => (degree * Math.PI) / 180
+  const dLat = toRadians(lat2 - lat1)
+  const dLon = toRadians(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return earthRadius * c
+}
+
+function getBoundingBox(lat: number, lon: number, radiusM: number) {
+  const latDelta = radiusM / 111000
+  const cosLat = Math.cos((lat * Math.PI) / 180)
+  const safeCosLat = Math.max(Math.abs(cosLat), 0.2)
+  const lonDelta = radiusM / (111000 * safeCosLat)
+
+  return {
+    minLat: lat - latDelta,
+    maxLat: lat + latDelta,
+    minLon: lon - lonDelta,
+    maxLon: lon + lonDelta,
+  }
+}
+
+function normaliseComparableText(value: string | null | undefined) {
+  return normaliseText(value).replace(/[-_/]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function extractBlockNumber(address: string | null | undefined) {
+  const text = normaliseComparableText(address)
+  if (!text) return ''
+  const match = text.match(/^(\d+[A-Z]?)/)
+  return match ? match[1] : ''
+}
+
+function getBedroomCount(value: string | null | undefined) {
+  const text = normaliseComparableText(value)
+  const match = text.match(/\b([1-6])\s*(BEDROOM|BED|BR)\b/)
+  return match ? Number(match[1]) : null
+}
+
+function getReportPropertyCategory(propertyType: string | null | undefined): 'hdb' | 'condo' | 'ec' | 'landed' {
+  const text = normaliseComparableText(propertyType)
+
+  if (/\b[2345]\s*ROOM\b/.test(text) || text === 'EXECUTIVE') return 'hdb'
+  if (text.includes('TERRACE') || text.includes('SEMI') || text.includes('DETACHED') || text.includes('BUNGALOW') || text.includes('GCB')) return 'landed'
+  if (text.includes(' EC') || text.endsWith(' EC') || text.includes('EXECUTIVE CONDOMINIUM')) return 'ec'
+
+  return 'condo'
+}
+
+function getLandedGroup(value: string | null | undefined) {
+  const text = normaliseComparableText(value)
+  if (text.includes('TERRACE')) return 'terrace'
+  if (text.includes('SEMI')) return 'semi'
+  if (text.includes('DETACHED') || text.includes('BUNGALOW') || text.includes('GCB')) return 'detached'
+  return 'other'
+}
+
+function isSameProject(form: ReportForm, projectName: string | null | undefined) {
+  const project = normaliseComparableText(projectName)
+  const address = normaliseComparableText(form.property_address)
+  if (!project || !address) return false
+  return address.includes(project) || project.includes(address)
+}
+
+function similarityScore(subject: number | null, comparable: number | null) {
+  if (!subject || !comparable || subject <= 0 || comparable <= 0) return 0
+  const ratioDiff = Math.abs(comparable - subject) / subject
+  return Math.max(0, 1 - Math.min(ratioDiff, 1))
+}
+
+function getRecentTransactionRadius(propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
+  if (propertyCategory === 'hdb') return 1200
+  if (propertyCategory === 'landed') return 5000
+  return 2000
+}
+
+function getTransactionScore(form: ReportForm, row: any, distanceM: number) {
+  const propertyCategory = getReportPropertyCategory(form.property_type)
+  const subjectAreaSqm = sqftToSqm(form.floor_area_sqm)
+  const rowAreaSqm = toNumber(row.floor_area_sqm)
+  const sizeScore = similarityScore(subjectAreaSqm, rowAreaSqm)
+  const distanceScore = 1 / Math.max(distanceM, 80)
+  const rowDate = row.transaction_date ? new Date(row.transaction_date).getTime() : 0
+  const recencyScore = rowDate > 0 ? rowDate / 10000000000000 : 0
+
+  if (propertyCategory === 'hdb') {
+    const sameBlock = extractBlockNumber(form.property_address) && extractBlockNumber(form.property_address) === extractBlockNumber(row.address)
+    return (sameBlock ? 500 : 0) + sizeScore * 120 + distanceScore * 10000 + recencyScore
+  }
+
+  if (propertyCategory === 'condo' || propertyCategory === 'ec') {
+    const sameProject = isSameProject(form, row.project_name)
+    const sameBedroom = getBedroomCount(form.property_type) && getBedroomCount(form.property_type) === getBedroomCount(row.unit_type)
+    const sameUnitType = normaliseComparableText(form.property_type) === normaliseComparableText(row.unit_type)
+    return (sameProject ? 600 : 0) + (sameUnitType || sameBedroom ? 220 : 0) + sizeScore * 140 + distanceScore * 10000 + recencyScore
+  }
+
+  const subjectGroup = getLandedGroup(form.property_type)
+  const rowGroup = getLandedGroup(row.unit_type)
+  const sameLandedGroup = subjectGroup !== 'other' && subjectGroup === rowGroup
+  const subjectTenure = normaliseComparableText(form.tenure).replace(' YEAR LEASEHOLD', '')
+  const sameTenure = Boolean(subjectTenure && normaliseComparableText(row.tenure).includes(subjectTenure))
+
+  if (subjectGroup === 'detached') {
+    return sizeScore * 260 + (sameLandedGroup ? 180 : 0) + (sameTenure ? 50 : 0) + distanceScore * 8000 + recencyScore
+  }
+
+  return (sameLandedGroup ? 260 : 0) + sizeScore * 180 + (sameTenure ? 50 : 0) + distanceScore * 8000 + recencyScore
+}
+
+function normaliseRecentTransactions(value: unknown): RecentTransaction[] {
+  if (!Array.isArray(value)) return []
+
+  return value.map((item, index) => {
+    const row = item as Partial<RecentTransaction>
+    return {
+      id: row.id ?? index,
+      transaction_date: row.transaction_date || '',
+      display_name: row.display_name || '',
+      project_name: row.project_name || '',
+      address: row.address || '',
+      unit_type: row.unit_type || '',
+      floor_area_sqft: Number(row.floor_area_sqft) || 0,
+      floor_level: row.floor_level || '',
+      transaction_price: Number(row.transaction_price) || 0,
+      price_psf: Number(row.price_psf) || 0,
+      distance_m: Number(row.distance_m) || 0,
+    }
+  })
+}
+
 function roundToNearest(value: number, nearest = 5000) {
   return Math.round(value / nearest) * nearest
 }
@@ -229,46 +402,13 @@ function calculateConditionRanges(estimated: number | null, low: number | null, 
   }
 
   return {
-    original_low: String(roundToNearest(renovatedLow * 0.92, 5000)),
-    original_high: String(roundToNearest(renovatedHigh * 0.92, 5000)),
+    original_low: String(roundToNearest(renovatedLow * 0.9, 5000)),
+    original_high: String(roundToNearest(renovatedHigh * 0.9, 5000)),
     renovated_low: String(renovatedLow),
     renovated_high: String(renovatedHigh),
-    well_renovated_low: String(roundToNearest(renovatedLow * 1.08, 5000)),
-    well_renovated_high: String(roundToNearest(renovatedHigh * 1.08, 5000)),
+    well_renovated_low: String(roundToNearest(renovatedLow * 1.1, 5000)),
+    well_renovated_high: String(roundToNearest(renovatedHigh * 1.1, 5000)),
   }
-}
-
-
-function isOldTenPercentConditionRange(report: any) {
-  const renovatedLow = Number(report.renovated_low)
-  const renovatedHigh = Number(report.renovated_high)
-  const originalLow = Number(report.original_low)
-  const originalHigh = Number(report.original_high)
-  const wellRenovatedLow = Number(report.well_renovated_low)
-  const wellRenovatedHigh = Number(report.well_renovated_high)
-
-  if (
-    !Number.isFinite(renovatedLow) ||
-    !Number.isFinite(renovatedHigh) ||
-    !Number.isFinite(originalLow) ||
-    !Number.isFinite(originalHigh) ||
-    !Number.isFinite(wellRenovatedLow) ||
-    !Number.isFinite(wellRenovatedHigh)
-  ) {
-    return false
-  }
-
-  const oldOriginalLow = roundToNearest(renovatedLow * 0.9, 5000)
-  const oldOriginalHigh = roundToNearest(renovatedHigh * 0.9, 5000)
-  const oldWellRenovatedLow = roundToNearest(renovatedLow * 1.1, 5000)
-  const oldWellRenovatedHigh = roundToNearest(renovatedHigh * 1.1, 5000)
-
-  return (
-    originalLow === oldOriginalLow &&
-    originalHigh === oldOriginalHigh &&
-    wellRenovatedLow === oldWellRenovatedLow &&
-    wellRenovatedHigh === oldWellRenovatedHigh
-  )
 }
 
 function normaliseListings(value: unknown): CompetingListing[] {
@@ -280,6 +420,7 @@ function normaliseListings(value: unknown): CompetingListing[] {
     const row = item as Partial<CompetingListing>
     return {
       title: row.title || '',
+      listing_url: row.listing_url || '',
       asking_price: row.asking_price ? String(row.asking_price) : '',
       size_sqft: row.size_sqft ? String(row.size_sqft) : '',
       psf: row.psf ? String(row.psf) : '',
@@ -327,6 +468,7 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
     radius_used_m: toInputValue(lead.radius_used_m),
     num_of_comps: toInputValue(lead.num_of_comps),
     ...ranges,
+    recent_transactions: [],
     competing_listings: [{ ...EMPTY_LISTING }, { ...EMPTY_LISTING }, { ...EMPTY_LISTING }],
     suggested_asking_price: '',
     consultant_notes: '',
@@ -335,15 +477,6 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
 }
 
 function buildFormFromReport(report: any): ReportForm {
-  const shouldRecalculateRanges = isOldTenPercentConditionRange(report)
-  const recalculatedRanges = shouldRecalculateRanges
-    ? calculateConditionRanges(
-        toNumber(report.homevalue_estimated_price),
-        toNumber(report.homevalue_estimated_low),
-        toNumber(report.homevalue_estimated_high)
-      )
-    : null
-
   return {
     id: report.id || null,
     lead_id: report.lead_id || null,
@@ -355,7 +488,7 @@ function buildFormFromReport(report: any): ReportForm {
     property_address: report.property_address || '',
     unit_number: report.unit_number || '',
     property_type: report.property_type || '',
-    floor_area_sqm: sqmToSqftInput(report.floor_area_sqm),
+    floor_area_sqm: toInputValue(report.floor_area_sqm),
     floor_level: report.floor_level || getFloorCategoryFromUnitNumber(report.unit_number),
     tenure: report.tenure || inferTenureFromPropertyType(report.property_type),
     completion_year: toInputValue(report.completion_year),
@@ -366,12 +499,12 @@ function buildFormFromReport(report: any): ReportForm {
     homevalue_estimated_high: toInputValue(report.homevalue_estimated_high),
     radius_used_m: toInputValue(report.radius_used_m),
     num_of_comps: toInputValue(report.num_of_comps),
-    original_low: recalculatedRanges?.original_low ?? toInputValue(report.original_low),
-    original_high: recalculatedRanges?.original_high ?? toInputValue(report.original_high),
-    renovated_low: recalculatedRanges?.renovated_low ?? toInputValue(report.renovated_low),
-    renovated_high: recalculatedRanges?.renovated_high ?? toInputValue(report.renovated_high),
-    well_renovated_low: recalculatedRanges?.well_renovated_low ?? toInputValue(report.well_renovated_low),
-    well_renovated_high: recalculatedRanges?.well_renovated_high ?? toInputValue(report.well_renovated_high),
+    original_low: toInputValue(report.original_low),
+    original_high: toInputValue(report.original_high),
+    renovated_low: toInputValue(report.renovated_low),
+    renovated_high: toInputValue(report.renovated_high),
+    well_renovated_low: toInputValue(report.well_renovated_low),
+    well_renovated_high: toInputValue(report.well_renovated_high),
     competing_listings: normaliseListings(report.competing_listings),
     suggested_asking_price: toInputValue(report.suggested_asking_price),
     consultant_notes: report.consultant_notes || '',
@@ -407,6 +540,7 @@ function buildPayload(form: ReportForm) {
     renovated_high: toNumber(form.renovated_high),
     well_renovated_low: toNumber(form.well_renovated_low),
     well_renovated_high: toNumber(form.well_renovated_high),
+    recent_transactions: form.recent_transactions,
     competing_listings: form.competing_listings,
     suggested_asking_price: toNumber(form.suggested_asking_price),
     consultant_notes: form.consultant_notes || null,
@@ -462,6 +596,8 @@ export default function AgentReportDetailPage() {
   const [form, setForm] = useState<ReportForm | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [transactionsError, setTransactionsError] = useState<string | null>(null)
 
   const isAuthorised = useMemo(() => {
     if (!user?.email) return false
@@ -615,6 +751,11 @@ export default function AgentReportDetailPage() {
     }
   }, [leadId])
 
+  useEffect(() => {
+    if (!form || form.recent_transactions.length > 0) return
+    fetchRecentTransactions(form)
+  }, [form?.id])
+
   async function signInWithGoogle() {
     setError(null)
     const redirectTo = `${window.location.origin}/agent/reports/${leadId}`
@@ -628,6 +769,119 @@ export default function AgentReportDetailPage() {
   async function signOut() {
     await supabase.auth.signOut()
     router.push('/agent/reports')
+  }
+
+  async function fetchRecentTransactions(currentForm: ReportForm) {
+    const lat = Number(currentForm.subject_lat)
+    const lon = Number(currentForm.subject_lon)
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      setTransactionsError('Missing saved coordinates for this property.')
+      return
+    }
+
+    setTransactionsLoading(true)
+    setTransactionsError(null)
+
+    const propertyCategory = getReportPropertyCategory(currentForm.property_type)
+    const radius = getRecentTransactionRadius(propertyCategory)
+    const box = getBoundingBox(lat, lon, radius)
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+    const dateFilter = twelveMonthsAgo.toISOString().slice(0, 10)
+
+    let query = supabase
+      .from('property_transactions_v2')
+      .select('id, property_type, property_subtype, project_name, address, latitude, longitude, transaction_price, transaction_date, floor_area_sqm, price_psf, unit_type, tenure, completion_year, floor_level, property_group, is_strata')
+      .gte('latitude', box.minLat)
+      .lte('latitude', box.maxLat)
+      .gte('longitude', box.minLon)
+      .lte('longitude', box.maxLon)
+      .gte('transaction_date', dateFilter)
+      .not('transaction_price', 'is', null)
+      .not('floor_area_sqm', 'is', null)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .order('transaction_date', { ascending: false })
+      .limit(1000)
+
+    if (propertyCategory === 'hdb') {
+      query = query.eq('property_group', 'hdb')
+    } else if (propertyCategory === 'condo') {
+      query = query.eq('property_subtype', 'condo')
+    } else if (propertyCategory === 'ec') {
+      query = query.eq('property_subtype', 'ec')
+    } else {
+      query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+    }
+
+    const { data, error: transactionError } = await query
+
+    if (transactionError) {
+      setTransactionsError(transactionError.message)
+      setTransactionsLoading(false)
+      return
+    }
+
+    const subjectHdbType = normaliseComparableText(currentForm.property_type)
+
+    const rows = (data || [])
+      .map((row: any) => {
+        const rowLat = Number(row.latitude)
+        const rowLon = Number(row.longitude)
+        const floorAreaSqm = Number(row.floor_area_sqm)
+        const transactionPrice = Number(row.transaction_price)
+
+        if (
+          !Number.isFinite(rowLat) ||
+          !Number.isFinite(rowLon) ||
+          !Number.isFinite(floorAreaSqm) ||
+          !Number.isFinite(transactionPrice) ||
+          floorAreaSqm <= 0 ||
+          transactionPrice <= 0
+        ) {
+          return null
+        }
+
+        if (propertyCategory === 'hdb' && normaliseComparableText(row.unit_type) !== subjectHdbType) {
+          return null
+        }
+
+        const distanceM = distanceInMeters(lat, lon, rowLat, rowLon)
+        if (distanceM > radius) return null
+
+        const floorAreaSqft = Math.round(floorAreaSqm * 10.7639)
+        const explicitPsf = Number(row.price_psf)
+        const pricePsf = Number.isFinite(explicitPsf) && explicitPsf > 0
+          ? explicitPsf
+          : Math.round(transactionPrice / floorAreaSqft)
+
+        const transaction: RecentTransaction = {
+          id: row.id,
+          transaction_date: row.transaction_date || '',
+          display_name: row.project_name || row.address || 'Nearby transaction',
+          project_name: row.project_name || '',
+          address: row.address || '',
+          unit_type: row.unit_type || '',
+          floor_area_sqft: floorAreaSqft,
+          floor_level: row.floor_level || '',
+          transaction_price: transactionPrice,
+          price_psf: Math.round(pricePsf),
+          distance_m: Math.round(distanceM),
+        }
+
+        return {
+          transaction,
+          score: getTransactionScore(currentForm, row, distanceM),
+        }
+      })
+      .filter((row): row is { transaction: RecentTransaction; score: number } => Boolean(row))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 15)
+      .map((row) => row.transaction)
+
+    setForm((current) => (current ? { ...current, recent_transactions: rows } : current))
+    setTransactionsLoading(false)
   }
 
   async function saveReport() {
@@ -805,15 +1059,79 @@ export default function AgentReportDetailPage() {
         </section>
 
         <section className="rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:p-8">
-          <h2 className="text-xl font-semibold">2. Recent Nearby Transactions</h2>
-          <div className="mt-4 rounded-2xl border border-dashed border-[#D7C6B5] bg-[#FBF7F1] p-5 text-sm leading-6 text-[#6F5C4E]">
-            Coming in the next step. This section will pull relevant transactions from the last 12 months using the saved property coordinates.
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">2. Recent Nearby Transactions</h2>
+              <p className="mt-1 text-sm text-[#6F5C4E]">
+                Last 12 months · Showing up to 15 most relevant transactions.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => fetchRecentTransactions(form)}
+              disabled={transactionsLoading}
+              className="rounded-2xl border border-[#D7C6B5] px-4 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8] disabled:opacity-60"
+            >
+              {transactionsLoading ? 'Refreshing...' : 'Refresh transactions'}
+            </button>
           </div>
+
+          {transactionsError && (
+            <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {transactionsError}
+            </p>
+          )}
+
+          {transactionsLoading && form.recent_transactions.length === 0 ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-[#D7C6B5] bg-[#FBF7F1] p-5 text-sm leading-6 text-[#6F5C4E]">
+              Loading recent transactions...
+            </div>
+          ) : form.recent_transactions.length === 0 ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-[#D7C6B5] bg-[#FBF7F1] p-5 text-sm leading-6 text-[#6F5C4E]">
+              No relevant transactions found in the last 12 months using the current property details.
+            </div>
+          ) : (
+            <div className="mt-5 overflow-x-auto rounded-2xl border border-[#EFE3D4]">
+              <table className="min-w-full divide-y divide-[#EFE3D4] text-left text-sm">
+                <thead className="bg-[#FBF7F1] text-xs uppercase tracking-[0.12em] text-[#7B6757]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Date</th>
+                    <th className="px-4 py-3 font-semibold">Address / Project</th>
+                    <th className="px-4 py-3 font-semibold">Unit Type</th>
+                    <th className="px-4 py-3 font-semibold">Size</th>
+                    <th className="px-4 py-3 font-semibold">Floor</th>
+                    <th className="px-4 py-3 font-semibold">Price</th>
+                    <th className="px-4 py-3 font-semibold">PSF</th>
+                    <th className="px-4 py-3 font-semibold">Distance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EFE3D4] bg-white">
+                  {form.recent_transactions.map((transaction) => (
+                    <tr key={transaction.id} className="align-top">
+                      <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{formatDate(transaction.transaction_date)}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-[#231A14]">{transaction.display_name || transaction.address || '—'}</div>
+                        {transaction.project_name && transaction.address && transaction.project_name !== transaction.address && (
+                          <div className="mt-1 text-xs text-[#7B6757]">{transaction.address}</div>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.unit_type || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.floor_area_sqft ? `${transaction.floor_area_sqft.toLocaleString()} sqft` : '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.floor_level || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold">{formatCurrency(transaction.transaction_price)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.price_psf ? `$${transaction.price_psf.toLocaleString()} psf` : '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{formatDistance(transaction.distance_m)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         <section className="rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:p-8">
           <h2 className="text-xl font-semibold">3. Current Competing Listings</h2>
-          <p className="mt-1 text-sm text-[#6F5C4E]">Manually enter around 3 active listings from PropertyGuru or other portals.</p>
+          <p className="mt-1 text-sm text-[#6F5C4E]">Manually enter around 3 active listings. Paste the listing link for quick reference, then key in the asking price and size.</p>
 
           <div className="mt-6 space-y-5">
             {form.competing_listings.map((listing, index) => (
@@ -822,6 +1140,9 @@ export default function AgentReportDetailPage() {
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="md:col-span-3">
                     <Field label="Listing title / block / project" value={listing.title} onChange={(value) => updateListing(index, 'title', value)} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <Field label="Listing URL / link" value={listing.listing_url} onChange={(value) => updateListing(index, 'listing_url', value)} placeholder="Paste PropertyGuru / 99.co / SRX link here" />
                   </div>
                   <Field label="Asking price" value={listing.asking_price} onChange={(value) => updateListing(index, 'asking_price', value)} type="number" />
                   <Field label="Size sqft" value={listing.size_sqft} onChange={(value) => updateListing(index, 'size_sqft', value)} type="number" />
@@ -845,7 +1166,7 @@ export default function AgentReportDetailPage() {
         <section className="rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:p-8">
           <h2 className="text-xl font-semibold">4. Estimated Market Range</h2>
           <p className="mt-1 text-sm text-[#6F5C4E]">
-            Renovated is based on the HomeValue estimate with a tightened range. Original is 8% below. Well-renovated is 8% above.
+            Renovated is based on the HomeValue estimate with a tightened range. Original is 10% below. Well-renovated is 10% above.
           </p>
 
           <div className="mt-6 grid gap-5 md:grid-cols-3">
