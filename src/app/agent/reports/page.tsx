@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 
@@ -270,7 +271,7 @@ export default function AgentReportsPage() {
               <div>
                 <h2 className="text-xl font-semibold">Recent HomeValue Leads</h2>
                 <p className="mt-1 text-sm text-[#6F5C4E]">
-                  Showing the latest 25 leads. Report generation will be added in the next step.
+                  Showing the latest 25 leads. Open any lead to create or edit its pre-consultation report.
                 </p>
               </div>
               <p className="text-sm text-[#6F5C4E]">
@@ -327,13 +328,12 @@ export default function AgentReportsPage() {
                       </p>
                     </td>
                     <td className="px-5 py-5">
-                      <button
-                        type="button"
-                        disabled
-                        className="cursor-not-allowed rounded-2xl bg-[#EFE3D4] px-4 py-3 text-xs font-semibold text-[#7B6757]"
+                      <Link
+                        href={`/agent/reports/${lead.id}`}
+                        className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
                       >
-                        Generate report soon
-                      </button>
+                        Open report
+                      </Link>
                     </td>
                   </tr>
                 ))}
