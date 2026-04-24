@@ -229,10 +229,15 @@ function formatDate(value: string | null | undefined) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('en-SG', {
-    day: '2-digit',
     month: 'short',
     year: 'numeric',
   })
+}
+
+function getTransactionTimestamp(value: string | null | undefined) {
+  if (!value) return 0
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime()
 }
 
 function formatDistance(value: number | string | null | undefined) {
@@ -323,6 +328,19 @@ function getRecentTransactionRadius(propertyCategory: 'hdb' | 'condo' | 'ec' | '
   if (propertyCategory === 'hdb') return 1200
   if (propertyCategory === 'landed') return 5000
   return 2000
+}
+
+function getTransactionSectionTitle(propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
+  if (propertyCategory === 'condo' || propertyCategory === 'ec') return 'Recent Project Transactions'
+  return 'Recent Nearby Transactions'
+}
+
+function getTransactionSectionDescription(propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
+  if (propertyCategory === 'condo' || propertyCategory === 'ec') {
+    return 'Last 12 months · Showing up to 15 same-project transactions.'
+  }
+
+  return 'Last 12 months · Showing up to 15 most relevant nearby transactions.'
 }
 
 function removeSingaporePostal(value: string | null | undefined) {
@@ -952,7 +970,7 @@ export default function AgentReportDetailPage() {
 
     const subjectHdbType = normaliseComparableText(currentForm.property_type)
 
-    const rows = (data || [])
+    const scoredRows = (data || [])
       .map((row: any) => {
         const rowLat = Number(row.latitude)
         const rowLon = Number(row.longitude)
@@ -971,6 +989,10 @@ export default function AgentReportDetailPage() {
         }
 
         if (propertyCategory === 'hdb' && normaliseComparableText(row.unit_type) !== subjectHdbType) {
+          return null
+        }
+
+        if ((propertyCategory === 'condo' || propertyCategory === 'ec') && !isSameProject(currentForm, row.project_name)) {
           return null
         }
 
@@ -1003,9 +1025,16 @@ export default function AgentReportDetailPage() {
         }
       })
       .filter((row): row is { transaction: RecentTransaction; score: number } => Boolean(row))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 15)
-      .map((row) => row.transaction)
+
+    const rows = (propertyCategory === 'condo' || propertyCategory === 'ec'
+      ? scoredRows
+          .sort((a, b) => getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date))
+          .slice(0, 15)
+      : scoredRows
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 15)
+          .sort((a, b) => getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date))
+    ).map((row) => row.transaction)
 
     setForm((current) => {
       if (!current) return current
@@ -1117,6 +1146,7 @@ export default function AgentReportDetailPage() {
     form.completion_year,
     form.property_type
   )
+  const propertyCategoryForDisplay = getReportPropertyCategory(form.property_type)
 
   return (
     <main className="min-h-screen bg-[#F7F1E8] px-4 py-6 text-[#231A14] md:px-8 md:py-10">
@@ -1201,9 +1231,9 @@ export default function AgentReportDetailPage() {
         <section className="rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">2. Recent Nearby Transactions</h2>
+              <h2 className="text-xl font-semibold">2. {getTransactionSectionTitle(propertyCategoryForDisplay)}</h2>
               <p className="mt-1 text-sm text-[#6F5C4E]">
-                Last 12 months · Showing up to 15 most relevant transactions.
+                {getTransactionSectionDescription(propertyCategoryForDisplay)}
               </p>
             </div>
             <button
@@ -1228,7 +1258,7 @@ export default function AgentReportDetailPage() {
             </div>
           ) : form.recent_transactions.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-[#D7C6B5] bg-[#FBF7F1] p-5 text-sm leading-6 text-[#6F5C4E]">
-              No relevant transactions found in the last 12 months using the current property details.
+              {propertyCategoryForDisplay === 'condo' || propertyCategoryForDisplay === 'ec' ? 'No same-project transactions found in the last 12 months using the current property details.' : 'No relevant nearby transactions found in the last 12 months using the current property details.'}
             </div>
           ) : (
             <div className="mt-5 overflow-x-auto rounded-2xl border border-[#EFE3D4]">
