@@ -109,6 +109,67 @@ function toInputValue(value: number | string | null | undefined) {
   return String(value)
 }
 
+function normaliseText(value: string | null | undefined) {
+  return (value || '').toUpperCase().trim()
+}
+
+function inferTenureFromPropertyType(propertyType: string | null | undefined) {
+  const normalised = normaliseText(propertyType)
+
+  if (
+    normalised.includes('ROOM') ||
+    normalised.includes('EXECUTIVE') ||
+    normalised.includes('EC')
+  ) {
+    return '99-year leasehold'
+  }
+
+  return ''
+}
+
+function extractFloorNumberFromUnit(unitNumber: string | null | undefined) {
+  const text = (unitNumber || '').trim()
+  if (!text) return null
+
+  const match = text.match(/#?\s*(\d{1,2})\s*[-/]/)
+  if (!match) return null
+
+  const level = Number(match[1])
+  return Number.isFinite(level) && level > 0 ? level : null
+}
+
+function getFloorCategoryFromUnitNumber(unitNumber: string | null | undefined) {
+  const level = extractFloorNumberFromUnit(unitNumber)
+  if (!level) return ''
+
+  if (level <= 5) return 'Low floor'
+  if (level <= 11) return 'Mid floor'
+  return 'High floor'
+}
+
+function getEstimatedRemainingLease(
+  tenure: string | null | undefined,
+  completionYear: string | number | null | undefined,
+  propertyType?: string | null
+) {
+  const inferredTenure = tenure || inferTenureFromPropertyType(propertyType)
+  const normalisedTenure = normaliseText(inferredTenure)
+  const year = Number(completionYear)
+
+  if (normalisedTenure.includes('FREEHOLD')) return 'Not applicable for freehold'
+
+  let leaseTerm: number | null = null
+  if (normalisedTenure.includes('999')) leaseTerm = 999
+  else if (normalisedTenure.includes('99')) leaseTerm = 99
+
+  if (!leaseTerm) return '—'
+  if (!Number.isFinite(year) || year <= 0) return 'Enter lease start / completion year'
+
+  const currentYear = new Date().getFullYear()
+  const remainingYears = Math.max(0, Math.round(year + leaseTerm - currentYear))
+  return `${remainingYears} years remaining`
+}
+
 function formatCurrency(value: number | string | null | undefined) {
   const numberValue = Number(value)
   if (!Number.isFinite(numberValue) || numberValue <= 0) return '—'
@@ -210,8 +271,8 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
     unit_number: lead.unit_number || '',
     property_type: lead.unit_type || '',
     floor_area_sqm: toInputValue(lead.floor_area_sqm),
-    floor_level: lead.floor_level || '',
-    tenure: lead.tenure || '',
+    floor_level: lead.floor_level || getFloorCategoryFromUnitNumber(lead.unit_number),
+    tenure: lead.tenure || inferTenureFromPropertyType(lead.unit_type),
     completion_year: toInputValue(lead.completion_year),
     subject_lat: toInputValue(lead.subject_lat),
     subject_lon: toInputValue(lead.subject_lon),
@@ -241,8 +302,8 @@ function buildFormFromReport(report: any): ReportForm {
     unit_number: report.unit_number || '',
     property_type: report.property_type || '',
     floor_area_sqm: toInputValue(report.floor_area_sqm),
-    floor_level: report.floor_level || '',
-    tenure: report.tenure || '',
+    floor_level: report.floor_level || getFloorCategoryFromUnitNumber(report.unit_number),
+    tenure: report.tenure || inferTenureFromPropertyType(report.property_type),
     completion_year: toInputValue(report.completion_year),
     subject_lat: toInputValue(report.subject_lat),
     subject_lon: toInputValue(report.subject_lon),
@@ -305,12 +366,16 @@ function Field({
   onChange,
   type = 'text',
   placeholder,
+  helperText,
+  readOnly = false,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   type?: string
   placeholder?: string
+  helperText?: string
+  readOnly?: boolean
 }) {
   return (
     <label className="block">
@@ -321,9 +386,13 @@ function Field({
         type={type}
         value={value}
         placeholder={placeholder}
+        readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-[#E4D7C6] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#B55A1E]"
+        className={`w-full rounded-2xl border border-[#E4D7C6] px-4 py-3 text-sm outline-none transition focus:border-[#B55A1E] ${
+          readOnly ? 'bg-[#F7F1E8] text-[#6F5C4E]' : 'bg-white'
+        }`}
       />
+      {helperText && <span className="mt-2 block text-xs leading-5 text-[#7B6757]">{helperText}</span>}
     </label>
   )
 }
@@ -349,6 +418,18 @@ export default function AgentReportDetailPage() {
     setForm((current) => (current ? { ...current, [key]: value } : current))
   }
 
+  function updateUnitNumber(value: string) {
+    setForm((current) => {
+      if (!current) return current
+      const detectedFloorCategory = getFloorCategoryFromUnitNumber(value)
+      return {
+        ...current,
+        unit_number: value,
+        floor_level: detectedFloorCategory || current.floor_level,
+      }
+    })
+  }
+
   function updateListing(index: number, key: keyof CompetingListing, value: string) {
     setForm((current) => {
       if (!current) return current
@@ -361,6 +442,8 @@ export default function AgentReportDetailPage() {
           const size = Number(key === 'size_sqft' ? value : updated.size_sqft)
           if (Number.isFinite(price) && price > 0 && Number.isFinite(size) && size > 0) {
             updated.psf = String(Math.round(price / size))
+          } else {
+            updated.psf = ''
           }
         }
 
@@ -581,6 +664,12 @@ export default function AgentReportDetailPage() {
     )
   }
 
+  const estimatedRemainingLease = getEstimatedRemainingLease(
+    form.tenure,
+    form.completion_year,
+    form.property_type
+  )
+
   return (
     <main className="min-h-screen bg-[#F7F1E8] px-4 py-6 text-[#231A14] md:px-8 md:py-10">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -623,12 +712,41 @@ export default function AgentReportDetailPage() {
             <div className="md:col-span-2">
               <Field label="Property address" value={form.property_address} onChange={(value) => updateForm('property_address', value)} />
             </div>
-            <Field label="Unit number" value={form.unit_number} onChange={(value) => updateForm('unit_number', value)} />
+            <Field
+              label="Unit number"
+              value={form.unit_number}
+              onChange={updateUnitNumber}
+              helperText="Floor category will auto-detect from the unit number where possible."
+            />
             <Field label="Property type" value={form.property_type} onChange={(value) => updateForm('property_type', value)} />
             <Field label="Floor area sqm" value={form.floor_area_sqm} onChange={(value) => updateForm('floor_area_sqm', value)} type="number" />
-            <Field label="Floor level" value={form.floor_level} onChange={(value) => updateForm('floor_level', value)} placeholder="Example: High floor" />
-            <Field label="Tenure" value={form.tenure} onChange={(value) => updateForm('tenure', value)} />
-            <Field label="Completion year" value={form.completion_year} onChange={(value) => updateForm('completion_year', value)} type="number" />
+            <Field
+              label="Floor category"
+              value={form.floor_level}
+              onChange={(value) => updateForm('floor_level', value)}
+              placeholder="Example: High floor"
+              helperText="Auto rule: Level 1–5 = Low floor, 6–11 = Mid floor, 12+ = High floor. Editable if needed."
+            />
+            <Field
+              label="Tenure / lease"
+              value={form.tenure}
+              onChange={(value) => updateForm('tenure', value)}
+              placeholder="Example: 99-year leasehold / 999-year leasehold / Freehold"
+            />
+            <Field
+              label="Lease start / completion year"
+              value={form.completion_year}
+              onChange={(value) => updateForm('completion_year', value)}
+              type="number"
+              helperText="Editable. For HDB, use lease start year where available; for private, use TOP/completion year where appropriate."
+            />
+            <Field
+              label="Estimated remaining lease"
+              value={estimatedRemainingLease}
+              onChange={() => undefined}
+              readOnly
+              helperText="Auto-calculated from tenure and lease start / completion year."
+            />
           </div>
         </section>
 
@@ -653,7 +771,14 @@ export default function AgentReportDetailPage() {
                   </div>
                   <Field label="Asking price" value={listing.asking_price} onChange={(value) => updateListing(index, 'asking_price', value)} type="number" />
                   <Field label="Size sqft" value={listing.size_sqft} onChange={(value) => updateListing(index, 'size_sqft', value)} type="number" />
-                  <Field label="PSF" value={listing.psf} onChange={(value) => updateListing(index, 'psf', value)} type="number" />
+                  <Field
+                    label="PSF (auto)"
+                    value={listing.psf}
+                    onChange={() => undefined}
+                    type="number"
+                    readOnly
+                    helperText="Auto-calculated from asking price ÷ size sqft."
+                  />
                   <Field label="Condition" value={listing.condition} onChange={(value) => updateListing(index, 'condition', value)} placeholder="Original / Renovated / Well-renovated" />
                   <Field label="Source" value={listing.source} onChange={(value) => updateListing(index, 'source', value)} />
                   <Field label="Notes" value={listing.notes} onChange={(value) => updateListing(index, 'notes', value)} />
