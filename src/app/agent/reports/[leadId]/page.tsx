@@ -229,20 +229,15 @@ function formatDate(value: string | null | undefined) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('en-SG', {
+    day: '2-digit',
     month: 'short',
     year: 'numeric',
   })
 }
 
-function getTransactionTimestamp(value: string | null | undefined) {
-  if (!value) return 0
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime()
-}
-
 function formatDistance(value: number | string | null | undefined) {
   const distance = Number(value)
-  if (!Number.isFinite(distance)) return '—'
+  if (!Number.isFinite(distance) || distance < 0) return '—'
   if (distance >= 1000) return `${(distance / 1000).toFixed(1)}km`
   return `${Math.round(distance)}m`
 }
@@ -328,19 +323,6 @@ function getRecentTransactionRadius(propertyCategory: 'hdb' | 'condo' | 'ec' | '
   if (propertyCategory === 'hdb') return 1200
   if (propertyCategory === 'landed') return 5000
   return 2000
-}
-
-function getTransactionSectionTitle(propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
-  if (propertyCategory === 'condo' || propertyCategory === 'ec') return 'Recent Project Transactions'
-  return 'Recent Nearby Transactions'
-}
-
-function getTransactionSectionDescription(propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
-  if (propertyCategory === 'condo' || propertyCategory === 'ec') {
-    return 'Last 12 months · Showing up to 15 same-project transactions.'
-  }
-
-  return 'Last 12 months · Showing up to 15 most relevant nearby transactions.'
 }
 
 function removeSingaporePostal(value: string | null | undefined) {
@@ -908,24 +890,107 @@ export default function AgentReportDetailPage() {
 
   async function fetchRecentTransactions(currentForm: ReportForm) {
     const propertyCategory = getReportPropertyCategory(currentForm.property_type)
+
+    setTransactionsLoading(true)
+    setTransactionsError(null)
+
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
+    const dateFilter = twelveMonthsAgo.toISOString().slice(0, 10)
+
+    if (propertyCategory === 'condo' || propertyCategory === 'ec') {
+      const projectSearchTerm = getProjectLikeSearchTerm(currentForm.property_address)
+
+      if (!projectSearchTerm) {
+        setTransactionsError('Unable to identify the project name from this property address. Please check the address format.')
+        setForm((current) => (current ? { ...current, recent_transactions: [] } : current))
+        setTransactionsLoading(false)
+        return
+      }
+
+      let projectQuery = supabase
+        .from('property_transactions_v2')
+        .select('id, property_type, property_subtype, project_name, address, latitude, longitude, transaction_price, transaction_date, floor_area_sqm, price_psf, unit_type, tenure, completion_year, floor_level, property_group, is_strata')
+        .gte('transaction_date', dateFilter)
+        .not('transaction_price', 'is', null)
+        .not('floor_area_sqm', 'is', null)
+        .not('project_name', 'is', null)
+        .not('transaction_date', 'is', null)
+        .order('transaction_date', { ascending: false })
+        .limit(1500)
+
+      projectQuery = propertyCategory === 'ec'
+        ? projectQuery.eq('property_subtype', 'ec')
+        : projectQuery.eq('property_subtype', 'condo')
+
+      projectQuery = projectQuery.ilike('project_name', `%${projectSearchTerm}%`)
+
+      const { data, error: transactionError } = await projectQuery
+
+      if (transactionError) {
+        setTransactionsError(transactionError.message)
+        setTransactionsLoading(false)
+        return
+      }
+
+      const projectRows = (data || [])
+        .map((row: any) => {
+          const floorAreaSqm = Number(row.floor_area_sqm)
+          const transactionPrice = Number(row.transaction_price)
+
+          if (
+            !Number.isFinite(floorAreaSqm) ||
+            !Number.isFinite(transactionPrice) ||
+            floorAreaSqm <= 0 ||
+            transactionPrice <= 0 ||
+            !isSameProject(currentForm, row.project_name)
+          ) {
+            return null
+          }
+
+          const floorAreaSqft = Math.round(floorAreaSqm * 10.7639)
+          const explicitPsf = Number(row.price_psf)
+          const pricePsf = Number.isFinite(explicitPsf) && explicitPsf > 0
+            ? explicitPsf
+            : Math.round(transactionPrice / floorAreaSqft)
+
+          const transaction: RecentTransaction = {
+            id: row.id,
+            transaction_date: row.transaction_date || '',
+            display_name: row.project_name || currentForm.property_address || 'Project transaction',
+            project_name: row.project_name || '',
+            address: row.address || '',
+            unit_type: row.unit_type || '',
+            floor_area_sqft: floorAreaSqft,
+            floor_level: row.floor_level || '',
+            transaction_price: transactionPrice,
+            price_psf: Math.round(pricePsf),
+            distance_m: -1,
+          }
+
+          return transaction
+        })
+        .filter((row): row is RecentTransaction => Boolean(row))
+        .sort((a, b) => getTransactionTimestamp(b.transaction_date) - getTransactionTimestamp(a.transaction_date))
+        .slice(0, 15)
+
+      setForm((current) => (current ? { ...current, recent_transactions: projectRows } : current))
+      setTransactionsLoading(false)
+      return
+    }
+
     const resolvedCoordinates = await resolveReferenceCoordinates(currentForm, propertyCategory)
 
     if (!resolvedCoordinates) {
       setTransactionsError('Unable to find usable coordinates for this property. Check the address or enter this report again after coordinates are saved.')
+      setTransactionsLoading(false)
       return
     }
 
     const lat = resolvedCoordinates.lat
     const lon = resolvedCoordinates.lon
-
-    setTransactionsLoading(true)
-    setTransactionsError(null)
-
     const radius = getRecentTransactionRadius(propertyCategory)
     const box = getBoundingBox(lat, lon, radius)
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-    const dateFilter = twelveMonthsAgo.toISOString().slice(0, 10)
     const textSearchTerm = getTextSearchTerm(currentForm, propertyCategory)
     const textFilter = buildTextSearchOrFilter(textSearchTerm)
 
@@ -942,10 +1007,6 @@ export default function AgentReportDetailPage() {
 
     if (propertyCategory === 'hdb') {
       query = query.eq('property_group', 'hdb')
-    } else if (propertyCategory === 'condo') {
-      query = query.eq('property_subtype', 'condo')
-    } else if (propertyCategory === 'ec') {
-      query = query.eq('property_subtype', 'ec')
     } else {
       query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
     }
@@ -992,10 +1053,6 @@ export default function AgentReportDetailPage() {
           return null
         }
 
-        if ((propertyCategory === 'condo' || propertyCategory === 'ec') && !isSameProject(currentForm, row.project_name)) {
-          return null
-        }
-
         const distanceM = distanceInMeters(lat, lon, rowLat, rowLon)
         if (distanceM > radius) return null
 
@@ -1026,15 +1083,11 @@ export default function AgentReportDetailPage() {
       })
       .filter((row): row is { transaction: RecentTransaction; score: number } => Boolean(row))
 
-    const rows = (propertyCategory === 'condo' || propertyCategory === 'ec'
-      ? scoredRows
-          .sort((a, b) => getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date))
-          .slice(0, 15)
-      : scoredRows
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 15)
-          .sort((a, b) => getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date))
-    ).map((row) => row.transaction)
+    const rows = scoredRows
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 15)
+      .sort((a, b) => getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date))
+      .map((row) => row.transaction)
 
     setForm((current) => {
       if (!current) return current
@@ -1047,7 +1100,7 @@ export default function AgentReportDetailPage() {
     })
 
     if (rows.length === 0 && resolvedCoordinates.source === 'derived') {
-      setTransactionsError('Coordinates were derived from the transaction table, but no matching transactions were found within the selected radius and last 12 months.')
+      setTransactionsError('Coordinates were derived from the transaction table, but no matching nearby transactions were found within the selected radius and last 12 months.')
     }
 
     setTransactionsLoading(false)
@@ -1146,7 +1199,6 @@ export default function AgentReportDetailPage() {
     form.completion_year,
     form.property_type
   )
-  const propertyCategoryForDisplay = getReportPropertyCategory(form.property_type)
 
   return (
     <main className="min-h-screen bg-[#F7F1E8] px-4 py-6 text-[#231A14] md:px-8 md:py-10">
@@ -1231,9 +1283,9 @@ export default function AgentReportDetailPage() {
         <section className="rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">2. {getTransactionSectionTitle(propertyCategoryForDisplay)}</h2>
+              <h2 className="text-xl font-semibold">2. Recent Nearby Transactions</h2>
               <p className="mt-1 text-sm text-[#6F5C4E]">
-                {getTransactionSectionDescription(propertyCategoryForDisplay)}
+                Last 12 months · Showing up to 15 most relevant transactions.
               </p>
             </div>
             <button
@@ -1258,7 +1310,7 @@ export default function AgentReportDetailPage() {
             </div>
           ) : form.recent_transactions.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-[#D7C6B5] bg-[#FBF7F1] p-5 text-sm leading-6 text-[#6F5C4E]">
-              {propertyCategoryForDisplay === 'condo' || propertyCategoryForDisplay === 'ec' ? 'No same-project transactions found in the last 12 months using the current property details.' : 'No relevant nearby transactions found in the last 12 months using the current property details.'}
+              No relevant transactions found in the last 12 months using the current property details.
             </div>
           ) : (
             <div className="mt-5 overflow-x-auto rounded-2xl border border-[#EFE3D4]">
