@@ -235,6 +235,12 @@ function formatDate(value: string | null | undefined) {
   })
 }
 
+function getTransactionTimestamp(value: string | null | undefined) {
+  if (!value) return 0
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime()
+}
+
 function formatDistance(value: number | string | null | undefined) {
   const distance = Number(value)
   if (!Number.isFinite(distance) || distance < 0) return '—'
