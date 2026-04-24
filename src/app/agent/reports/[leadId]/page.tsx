@@ -402,12 +402,12 @@ function calculateConditionRanges(estimated: number | null, low: number | null, 
   }
 
   return {
-    original_low: String(roundToNearest(renovatedLow * 0.9, 5000)),
-    original_high: String(roundToNearest(renovatedHigh * 0.9, 5000)),
+    original_low: String(roundToNearest(renovatedLow * 0.92, 5000)),
+    original_high: String(roundToNearest(renovatedHigh * 0.92, 5000)),
     renovated_low: String(renovatedLow),
     renovated_high: String(renovatedHigh),
-    well_renovated_low: String(roundToNearest(renovatedLow * 1.1, 5000)),
-    well_renovated_high: String(roundToNearest(renovatedHigh * 1.1, 5000)),
+    well_renovated_low: String(roundToNearest(renovatedLow * 1.08, 5000)),
+    well_renovated_high: String(roundToNearest(renovatedHigh * 1.08, 5000)),
   }
 }
 
@@ -488,7 +488,7 @@ function buildFormFromReport(report: any): ReportForm {
     property_address: report.property_address || '',
     unit_number: report.unit_number || '',
     property_type: report.property_type || '',
-    floor_area_sqm: toInputValue(report.floor_area_sqm),
+    floor_area_sqm: sqmToSqftInput(report.floor_area_sqm),
     floor_level: report.floor_level || getFloorCategoryFromUnitNumber(report.unit_number),
     tenure: report.tenure || inferTenureFromPropertyType(report.property_type),
     completion_year: toInputValue(report.completion_year),
@@ -505,6 +505,7 @@ function buildFormFromReport(report: any): ReportForm {
     renovated_high: toInputValue(report.renovated_high),
     well_renovated_low: toInputValue(report.well_renovated_low),
     well_renovated_high: toInputValue(report.well_renovated_high),
+    recent_transactions: normaliseRecentTransactions(report.recent_transactions),
     competing_listings: normaliseListings(report.competing_listings),
     suggested_asking_price: toInputValue(report.suggested_asking_price),
     consultant_notes: report.consultant_notes || '',
@@ -1166,7 +1167,7 @@ export default function AgentReportDetailPage() {
         <section className="rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:p-8">
           <h2 className="text-xl font-semibold">4. Estimated Market Range</h2>
           <p className="mt-1 text-sm text-[#6F5C4E]">
-            Renovated is based on the HomeValue estimate with a tightened range. Original is 10% below. Well-renovated is 10% above.
+            Renovated is based on the HomeValue estimate with a tightened range. Original is 8% below. Well-renovated is 8% above.
           </p>
 
           <div className="mt-6 grid gap-5 md:grid-cols-3">
