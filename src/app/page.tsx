@@ -1213,8 +1213,41 @@ export default function Home() {
       const unitNumber = (floorLevel.trim() && stackNumber.trim())
         ? `${floorLevel.trim()}-${stackNumber.trim()}`
         : ''
+
+      // Keep the 30-day cache stable only for the same valuation inputs.
+      // This prevents a wrong sqft / land size entry from being reused for the same address.
+      const cacheFloorAreaSqm = propertyCategory === 'landed'
+        ? Number(sqftToSqm(builtUpSqm))
+        : Number(sqftToSqm(floorAreaSqm))
+      const cacheLandSizeSqm = propertyCategory === 'landed'
+        ? Number(sqftToSqm(landSizeSqm))
+        : null
+      const cacheBuiltUpSqm = propertyCategory === 'landed'
+        ? Number(sqftToSqm(builtUpSqm))
+        : null
+      const cacheFloorLevel = Number(floorLevel) || null
+      const cacheSubjectBlockNo = propertyCategory === 'hdb'
+        ? (resolved.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\s/)?.[1] || ''
+        : ''
+
       const cacheKey = selectedPostal
-        ? `${selectedPostal}|${unitNumber}|${propertyCategory}`.toLowerCase()
+        ? [
+            selectedPostal,
+            unitNumber,
+            propertyCategory,
+            propertyType,
+            Number.isFinite(cacheFloorAreaSqm) ? cacheFloorAreaSqm.toFixed(2) : '',
+            Number.isFinite(cacheLandSizeSqm ?? NaN) ? Number(cacheLandSizeSqm).toFixed(2) : '',
+            Number.isFinite(cacheBuiltUpSqm ?? NaN) ? Number(cacheBuiltUpSqm).toFixed(2) : '',
+            propertyCategory === 'landed' ? tenure : '',
+            cacheFloorLevel ?? '',
+            resolvedProjectName || '',
+            subjectCompletionYear ?? '',
+            subjectIsStrata === null || subjectIsStrata === undefined ? '' : String(subjectIsStrata),
+            cacheSubjectBlockNo,
+          ]
+            .join('|')
+            .toLowerCase()
         : null
   
       const result = await getValuation({
