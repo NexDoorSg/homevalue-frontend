@@ -109,6 +109,18 @@ function toInputValue(value: number | string | null | undefined) {
   return String(value)
 }
 
+function sqmToSqftInput(value: number | string | null | undefined) {
+  const sqm = Number(value)
+  if (!Number.isFinite(sqm) || sqm <= 0) return ''
+  return String(Math.round(sqm * 10.7639))
+}
+
+function sqftToSqm(value: number | string | null | undefined) {
+  const sqft = Number(value)
+  if (!Number.isFinite(sqft) || sqft <= 0) return null
+  return sqft / 10.7639
+}
+
 function normaliseText(value: string | null | undefined) {
   return (value || '').toUpperCase().trim()
 }
@@ -270,7 +282,7 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
     property_address: lead.address || '',
     unit_number: lead.unit_number || '',
     property_type: lead.unit_type || '',
-    floor_area_sqm: toInputValue(lead.floor_area_sqm),
+    floor_area_sqm: sqmToSqftInput(lead.floor_area_sqm),
     floor_level: lead.floor_level || getFloorCategoryFromUnitNumber(lead.unit_number),
     tenure: lead.tenure || inferTenureFromPropertyType(lead.unit_type),
     completion_year: toInputValue(lead.completion_year),
@@ -336,7 +348,7 @@ function buildPayload(form: ReportForm) {
     property_address: form.property_address || null,
     unit_number: form.unit_number || null,
     property_type: form.property_type || null,
-    floor_area_sqm: toNumber(form.floor_area_sqm),
+    floor_area_sqm: sqftToSqm(form.floor_area_sqm),
     floor_level: form.floor_level || null,
     tenure: form.tenure || null,
     completion_year: toNumber(form.completion_year),
@@ -719,7 +731,7 @@ export default function AgentReportDetailPage() {
               helperText="Floor category will auto-detect from the unit number where possible."
             />
             <Field label="Property type" value={form.property_type} onChange={(value) => updateForm('property_type', value)} />
-            <Field label="Floor area sqm" value={form.floor_area_sqm} onChange={(value) => updateForm('floor_area_sqm', value)} type="number" />
+            <Field label="Floor area sqft" value={form.floor_area_sqm} onChange={(value) => updateForm('floor_area_sqm', value)} type="number" />
             <Field
               label="Floor category"
               value={form.floor_level}
