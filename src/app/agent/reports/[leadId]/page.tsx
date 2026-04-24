@@ -117,8 +117,22 @@ const EMPTY_LISTING: CompetingListing = {
 }
 
 function toNumber(value: number | string | null | undefined) {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string' && value.trim() === '') return null
+
   const numberValue = Number(value)
   return Number.isFinite(numberValue) ? numberValue : null
+}
+
+function toCoordinateInput(value: number | string | null | undefined) {
+  const numberValue = toNumber(value)
+  if (!numberValue || !Number.isFinite(numberValue)) return ''
+  return String(numberValue)
+}
+
+function isValidSingaporeCoordinate(lat: number | null, lon: number | null) {
+  if (!lat || !lon || !Number.isFinite(lat) || !Number.isFinite(lon)) return false
+  return lat >= 1.1 && lat <= 1.55 && lon >= 103.55 && lon <= 104.1
 }
 
 function toInputValue(value: number | string | null | undefined) {
@@ -311,6 +325,108 @@ function getRecentTransactionRadius(propertyCategory: 'hdb' | 'condo' | 'ec' | '
   return 2000
 }
 
+function removeSingaporePostal(value: string | null | undefined) {
+  return normaliseComparableText(value)
+    .replace(/\bSINGAPORE\b/g, ' ')
+    .replace(/\b\d{6}\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getStreetLikeSearchTerm(address: string | null | undefined) {
+  const cleaned = removeSingaporePostal(address)
+  if (!cleaned) return ''
+
+  return cleaned
+    .replace(/^\d+[A-Z]?\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getProjectLikeSearchTerm(address: string | null | undefined) {
+  const cleaned = removeSingaporePostal(address)
+  if (!cleaned) return ''
+
+  const withoutLeadingNumber = cleaned.replace(/^\d+[A-Z]?\s+/, '').trim()
+  const words = withoutLeadingNumber.split(' ').filter((word) => word.length >= 4 && !/^\d+$/.test(word))
+
+  if (words.length >= 2) {
+    const tail = words.slice(-2).join(' ')
+    if (tail.length >= 6) return tail
+  }
+
+  return words[0] || withoutLeadingNumber
+}
+
+function getTextSearchTerm(form: ReportForm, propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
+  if (propertyCategory === 'hdb' || propertyCategory === 'landed') {
+    return getStreetLikeSearchTerm(form.property_address)
+  }
+
+  return getProjectLikeSearchTerm(form.property_address)
+}
+
+function buildTextSearchOrFilter(searchTerm: string) {
+  const safeTerm = searchTerm.replace(/[(),]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!safeTerm) return ''
+
+  const primary = safeTerm.length > 28 ? safeTerm.slice(0, 28).trim() : safeTerm
+  const firstWord = primary.split(' ').find((word) => word.length >= 4) || primary
+
+  if (!firstWord) return ''
+
+  return `address.ilike.%${firstWord}%,project_name.ilike.%${firstWord}%`
+}
+
+async function resolveReferenceCoordinates(form: ReportForm, propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
+  const lat = toNumber(form.subject_lat)
+  const lon = toNumber(form.subject_lon)
+
+  if (isValidSingaporeCoordinate(lat, lon)) {
+    return { lat: lat as number, lon: lon as number, source: 'saved' as const }
+  }
+
+  const searchTerm = getTextSearchTerm(form, propertyCategory)
+  const textFilter = buildTextSearchOrFilter(searchTerm)
+
+  if (!textFilter) return null
+
+  let query = supabase
+    .from('property_transactions_v2')
+    .select('latitude, longitude, address, project_name, unit_type, property_group, property_subtype, transaction_date')
+    .not('latitude', 'is', null)
+    .not('longitude', 'is', null)
+    .order('transaction_date', { ascending: false })
+    .limit(20)
+
+  if (propertyCategory === 'hdb') {
+    query = query.eq('property_group', 'hdb')
+  } else if (propertyCategory === 'condo') {
+    query = query.eq('property_subtype', 'condo')
+  } else if (propertyCategory === 'ec') {
+    query = query.eq('property_subtype', 'ec')
+  } else {
+    query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+  }
+
+  query = query.or(textFilter)
+
+  const { data, error } = await query
+
+  if (error || !data || data.length === 0) return null
+
+  const validRows = data
+    .map((row: any) => ({ lat: toNumber(row.latitude), lon: toNumber(row.longitude) }))
+    .filter((row) => isValidSingaporeCoordinate(row.lat, row.lon)) as { lat: number; lon: number }[]
+
+  if (validRows.length === 0) return null
+
+  const averageLat = validRows.reduce((sum, row) => sum + row.lat, 0) / validRows.length
+  const averageLon = validRows.reduce((sum, row) => sum + row.lon, 0) / validRows.length
+
+  return { lat: averageLat, lon: averageLon, source: 'derived' as const }
+}
+
 function getTransactionScore(form: ReportForm, row: any, distanceM: number) {
   const propertyCategory = getReportPropertyCategory(form.property_type)
   const subjectAreaSqm = sqftToSqm(form.floor_area_sqm)
@@ -460,8 +576,8 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
     floor_level: lead.floor_level || getFloorCategoryFromUnitNumber(lead.unit_number),
     tenure: lead.tenure || inferTenureFromPropertyType(lead.unit_type),
     completion_year: toInputValue(lead.completion_year),
-    subject_lat: toInputValue(lead.subject_lat),
-    subject_lon: toInputValue(lead.subject_lon),
+    subject_lat: toCoordinateInput(lead.subject_lat),
+    subject_lon: toCoordinateInput(lead.subject_lon),
     homevalue_estimated_price: toInputValue(lead.estimated_price),
     homevalue_estimated_low: toInputValue(lead.estimated_low),
     homevalue_estimated_high: toInputValue(lead.estimated_high),
@@ -492,8 +608,8 @@ function buildFormFromReport(report: any): ReportForm {
     floor_level: report.floor_level || getFloorCategoryFromUnitNumber(report.unit_number),
     tenure: report.tenure || inferTenureFromPropertyType(report.property_type),
     completion_year: toInputValue(report.completion_year),
-    subject_lat: toInputValue(report.subject_lat),
-    subject_lon: toInputValue(report.subject_lon),
+    subject_lat: toCoordinateInput(report.subject_lat),
+    subject_lon: toCoordinateInput(report.subject_lon),
     homevalue_estimated_price: toInputValue(report.homevalue_estimated_price),
     homevalue_estimated_low: toInputValue(report.homevalue_estimated_low),
     homevalue_estimated_high: toInputValue(report.homevalue_estimated_high),
@@ -773,38 +889,38 @@ export default function AgentReportDetailPage() {
   }
 
   async function fetchRecentTransactions(currentForm: ReportForm) {
-    const lat = Number(currentForm.subject_lat)
-    const lon = Number(currentForm.subject_lon)
+    const propertyCategory = getReportPropertyCategory(currentForm.property_type)
+    const resolvedCoordinates = await resolveReferenceCoordinates(currentForm, propertyCategory)
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      setTransactionsError('Missing saved coordinates for this property.')
+    if (!resolvedCoordinates) {
+      setTransactionsError('Unable to find usable coordinates for this property. Check the address or enter this report again after coordinates are saved.')
       return
     }
+
+    const lat = resolvedCoordinates.lat
+    const lon = resolvedCoordinates.lon
 
     setTransactionsLoading(true)
     setTransactionsError(null)
 
-    const propertyCategory = getReportPropertyCategory(currentForm.property_type)
     const radius = getRecentTransactionRadius(propertyCategory)
     const box = getBoundingBox(lat, lon, radius)
     const twelveMonthsAgo = new Date()
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
     const dateFilter = twelveMonthsAgo.toISOString().slice(0, 10)
+    const textSearchTerm = getTextSearchTerm(currentForm, propertyCategory)
+    const textFilter = buildTextSearchOrFilter(textSearchTerm)
 
     let query = supabase
       .from('property_transactions_v2')
       .select('id, property_type, property_subtype, project_name, address, latitude, longitude, transaction_price, transaction_date, floor_area_sqm, price_psf, unit_type, tenure, completion_year, floor_level, property_group, is_strata')
-      .gte('latitude', box.minLat)
-      .lte('latitude', box.maxLat)
-      .gte('longitude', box.minLon)
-      .lte('longitude', box.maxLon)
       .gte('transaction_date', dateFilter)
       .not('transaction_price', 'is', null)
       .not('floor_area_sqm', 'is', null)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .order('transaction_date', { ascending: false })
-      .limit(1000)
+      .limit(1500)
 
     if (propertyCategory === 'hdb') {
       query = query.eq('property_group', 'hdb')
@@ -814,6 +930,16 @@ export default function AgentReportDetailPage() {
       query = query.eq('property_subtype', 'ec')
     } else {
       query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+    }
+
+    if (resolvedCoordinates.source === 'saved') {
+      query = query
+        .gte('latitude', box.minLat)
+        .lte('latitude', box.maxLat)
+        .gte('longitude', box.minLon)
+        .lte('longitude', box.maxLon)
+    } else if (textFilter) {
+      query = query.or(textFilter)
     }
 
     const { data, error: transactionError } = await query
@@ -881,7 +1007,20 @@ export default function AgentReportDetailPage() {
       .slice(0, 15)
       .map((row) => row.transaction)
 
-    setForm((current) => (current ? { ...current, recent_transactions: rows } : current))
+    setForm((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        subject_lat: String(lat),
+        subject_lon: String(lon),
+        recent_transactions: rows,
+      }
+    })
+
+    if (rows.length === 0 && resolvedCoordinates.source === 'derived') {
+      setTransactionsError('Coordinates were derived from the transaction table, but no matching transactions were found within the selected radius and last 12 months.')
+    }
+
     setTransactionsLoading(false)
   }
 
