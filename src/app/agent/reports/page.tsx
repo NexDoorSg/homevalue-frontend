@@ -45,6 +45,10 @@ type ManualReport = {
   status: string | null
 }
 
+type CombinedReport =
+  | { kind: 'lead'; created_at: string | null; lead: Lead }
+  | { kind: 'manual'; created_at: string | null; report: ManualReport }
+
 type AgentUser = {
   email: string
 }
@@ -89,18 +93,34 @@ function formatAreaSqft(areaSqm: number | string | null | undefined) {
   return `${sqft.toLocaleString('en-SG')} sqft`
 }
 
+function getCreatedTimestamp(value: string | null | undefined) {
+  if (!value) return 0
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime()
+}
+
 export default function AgentReportsPage() {
   const [loading, setLoading] = useState(true)
   const [leadLoading, setLeadLoading] = useState(false)
   const [user, setUser] = useState<AgentUser | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
   const [manualReports, setManualReports] = useState<ManualReport[]>([])
+  const [archivingReportId, setArchivingReportId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const isAuthorised = useMemo(() => {
     if (!user?.email) return false
     return AUTHORISED_EMAILS.includes(user.email.toLowerCase())
   }, [user])
+
+  const combinedReports = useMemo<CombinedReport[]>(() => {
+    const leadRows: CombinedReport[] = leads.map((lead) => ({ kind: 'lead', created_at: lead.created_at, lead }))
+    const manualRows: CombinedReport[] = manualReports.map((report) => ({ kind: 'manual', created_at: report.created_at, report }))
+
+    return [...leadRows, ...manualRows].sort(
+      (a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at)
+    )
+  }, [leads, manualReports])
 
   async function loadReports() {
     setLeadLoading(true)
@@ -113,15 +133,16 @@ export default function AgentReportsPage() {
           'id, created_at, name, phone, email, address, unit_number, unit_type, floor_area_sqm, tenure, completion_year, estimated_price, estimated_low, estimated_high, radius_used_m, num_of_comps, status, plan'
         )
         .order('created_at', { ascending: false })
-        .limit(25),
+        .limit(50),
       supabase
         .from('agent_valuation_reports')
         .select(
           'id, created_at, client_name, client_phone, client_email, property_address, unit_number, property_type, floor_area_sqm, tenure, completion_year, homevalue_estimated_price, homevalue_estimated_low, homevalue_estimated_high, radius_used_m, num_of_comps, status'
         )
         .eq('source_type', 'manual')
+        .or('status.is.null,status.neq.archived')
         .order('created_at', { ascending: false })
-        .limit(25),
+        .limit(50),
     ])
 
     if (leadsResult.error) {
@@ -196,6 +217,29 @@ export default function AgentReportsPage() {
     setUser(null)
     setLeads([])
     setManualReports([])
+  }
+
+  async function archiveManualReport(report: ManualReport) {
+    const confirmed = window.confirm('Archive this manual report?')
+    if (!confirmed) return
+
+    setArchivingReportId(report.id)
+    setError(null)
+
+    const { error: archiveError } = await supabase
+      .from('agent_valuation_reports')
+      .update({ status: 'archived' })
+      .eq('id', report.id)
+      .eq('source_type', 'manual')
+
+    if (archiveError) {
+      setError(archiveError.message)
+      setArchivingReportId(null)
+      return
+    }
+
+    setManualReports((current) => current.filter((item) => item.id !== report.id))
+    setArchivingReportId(null)
   }
 
   if (loading) {
@@ -316,11 +360,11 @@ export default function AgentReportsPage() {
               <div>
                 <h2 className="text-xl font-semibold">Recent Reports</h2>
                 <p className="mt-1 text-sm text-[#6F5C4E]">
-                  Showing recent HomeValue leads and manual reports. Open any item to create or edit its pre-consultation report.
+                  Showing HomeValue leads and manual reports together, sorted from newest to oldest.
                 </p>
               </div>
               <p className="text-sm text-[#6F5C4E]">
-                {leadLoading ? 'Loading...' : `${leads.length + manualReports.length} reports loaded`}
+                {leadLoading ? 'Loading...' : `${combinedReports.length} reports loaded`}
               </p>
             </div>
           </div>
@@ -343,83 +387,101 @@ export default function AgentReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EFE3D4]">
-                {leads.map((lead) => (
-                  <tr key={lead.id} className="align-top">
-                    <td className="px-5 py-5">
-                      <p className="font-semibold text-[#231A14]">{lead.name || 'Unnamed lead'}</p>
-                      <p className="mt-1 inline-flex rounded-full bg-[#FBF7F1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B6757]">HomeValue Lead</p>
-                      <p className="mt-1 text-[#6F5C4E]">{lead.phone || 'No phone'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">{lead.email || 'No email'}</p>
-                      <p className="mt-2 text-xs text-[#8B7868]">{formatDate(lead.created_at)}</p>
-                    </td>
-                    <td className="max-w-sm px-5 py-5">
-                      <p className="font-semibold text-[#231A14]">{lead.address || 'No address'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">Unit: {lead.unit_number || '—'}</p>
-                    </td>
-                    <td className="px-5 py-5">
-                      <p>{lead.unit_type || '—'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(lead.floor_area_sqm)}</p>
-                      <p className="mt-1 text-[#6F5C4E]">Tenure: {lead.tenure || '—'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">Completion: {lead.completion_year || '—'}</p>
-                    </td>
-                    <td className="px-5 py-5">
-                      <p className="font-semibold text-[#231A14]">
-                        {formatCurrency(lead.estimated_price)}
-                      </p>
-                      <p className="mt-1 text-[#6F5C4E]">
-                        {formatCurrency(lead.estimated_low)} – {formatCurrency(lead.estimated_high)}
-                      </p>
-                      <p className="mt-2 text-xs text-[#8B7868]">
-                        {lead.num_of_comps || 0} comps · {lead.radius_used_m || '—'}m radius
-                      </p>
-                    </td>
-                    <td className="px-5 py-5">
-                      <Link
-                        href={`/agent/reports/${lead.id}`}
-                        className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
-                      >
-                        Open report
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {combinedReports.map((item) => {
+                  if (item.kind === 'lead') {
+                    const lead = item.lead
 
-                {manualReports.map((report) => (
-                  <tr key={`manual-${report.id}`} className="align-top">
-                    <td className="px-5 py-5">
-                      <p className="font-semibold text-[#231A14]">{report.client_name || 'Unnamed client'}</p>
-                      <p className="mt-1 inline-flex rounded-full bg-[#FFF8EF] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B55A1E]">Manual Report</p>
-                      <p className="mt-2 text-[#6F5C4E]">{report.client_phone || 'No phone'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">{report.client_email || 'No email'}</p>
-                      <p className="mt-2 text-xs text-[#8B7868]">{formatDate(report.created_at)}</p>
-                    </td>
-                    <td className="max-w-sm px-5 py-5">
-                      <p className="font-semibold text-[#231A14]">{report.property_address || 'No address'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">Unit: {report.unit_number || '—'}</p>
-                    </td>
-                    <td className="px-5 py-5">
-                      <p>{report.property_type || '—'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(report.floor_area_sqm)}</p>
-                      <p className="mt-1 text-[#6F5C4E]">Tenure: {report.tenure || '—'}</p>
-                      <p className="mt-1 text-[#6F5C4E]">Completion: {report.completion_year || '—'}</p>
-                    </td>
-                    <td className="px-5 py-5">
-                      <p className="font-semibold text-[#231A14]">{formatCurrency(report.homevalue_estimated_price)}</p>
-                      <p className="mt-1 text-[#6F5C4E]">{formatCurrency(report.homevalue_estimated_low)} – {formatCurrency(report.homevalue_estimated_high)}</p>
-                      <p className="mt-2 text-xs text-[#8B7868]">{report.num_of_comps || 0} comps · {report.radius_used_m || '—'}m radius</p>
-                    </td>
-                    <td className="px-5 py-5">
-                      <Link
-                        href={`/agent/reports/report/${report.id}`}
-                        className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
-                      >
-                        Open report
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                    return (
+                      <tr key={`lead-${lead.id}`} className="align-top">
+                        <td className="px-5 py-5">
+                          <p className="font-semibold text-[#231A14]">{lead.name || 'Unnamed lead'}</p>
+                          <p className="mt-1 inline-flex rounded-full bg-[#FBF7F1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B6757]">HomeValue Lead</p>
+                          <p className="mt-1 text-[#6F5C4E]">{lead.phone || 'No phone'}</p>
+                          <p className="mt-1 text-[#6F5C4E]">{lead.email || 'No email'}</p>
+                          <p className="mt-2 text-xs text-[#8B7868]">{formatDate(lead.created_at)}</p>
+                        </td>
+                        <td className="max-w-sm px-5 py-5">
+                          <p className="font-semibold text-[#231A14]">{lead.address || 'No address'}</p>
+                          <p className="mt-1 text-[#6F5C4E]">Unit: {lead.unit_number || '—'}</p>
+                        </td>
+                        <td className="px-5 py-5">
+                          <p>{lead.unit_type || '—'}</p>
+                          <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(lead.floor_area_sqm)}</p>
+                          <p className="mt-1 text-[#6F5C4E]">Tenure: {lead.tenure || '—'}</p>
+                          <p className="mt-1 text-[#6F5C4E]">Completion: {lead.completion_year || '—'}</p>
+                        </td>
+                        <td className="px-5 py-5">
+                          <p className="font-semibold text-[#231A14]">
+                            {formatCurrency(lead.estimated_price)}
+                          </p>
+                          <p className="mt-1 text-[#6F5C4E]">
+                            {formatCurrency(lead.estimated_low)} – {formatCurrency(lead.estimated_high)}
+                          </p>
+                          <p className="mt-2 text-xs text-[#8B7868]">
+                            {lead.num_of_comps || 0} comps · {lead.radius_used_m || '—'}m radius
+                          </p>
+                        </td>
+                        <td className="px-5 py-5">
+                          <Link
+                            href={`/agent/reports/${lead.id}`}
+                            className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
+                          >
+                            Open report
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  }
 
-                {!leadLoading && leads.length === 0 && manualReports.length === 0 && (
+                  const report = item.report
+
+                  return (
+                    <tr key={`manual-${report.id}`} className="align-top">
+                      <td className="px-5 py-5">
+                        <p className="font-semibold text-[#231A14]">{report.client_name || 'Unnamed client'}</p>
+                        <p className="mt-1 inline-flex rounded-full bg-[#FFF8EF] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B55A1E]">Manual Report</p>
+                        <p className="mt-2 text-[#6F5C4E]">{report.client_phone || 'No phone'}</p>
+                        <p className="mt-1 text-[#6F5C4E]">{report.client_email || 'No email'}</p>
+                        <p className="mt-2 text-xs text-[#8B7868]">{formatDate(report.created_at)}</p>
+                      </td>
+                      <td className="max-w-sm px-5 py-5">
+                        <p className="font-semibold text-[#231A14]">{report.property_address || 'No address'}</p>
+                        <p className="mt-1 text-[#6F5C4E]">Unit: {report.unit_number || '—'}</p>
+                      </td>
+                      <td className="px-5 py-5">
+                        <p>{report.property_type || '—'}</p>
+                        <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(report.floor_area_sqm)}</p>
+                        <p className="mt-1 text-[#6F5C4E]">Tenure: {report.tenure || '—'}</p>
+                        <p className="mt-1 text-[#6F5C4E]">Completion: {report.completion_year || '—'}</p>
+                      </td>
+                      <td className="px-5 py-5">
+                        <p className="font-semibold text-[#231A14]">{formatCurrency(report.homevalue_estimated_price)}</p>
+                        <p className="mt-1 text-[#6F5C4E]">{formatCurrency(report.homevalue_estimated_low)} – {formatCurrency(report.homevalue_estimated_high)}</p>
+                        <p className="mt-2 text-xs text-[#8B7868]">{report.num_of_comps || 0} comps · {report.radius_used_m || '—'}m radius</p>
+                      </td>
+                      <td className="px-5 py-5">
+                        <div className="flex flex-col gap-2">
+                          <Link
+                            href={`/agent/reports/report/${report.id}`}
+                            className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
+                          >
+                            Open report
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => archiveManualReport(report)}
+                            disabled={archivingReportId === report.id}
+                            className="inline-flex rounded-2xl border border-[#D7C6B5] px-4 py-3 text-xs font-semibold text-[#7B3F1A] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {archivingReportId === report.id ? 'Archiving...' : 'Archive'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+
+                {!leadLoading && combinedReports.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-5 py-10 text-center text-[#6F5C4E]">
                       No reports found.
