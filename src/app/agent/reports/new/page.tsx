@@ -8,6 +8,7 @@ import { supabase } from '../../../../lib/supabase'
 
 type AgentUser = { email: string }
 type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
+type LandedOwnershipType = 'non_strata' | 'strata_cluster'
 
 type OneMapResult = {
   ADDRESS: string
@@ -60,12 +61,19 @@ const PROPERTY_TYPE_OPTIONS: PropertyTypeOption[] = [
   { label: 'Terrace House', value: 'TERRACE HOUSE', category: 'landed' },
   { label: 'Semi-Detached House', value: 'SEMI-DETACHED HOUSE', category: 'landed' },
   { label: 'Detached House', value: 'DETACHED HOUSE', category: 'landed' },
+  { label: 'Bungalow', value: 'BUNGALOW', category: 'landed' },
+  { label: 'Good Class Bungalow', value: 'GOOD CLASS BUNGALOW', category: 'landed' },
 ]
 
 const TENURE_OPTIONS = [
   { label: '99-year leasehold', value: '99-year leasehold' },
   { label: '999-year leasehold', value: '999-year leasehold' },
   { label: 'Freehold', value: 'FREEHOLD' },
+]
+
+const LANDED_OWNERSHIP_OPTIONS: { label: string; value: LandedOwnershipType }[] = [
+  { label: 'Non-strata landed', value: 'non_strata' },
+  { label: 'Strata / cluster landed', value: 'strata_cluster' },
 ]
 
 function normaliseText(value: string | null | undefined) {
@@ -327,6 +335,7 @@ export default function NewManualReportPage() {
   const [floorAreaSqft, setFloorAreaSqft] = useState('')
   const [landSizeSqft, setLandSizeSqft] = useState('')
   const [builtUpSqft, setBuiltUpSqft] = useState('')
+  const [landedOwnershipType, setLandedOwnershipType] = useState<LandedOwnershipType | ''>('')
   const [tenure, setTenure] = useState('')
   const [completionYear, setCompletionYear] = useState('')
 
@@ -410,6 +419,7 @@ export default function NewManualReportPage() {
     setPropertyOptionLabel(label)
     const option = PROPERTY_TYPE_OPTIONS.find((item) => item.label === label)
     if (option && !tenure) setTenure(inferDefaultTenure(option.category))
+    if (option?.category !== 'landed') setLandedOwnershipType('')
   }
 
   async function createReport() {
@@ -454,6 +464,11 @@ export default function NewManualReportPage() {
       return
     }
 
+    if (propertyCategory === 'landed' && !landedOwnershipType) {
+      setError('Please select whether this is non-strata landed or strata / cluster landed.')
+      return
+    }
+
     if (propertyCategory === 'landed' && !tenure) {
       setError('Please select the tenure for landed reports.')
       return
@@ -466,14 +481,16 @@ export default function NewManualReportPage() {
         ? normaliseText(selectedAddress.BUILDING)
         : null
       let subjectCompletionYear: number | null = toNumber(completionYear)
-      let subjectIsStrata: boolean | null = null
+      let subjectIsStrata: boolean | null = propertyCategory === 'landed'
+        ? landedOwnershipType === 'strata_cluster'
+        : null
 
       if (propertyCategory === 'hdb') {
         const hdbCompletionYear = subjectCompletionYear || await getHdbCompletionYear(selectedAddress.ADDRESS)
         subjectCompletionYear = hdbCompletionYear
       }
 
-      if (propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') {
+      if (propertyCategory === 'condo' || propertyCategory === 'ec') {
         const canonical = await resolveCanonicalProjectName({
           lat,
           lon,
@@ -552,6 +569,7 @@ export default function NewManualReportPage() {
           land_size_sqm: landSizeSqm,
           built_up_sqm: builtUpSqm,
           subject_is_strata: subjectIsStrata,
+          landed_ownership_type: propertyCategory === 'landed' ? landedOwnershipType : null,
           homevalue_estimated_price: valuation.estimated,
           homevalue_estimated_low: valuation.low,
           homevalue_estimated_high: valuation.high,
@@ -696,6 +714,18 @@ export default function NewManualReportPage() {
 
               {propertyCategory === 'landed' ? (
                 <>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7B6757]">Landed ownership type</span>
+                    <select
+                      value={landedOwnershipType}
+                      onChange={(event) => setLandedOwnershipType(event.target.value as LandedOwnershipType | '')}
+                      className="w-full rounded-2xl border border-[#E4D7C6] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#B55A1E]"
+                    >
+                      <option value="">Select landed ownership type</option>
+                      {LANDED_OWNERSHIP_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                    <span className="mt-2 block text-xs leading-5 text-[#7B6757]">This controls whether recent transactions use non-strata landed or strata / cluster landed only.</span>
+                  </label>
                   <Field label="Land size sqft" value={landSizeSqft} onChange={setLandSizeSqft} type="number" />
                   <Field label="Built-up size sqft" value={builtUpSqft} onChange={setBuiltUpSqft} type="number" />
                 </>
