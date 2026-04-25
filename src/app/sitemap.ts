@@ -6,16 +6,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
     '',
     '/free-property-valuation-singapore',
+    '/how-much-is-my-property-worth-singapore',
+    '/how-property-valuation-works-singapore',
     '/hdb-valuation-singapore',
     '/condo-valuation-singapore',
     '/landed-valuation-singapore',
-    '/hdb-valuation-tampines',
+    '/hdb-valuation-ang-mo-kio',
+    '/hdb-valuation-bedok',
+    '/hdb-valuation-bishan',
     '/hdb-valuation-jurong-west',
+    '/hdb-valuation-punggol',
+    '/hdb-valuation-sengkang',
+    '/hdb-valuation-tampines',
     '/hdb-valuation-woodlands',
     '/hdb-valuation-yishun',
-    '/hdb-valuation-bedok',
-    '/hdb-valuation-punggol',
-    '/hdb-valuation-ang-mo-kio',
   ]
 
   return routes.map((route) => ({
