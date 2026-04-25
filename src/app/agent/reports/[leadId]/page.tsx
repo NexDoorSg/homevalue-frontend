@@ -318,8 +318,8 @@ function getLandedGroup(value: string | null | undefined) {
   const text = normaliseComparableText(value)
   if (text.includes('GOOD CLASS') || text.includes('GCB')) return 'gcb'
   if (text.includes('BUNGALOW')) return 'bungalow'
-  if (text.includes('DETACHED')) return 'detached'
   if (text.includes('SEMI')) return 'semi'
+  if (text.includes('DETACHED')) return 'detached'
   if (text.includes('TERRACE')) return 'terrace'
   return 'other'
 }
