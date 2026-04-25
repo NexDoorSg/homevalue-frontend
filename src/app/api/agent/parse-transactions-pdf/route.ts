@@ -20,13 +20,13 @@ type ParsedTransaction = {
 }
 
 function normaliseText(value: string | null | undefined) {
-  return (value || '').replace(/\s+/g, ' ').trim()
+  return (value || '').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').trim()
 }
 
 function parseMoney(value: string | null | undefined) {
   if (!value) return 0
 
-  const moneyMatch = value.match(/\$[\s-]*\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i)
+  const moneyMatch = value.match(/\$\s*-?\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i)
   if (!moneyMatch) return 0
 
   const cleaned = moneyMatch[0].replace(/[$,\s]/g, '').toUpperCase()
@@ -43,8 +43,10 @@ function parseMoney(value: string | null | undefined) {
 
 function parsePsf(value: string | null | undefined) {
   if (!value) return 0
+
   const match = value.replace(/,/g, '').match(/\$?\s*(\d+(?:\.\d+)?)\s*PSF/i)
   if (!match) return 0
+
   const numberValue = Number(match[1])
   return Number.isFinite(numberValue) ? Math.round(numberValue) : 0
 }
@@ -69,6 +71,7 @@ function getTransactionTimestamp(value: string) {
 function extractFloorFromAddress(value: string) {
   const match = value.match(/#\s*(\d{1,2})\s*[-A-Z0-9]/i)
   if (!match) return ''
+
   const level = Number(match[1])
   if (!Number.isFinite(level)) return ''
   return `Level ${level}`
@@ -76,7 +79,7 @@ function extractFloorFromAddress(value: string) {
 
 function removeMoneyAndPsf(value: string) {
   return normaliseText(value)
-    .replace(/\$[\s-]*\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/gi, ' ')
+    .replace(/\$\s*-?\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/gi, ' ')
     .replace(/\$?\s*\d[\d,.]*(?:\.\d+)?\s*PSF/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -86,6 +89,7 @@ function cleanLine(line: string) {
   return normaliseText(line)
     .replace(/^https:\/\/tech-rea\.com\/realAgent\s*/i, '')
     .replace(/^Generated on:.*$/i, '')
+    .replace(/[\f\u0000-\u001f]+/g, ' ')
     .trim()
 }
 
@@ -99,7 +103,8 @@ function isNoiseLine(line: string) {
   if (text.includes('agency:')) return true
   if (text.includes('cea:')) return true
   if (text.includes('built-up / floor area')) return true
-  if (text.includes('date details transacted')) return true
+  if (text.includes('date details')) return true
+  if (text.includes('transacted amount')) return true
   if (text.includes('source & activity')) return true
   if (text.includes('previous activity')) return true
   if (text.includes('gain/loss')) return true
@@ -119,12 +124,13 @@ function looksLikeUnitType(line: string) {
     text.includes('DETACHED') ||
     text.includes('BUNGALOW') ||
     text.includes('ROOM') ||
-    text.includes('BED')
+    text.includes('BED') ||
+    text.includes('BATH')
   )
 }
 
 function looksLikeNonTransactionDetail(line: string) {
-  const text = line.toUpperCase()
+  const text = removeMoneyAndPsf(line).toUpperCase().trim()
   if (!text) return true
   if (text === 'N.A') return true
   if (text === 'URA') return true
@@ -138,21 +144,21 @@ function looksLikeNonTransactionDetail(line: string) {
   return false
 }
 
-function splitRowsFromRealAgentText(rawText: string) {
-  const normalised = rawText
+function getCandidateLines(rawText: string) {
+  return rawText
     .replace(/\r/g, '\n')
     .replace(/\u00a0/g, ' ')
-    .replace(/[ \t]+/g, ' ')
-
-  const lines = normalised
     .split('\n')
     .map(cleanLine)
     .filter((line) => !isNoiseLine(line))
+}
 
+function splitRowsFromLines(lines: string[]) {
   const rowBlocks: { dateText: string; lines: string[] }[] = []
   let current: { dateText: string; lines: string[] } | null = null
 
-  for (const line of lines) {
+  for (const originalLine of lines) {
+    const line = originalLine.replace(/^[^0-9]*(?=\d{2}\/\d{2}\/\d{2})/, '').trim()
     const dateMatch = line.match(/^(\d{2}\/\d{2}\/\d{2})(?:\s+(.*))?$/)
 
     if (dateMatch) {
@@ -168,36 +174,29 @@ function splitRowsFromRealAgentText(rawText: string) {
   }
 
   if (current) rowBlocks.push(current)
-
   return rowBlocks
 }
 
-function parseRealAgentTransactions(rawText: string) {
-  const rowBlocks = splitRowsFromRealAgentText(rawText)
+function parseRowsFromLineBlocks(rawText: string) {
+  const rowBlocks = splitRowsFromLines(getCandidateLines(rawText))
   const rows: ParsedTransaction[] = []
 
   rowBlocks.forEach((rowBlock, index) => {
     const transactionDate = parseDate(rowBlock.dateText)
     if (!transactionDate) return
 
-    const lines = rowBlock.lines
-      .map(cleanLine)
-      .filter((line) => !isNoiseLine(line))
+    const lines = rowBlock.lines.map(cleanLine).filter((line) => !isNoiseLine(line))
+    if (lines.length < 3) return
 
-    if (lines.length < 4) return
-
-    const firstMoneyLine = lines.find((line) => /\$[\s-]*\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i.test(line) && !/PSF/i.test(line)) || ''
-    const firstPsfLine = lines.find((line) => /PSF/i.test(line)) || ''
-
-    const transactionPrice = parseMoney(firstMoneyLine)
-    const pricePsf = parsePsf(firstPsfLine)
+    const joinedBlock = lines.join('\n')
+    const transactionPrice = parseMoney(joinedBlock)
+    const pricePsf = parsePsf(joinedBlock)
     if (!transactionPrice || !pricePsf) return
 
     const projectLineIndex = lines.findIndex((line) => {
       const cleaned = removeMoneyAndPsf(line)
       return Boolean(cleaned && !/\bsqft\b/i.test(cleaned) && !looksLikeNonTransactionDetail(cleaned))
     })
-
     if (projectLineIndex === -1) return
 
     const projectName = removeMoneyAndPsf(lines[projectLineIndex])
@@ -210,7 +209,6 @@ function parseRealAgentTransactions(rawText: string) {
       if (looksLikeUnitType(cleaned)) return false
       return true
     })
-
     if (addressLineIndex === -1) return
 
     const address = removeMoneyAndPsf(lines[addressLineIndex])
@@ -220,11 +218,9 @@ function parseRealAgentTransactions(rawText: string) {
       if (lineIndex <= addressLineIndex) return false
       return /\b\d[\d,]*(?:\.\d+)?\s*sqft\b/i.test(line)
     })
-
     if (sizeLineIndex === -1) return
 
-    const sizeLine = lines[sizeLineIndex]
-    const sizeMatch = sizeLine.replace(/,/g, '').match(/\b(\d+(?:\.\d+)?)\s*sqft\b/i)
+    const sizeMatch = lines[sizeLineIndex].replace(/,/g, '').match(/\b(\d+(?:\.\d+)?)\s*sqft\b/i)
     const floorAreaSqft = sizeMatch ? Math.round(Number(sizeMatch[1])) : 0
     if (!floorAreaSqft) return
 
@@ -251,11 +247,102 @@ function parseRealAgentTransactions(rawText: string) {
     })
   })
 
+  return rows
+}
+
+function parseRowsFromFlatText(rawText: string) {
+  const text = rawText
+    .replace(/\r/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+
+  const rowPattern = /(\d{2}\/\d{2}\/\d{2})\s+([\s\S]*?)(?=\s+\d{2}\/\d{2}\/\d{2}\s+|\s+Transaction List|$)/g
+  const rows: ParsedTransaction[] = []
+  let match: RegExpExecArray | null
+  let index = 0
+
+  while ((match = rowPattern.exec(text)) !== null) {
+    const transactionDate = parseDate(match[1])
+    if (!transactionDate) continue
+
+    const block = normaliseText(match[2])
+    const transactionPrice = parseMoney(block)
+    const pricePsf = parsePsf(block)
+    const sizeMatch = block.replace(/,/g, '').match(/\b(\d+(?:\.\d+)?)\s*sqft\b/i)
+    const floorAreaSqft = sizeMatch ? Math.round(Number(sizeMatch[1])) : 0
+
+    if (!transactionPrice || !pricePsf || !floorAreaSqft) continue
+
+    const priceIndex = block.search(/\$\s*-?\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i)
+    const beforePrice = priceIndex >= 0 ? block.slice(0, priceIndex).trim() : block
+    const parts = beforePrice.split(/\s{2,}|(?=\d+\s+[A-Z][A-Za-z]+\s+#?\d)/).map((part) => part.trim()).filter(Boolean)
+
+    let projectName = ''
+    let address = ''
+
+    if (parts.length >= 2) {
+      projectName = removeMoneyAndPsf(parts[0])
+      address = removeMoneyAndPsf(parts[1])
+    }
+
+    if (!projectName || !address) {
+      const simpleMatch = beforePrice.match(/^(.+?)\s+((?:\d+[A-Za-z]?\s+).+?#?[A-Za-z0-9-]+)$/)
+      if (simpleMatch) {
+        projectName = removeMoneyAndPsf(simpleMatch[1])
+        address = removeMoneyAndPsf(simpleMatch[2])
+      }
+    }
+
+    if (!projectName || !address) continue
+
+    const unitTypeMatch = block.match(/(Apartment|Condominium|Executive Condominium)(?:\s*•\s*[^$\n]+)?/i)
+    const unitTypeLine = unitTypeMatch ? normaliseText(unitTypeMatch[0]) : ''
+
+    rows.push({
+      id: `uploaded-pdf-flat-${index + 1}`,
+      transaction_date: transactionDate,
+      display_name: address,
+      project_name: projectName,
+      address,
+      unit_type: unitTypeLine,
+      floor_area_sqft: floorAreaSqft,
+      floor_level: extractFloorFromAddress(address),
+      transaction_price: transactionPrice,
+      price_psf: pricePsf,
+      distance_m: -1,
+    })
+
+    index += 1
+  }
+
+  return rows
+}
+
+function dedupeRows(rows: ParsedTransaction[]) {
+  const seen = new Set<string>()
+  const output: ParsedTransaction[] = []
+
+  for (const row of rows) {
+    const key = [row.transaction_date, row.address, row.floor_area_sqft, row.transaction_price].join('|')
+    if (seen.has(key)) continue
+    seen.add(key)
+    output.push(row)
+  }
+
+  return output
+}
+
+function parseRealAgentTransactions(rawText: string) {
+  const parsedRows = dedupeRows([
+    ...parseRowsFromLineBlocks(rawText),
+    ...parseRowsFromFlatText(rawText),
+  ])
+
   const twelveMonthsAgo = new Date()
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
   twelveMonthsAgo.setHours(0, 0, 0, 0)
 
-  return rows
+  return parsedRows
     .filter((row) => {
       const timestamp = getTransactionTimestamp(row.transaction_date)
       return timestamp > 0 && timestamp >= twelveMonthsAgo.getTime()
