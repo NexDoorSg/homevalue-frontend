@@ -20,41 +20,29 @@ type ParsedTransaction = {
 }
 
 function normaliseText(value: string | null | undefined) {
-  return (value || '')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[\t ]+/g, ' ')
-    .replace(/\s+\n/g, '\n')
-    .replace(/\n\s+/g, '\n')
-    .trim()
-}
-
-function parseMoneyFromMatch(value: string | null | undefined) {
-  if (!value) return 0
-
-  const cleaned = value.replace(/[$,\s]/g, '').toUpperCase()
-  const match = cleaned.match(/^(-?\d+(?:\.\d+)?)(M|K)?$/)
-  if (!match) return 0
-
-  const amount = Number(match[1])
-  if (!Number.isFinite(amount)) return 0
-
-  if (match[2] === 'M') return Math.round(amount * 1_000_000)
-  if (match[2] === 'K') return Math.round(amount * 1_000)
-  return Math.round(amount)
+  return (value || '').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').trim()
 }
 
 function parseMoney(value: string | null | undefined) {
   if (!value) return 0
   const moneyMatch = value.match(/\$\s*-?\d[\d,]*(?:\.\d+)?\s*(?:M|K)?/i)
-  return parseMoneyFromMatch(moneyMatch?.[0])
+  if (!moneyMatch) return 0
+
+  const cleaned = moneyMatch[0].replace(/[$,\s]/g, '').toUpperCase()
+  const match = cleaned.match(/^(-?\d+(?:\.\d+)?)(M|K)?$/)
+  if (!match) return 0
+
+  const amount = Number(match[1])
+  if (!Number.isFinite(amount)) return 0
+  if (match[2] === 'M') return Math.round(amount * 1_000_000)
+  if (match[2] === 'K') return Math.round(amount * 1_000)
+  return Math.round(amount)
 }
 
 function parsePsf(value: string | null | undefined) {
   if (!value) return 0
-
   const match = value.replace(/,/g, '').match(/\$?\s*(\d+(?:\.\d+)?)\s*P\s*S\s*F/i)
   if (!match) return 0
-
   const numberValue = Number(match[1])
   return Number.isFinite(numberValue) ? Math.round(numberValue) : 0
 }
@@ -79,7 +67,6 @@ function getTransactionTimestamp(value: string) {
 function extractFloorFromAddress(value: string) {
   const match = value.match(/#\s*(\d{1,2})\s*[-A-Z0-9]/i)
   if (!match) return ''
-
   const level = Number(match[1])
   if (!Number.isFinite(level)) return ''
   return `Level ${level}`
@@ -128,12 +115,13 @@ function isNoiseText(value: string) {
 }
 
 function cleanPdfText(rawText: string) {
-  return rawText
+  const text = rawText
     .replace(/\r/g, '\n')
     .replace(/\u00a0/g, ' ')
-    .replace(/[\f\u0000-\u0008\u000b\u000c\u000e-\u001f]+/g, '\n')
-    .replace(/([^
-])(\d{2}\/\d{2}\/\d{2})\b/g, '$1\n$2')
+    .replace(/[\f\v]+/g, '\n')
+
+  return text
+    .replace(new RegExp('([^\\n])(\\d{2}\\/\\d{2}\\/\\d{2})\\b', 'g'), '$1\n$2')
     .replace(/\b(\d{2}\/\d{2}\/\d{2})(?=\S)/g, '$1 ')
 }
 
