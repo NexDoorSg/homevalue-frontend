@@ -370,7 +370,7 @@ function similarityScore(subject: number | null, comparable: number | null) {
 
 function getRecentTransactionRadius(propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
   if (propertyCategory === 'hdb') return 1200
-  if (propertyCategory === 'landed') return 5000
+  if (propertyCategory === 'landed') return 3000
   return 2000
 }
 
@@ -385,7 +385,7 @@ function getTransactionSectionDescription(propertyCategory: 'hdb' | 'condo' | 'e
   }
 
   if (propertyCategory === 'landed') {
-    return 'Last 12 months · Showing up to 15 same landed ownership and same landed type transactions.'
+    return 'Last 12 months · Showing up to 15 recent nearby landed transactions with the same ownership type.'
   }
 
   return 'Last 12 months · Showing up to 15 most relevant nearby transactions.'
@@ -1103,9 +1103,6 @@ export default function AgentReportDetailPage() {
           return null
         }
 
-        if (propertyCategory === 'landed' && !isSameLandedUnitType(currentForm.property_type, row.unit_type)) {
-          return null
-        }
 
         const distanceM = distanceInMeters(lat, lon, rowLat, rowLon)
         if (distanceM > radius) return null
@@ -1119,7 +1116,7 @@ export default function AgentReportDetailPage() {
         const transaction: RecentTransaction = {
           id: row.id,
           transaction_date: row.transaction_date || '',
-          display_name: row.project_name || row.address || 'Nearby transaction',
+          display_name: propertyCategory === 'landed' ? (row.address || 'Nearby landed transaction') : (row.project_name || row.address || 'Nearby transaction'),
           project_name: row.project_name || '',
           address: row.address || '',
           unit_type: row.unit_type || '',
@@ -1137,11 +1134,27 @@ export default function AgentReportDetailPage() {
       })
       .filter((row): row is { transaction: RecentTransaction; score: number } => Boolean(row))
 
-    const rows = scoredRows
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 15)
-      .sort((a, b) => getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date))
-      .map((row) => row.transaction)
+    const rows = propertyCategory === 'landed'
+      ? (() => {
+          const withinTwoKm = scoredRows.filter((row) => row.transaction.distance_m <= 2000)
+          const candidateRows = withinTwoKm.length >= 8
+            ? withinTwoKm
+            : scoredRows.filter((row) => row.transaction.distance_m <= 3000)
+
+          return candidateRows
+            .sort((a, b) => {
+              const dateDifference = getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date)
+              if (dateDifference !== 0) return dateDifference
+              return a.transaction.distance_m - b.transaction.distance_m
+            })
+            .slice(0, 15)
+            .map((row) => row.transaction)
+        })()
+      : scoredRows
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 15)
+          .sort((a, b) => getTransactionTimestamp(b.transaction.transaction_date) - getTransactionTimestamp(a.transaction.transaction_date))
+          .map((row) => row.transaction)
 
     setForm((current) => {
       if (!current) return current
@@ -1391,7 +1404,7 @@ export default function AgentReportDetailPage() {
             </div>
           ) : form.recent_transactions.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-[#D7C6B5] bg-[#FBF7F1] p-5 text-sm leading-6 text-[#6F5C4E]">
-              {propertyCategoryForDisplay === 'condo' || propertyCategoryForDisplay === 'ec' ? 'No same-project transactions found in the last 12 months using the current property details.' : propertyCategoryForDisplay === 'landed' ? 'No same landed ownership / same landed type transactions found in the last 12 months using the current property details.' : 'No relevant nearby transactions found in the last 12 months using the current property details.'}
+              {propertyCategoryForDisplay === 'condo' || propertyCategoryForDisplay === 'ec' ? 'No same-project transactions found in the last 12 months using the current property details.' : propertyCategoryForDisplay === 'landed' ? 'No recent nearby landed transactions found in the last 12 months using the current property details.' : 'No relevant nearby transactions found in the last 12 months using the current property details.'}
             </div>
           ) : (
             <div className="mt-5 overflow-x-auto rounded-2xl border border-[#EFE3D4]">
@@ -1400,7 +1413,7 @@ export default function AgentReportDetailPage() {
                   <tr>
                     <th className="px-4 py-3 font-semibold">Date</th>
                     <th className="px-4 py-3 font-semibold">Address / Project</th>
-                    <th className="px-4 py-3 font-semibold">Unit Type</th>
+                    {propertyCategoryForDisplay !== 'landed' && <th className="px-4 py-3 font-semibold">Unit Type</th>}
                     <th className="px-4 py-3 font-semibold">Size</th>
                     <th className="px-4 py-3 font-semibold">Floor</th>
                     <th className="px-4 py-3 font-semibold">Price</th>
@@ -1413,12 +1426,16 @@ export default function AgentReportDetailPage() {
                     <tr key={transaction.id} className="align-top">
                       <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{formatDate(transaction.transaction_date)}</td>
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-[#231A14]">{transaction.display_name || transaction.address || '—'}</div>
-                        {transaction.project_name && transaction.address && transaction.project_name !== transaction.address && (
-                          <div className="mt-1 text-xs text-[#7B6757]">{transaction.address}</div>
+                        <div className="font-semibold text-[#231A14]">{propertyCategoryForDisplay === 'landed' ? (transaction.address || transaction.display_name || '—') : (transaction.display_name || transaction.address || '—')}</div>
+                        {propertyCategoryForDisplay === 'landed' ? (
+                          transaction.unit_type && <div className="mt-1 text-xs text-[#7B6757]">{transaction.unit_type}</div>
+                        ) : (
+                          transaction.project_name && transaction.address && transaction.project_name !== transaction.address && (
+                            <div className="mt-1 text-xs text-[#7B6757]">{transaction.address}</div>
+                          )
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.unit_type || '—'}</td>
+                      {propertyCategoryForDisplay !== 'landed' && <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.unit_type || '—'}</td>}
                       <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.floor_area_sqft ? `${transaction.floor_area_sqft.toLocaleString()} sqft` : '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-[#6F5C4E]">{transaction.floor_level || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold">{formatCurrency(transaction.transaction_price)}</td>
