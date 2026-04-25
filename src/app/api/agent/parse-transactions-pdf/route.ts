@@ -20,16 +20,18 @@ type ParsedTransaction = {
 }
 
 function normaliseText(value: string | null | undefined) {
-  return (value || '').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').trim()
+  return (value || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\t ]+/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n\s+/g, '\n')
+    .trim()
 }
 
-function parseMoney(value: string | null | undefined) {
+function parseMoneyFromMatch(value: string | null | undefined) {
   if (!value) return 0
 
-  const moneyMatch = value.match(/\$\s*-?\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i)
-  if (!moneyMatch) return 0
-
-  const cleaned = moneyMatch[0].replace(/[$,\s]/g, '').toUpperCase()
+  const cleaned = value.replace(/[$,\s]/g, '').toUpperCase()
   const match = cleaned.match(/^(-?\d+(?:\.\d+)?)(M|K)?$/)
   if (!match) return 0
 
@@ -41,10 +43,16 @@ function parseMoney(value: string | null | undefined) {
   return Math.round(amount)
 }
 
+function parseMoney(value: string | null | undefined) {
+  if (!value) return 0
+  const moneyMatch = value.match(/\$\s*-?\d[\d,]*(?:\.\d+)?\s*(?:M|K)?/i)
+  return parseMoneyFromMatch(moneyMatch?.[0])
+}
+
 function parsePsf(value: string | null | undefined) {
   if (!value) return 0
 
-  const match = value.replace(/,/g, '').match(/\$?\s*(\d+(?:\.\d+)?)\s*PSF/i)
+  const match = value.replace(/,/g, '').match(/\$?\s*(\d+(?:\.\d+)?)\s*P\s*S\s*F/i)
   if (!match) return 0
 
   const numberValue = Number(match[1])
@@ -77,32 +85,39 @@ function extractFloorFromAddress(value: string) {
   return `Level ${level}`
 }
 
+function titleCaseFallback(value: string) {
+  return value
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => {
+      if (/^#/.test(word)) return word.toUpperCase()
+      if (/^\d+[a-z]?$/.test(word)) return word
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
+}
+
 function removeMoneyAndPsf(value: string) {
   return normaliseText(value)
-    .replace(/\$\s*-?\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/gi, ' ')
-    .replace(/\$?\s*\d[\d,.]*(?:\.\d+)?\s*PSF/gi, ' ')
+    .replace(/\$\s*-?\d[\d,]*(?:\.\d+)?\s*(?:M|K)?/gi, ' ')
+    .replace(/\$?\s*\d[\d,]*(?:\.\d+)?\s*P\s*S\s*F/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
 
-function cleanLine(line: string) {
-  return normaliseText(line)
-    .replace(/^https:\/\/tech-rea\.com\/realAgent\s*/i, '')
-    .replace(/^Generated on:.*$/i, '')
-    .replace(/[\f\u0000-\u001f]+/g, ' ')
-    .trim()
-}
-
-function isNoiseLine(line: string) {
-  const text = line.toLowerCase()
+function isNoiseText(value: string) {
+  const text = value.toLowerCase().trim()
   if (!text) return true
+  if (text.includes('https://tech-rea.com/realagent')) return true
+  if (text.includes('generated on:')) return true
   if (text.includes('transaction list')) return true
   if (text.includes('calculate your home')) return true
-  if (text.includes('generated on:')) return true
   if (text.includes('lim dong xian')) return true
   if (text.includes('agency:')) return true
   if (text.includes('cea:')) return true
   if (text.includes('built-up / floor area')) return true
+  if (text.includes('values represented')) return true
   if (text.includes('date details')) return true
   if (text.includes('transacted amount')) return true
   if (text.includes('source & activity')) return true
@@ -112,133 +127,131 @@ function isNoiseLine(line: string) {
   return false
 }
 
-function looksLikeUnitType(line: string) {
-  const text = line.toUpperCase()
-  return (
-    text.includes('APARTMENT') ||
-    text.includes('CONDOMINIUM') ||
-    text.includes('EXECUTIVE CONDOMINIUM') ||
-    text.includes('TERRACE') ||
-    text.includes('SEMI-DETACHED') ||
-    text.includes('SEMI DETACHED') ||
-    text.includes('DETACHED') ||
-    text.includes('BUNGALOW') ||
-    text.includes('ROOM') ||
-    text.includes('BED') ||
-    text.includes('BATH')
-  )
-}
-
-function looksLikeNonTransactionDetail(line: string) {
-  const text = removeMoneyAndPsf(line).toUpperCase().trim()
-  if (!text) return true
-  if (text === 'N.A') return true
-  if (text === 'URA') return true
-  if (text === 'AGENCY') return true
-  if (text === 'RESALE') return true
-  if (text === 'SUB SALE') return true
-  if (text === 'NEW LAUNCH') return true
-  if (/^\d{2}\/\d{2}\/\d{2}$/.test(text)) return true
-  if (/^-?\d+%$/.test(text)) return true
-  if (/^\d+\s+MONTHS$/i.test(text)) return true
-  return false
-}
-
-function getCandidateLines(rawText: string) {
+function cleanPdfText(rawText: string) {
   return rawText
     .replace(/\r/g, '\n')
     .replace(/\u00a0/g, ' ')
-    .split('\n')
-    .map(cleanLine)
-    .filter((line) => !isNoiseLine(line))
+    .replace(/[\f\u0000-\u0008\u000b\u000c\u000e-\u001f]+/g, '\n')
+    .replace(/([^
+])(\d{2}\/\d{2}\/\d{2})\b/g, '$1\n$2')
+    .replace(/\b(\d{2}\/\d{2}\/\d{2})(?=\S)/g, '$1 ')
 }
 
-function splitRowsFromLines(lines: string[]) {
-  const rowBlocks: { dateText: string; lines: string[] }[] = []
-  let current: { dateText: string; lines: string[] } | null = null
+function getRowBlocks(rawText: string) {
+  const text = cleanPdfText(rawText)
+  const rowPattern = /(^|\n)\s*(\d{2}\/\d{2}\/\d{2})\s+([\s\S]*?)(?=\n\s*\d{2}\/\d{2}\/\d{2}\s+|\n\s*Transaction List|$)/g
+  const blocks: { dateText: string; body: string }[] = []
+  let match: RegExpExecArray | null
 
-  for (const originalLine of lines) {
-    const line = originalLine.replace(/^[^0-9]*(?=\d{2}\/\d{2}\/\d{2})/, '').trim()
-    const dateMatch = line.match(/^(\d{2}\/\d{2}\/\d{2})(?:\s+(.*))?$/)
-
-    if (dateMatch) {
-      if (current) rowBlocks.push(current)
-      current = {
-        dateText: dateMatch[1],
-        lines: dateMatch[2] ? [dateMatch[2]] : [],
-      }
-      continue
-    }
-
-    if (current) current.lines.push(line)
+  while ((match = rowPattern.exec(text)) !== null) {
+    const body = normaliseText(match[3])
+    if (!body || isNoiseText(body)) continue
+    blocks.push({ dateText: match[2], body })
   }
 
-  if (current) rowBlocks.push(current)
-  return rowBlocks
+  return blocks
 }
 
-function parseRowsFromLineBlocks(rawText: string) {
-  const rowBlocks = splitRowsFromLines(getCandidateLines(rawText))
+function extractProjectAddressFromLines(body: string) {
+  const rawLines = body
+    .split('\n')
+    .map((line) => removeMoneyAndPsf(line))
+    .map((line) => line.replace(/^N\.A\b.*$/i, '').trim())
+    .filter((line) => line && !isNoiseText(line))
+
+  const meaningfulLines = rawLines.filter((line) => {
+    if (/^N\.A$/i.test(line)) return false
+    if (/^(URA|Agency|Resale|Sub Sale|New Launch)$/i.test(line)) return false
+    if (/^\$/.test(line)) return false
+    if (/^\d{2}\/\d{2}\/\d{2}$/.test(line)) return false
+    if (/^-?\d+%$/.test(line)) return false
+    if (/^\d+\s+months$/i.test(line)) return false
+    return true
+  })
+
+  const sizeIndex = meaningfulLines.findIndex((line) => /\b\d[\d,]*(?:\.\d+)?\s*sqft\b/i.test(line))
+  const beforeSize = sizeIndex >= 0 ? meaningfulLines.slice(0, sizeIndex) : meaningfulLines.slice(0, 2)
+
+  if (beforeSize.length >= 2) {
+    return {
+      projectName: beforeSize[0],
+      address: beforeSize[1],
+    }
+  }
+
+  return { projectName: '', address: '' }
+}
+
+function extractProjectAddressFromFlatBody(body: string) {
+  const cleaned = removeMoneyAndPsf(body)
+    .replace(/\bN\.A\b.*$/i, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const sizeIndex = cleaned.search(/\b\d[\d,]*(?:\.\d+)?\s*sqft\b/i)
+  const beforeSize = sizeIndex >= 0 ? cleaned.slice(0, sizeIndex).trim() : cleaned
+
+  const addressWithUnit = beforeSize.match(/(.+?)\s+(\d+[A-Za-z]?\s+[^#\n]+?#\s*\d{1,3}\s*[-A-Za-z0-9]+)\s*$/i)
+  if (addressWithUnit) {
+    return {
+      projectName: addressWithUnit[1].trim(),
+      address: addressWithUnit[2].replace(/#\s+/g, '#').trim(),
+    }
+  }
+
+  const addressWithoutUnit = beforeSize.match(/(.+?)\s+(\d+[A-Za-z]?\s+.+)$/i)
+  if (addressWithoutUnit) {
+    return {
+      projectName: addressWithoutUnit[1].trim(),
+      address: addressWithoutUnit[2].trim(),
+    }
+  }
+
+  return { projectName: '', address: '' }
+}
+
+function extractSize(body: string) {
+  const match = body.replace(/,/g, '').match(/\b(\d+(?:\.\d+)?)\s*sqft\b/i)
+  const numberValue = match ? Number(match[1]) : 0
+  return Number.isFinite(numberValue) ? Math.round(numberValue) : 0
+}
+
+function extractUnitType(body: string) {
+  const text = body.replace(/\n/g, ' ')
+  const match = text.match(/\b(Apartment|Condominium|Executive Condominium)(?:\s*[•·]\s*\d+\s*bed)?(?:\s*[•·]\s*\d+\s*bath)?/i)
+  if (!match) return ''
+  return match[0].replace(/\s+/g, ' ').trim()
+}
+
+function parseRealAgentTransactions(rawText: string) {
+  const rowBlocks = getRowBlocks(rawText)
   const rows: ParsedTransaction[] = []
 
   rowBlocks.forEach((rowBlock, index) => {
     const transactionDate = parseDate(rowBlock.dateText)
     if (!transactionDate) return
 
-    const lines = rowBlock.lines.map(cleanLine).filter((line) => !isNoiseLine(line))
-    if (lines.length < 3) return
+    const body = rowBlock.body
+    const transactionPrice = parseMoney(body)
+    const pricePsf = parsePsf(body)
+    const floorAreaSqft = extractSize(body)
 
-    const joinedBlock = lines.join('\n')
-    const transactionPrice = parseMoney(joinedBlock)
-    const pricePsf = parsePsf(joinedBlock)
-    if (!transactionPrice || !pricePsf) return
+    if (!transactionPrice || !pricePsf || !floorAreaSqft) return
 
-    const projectLineIndex = lines.findIndex((line) => {
-      const cleaned = removeMoneyAndPsf(line)
-      return Boolean(cleaned && !/\bsqft\b/i.test(cleaned) && !looksLikeNonTransactionDetail(cleaned))
-    })
-    if (projectLineIndex === -1) return
+    const fromLines = extractProjectAddressFromLines(body)
+    const fromFlatBody = extractProjectAddressFromFlatBody(body)
+    const projectName = normaliseText(fromLines.projectName || fromFlatBody.projectName)
+    const address = normaliseText(fromLines.address || fromFlatBody.address)
 
-    const projectName = removeMoneyAndPsf(lines[projectLineIndex])
-    if (!projectName) return
-
-    const addressLineIndex = lines.findIndex((line, lineIndex) => {
-      if (lineIndex <= projectLineIndex) return false
-      const cleaned = removeMoneyAndPsf(line)
-      if (!cleaned || /\bsqft\b/i.test(cleaned) || looksLikeNonTransactionDetail(cleaned)) return false
-      if (looksLikeUnitType(cleaned)) return false
-      return true
-    })
-    if (addressLineIndex === -1) return
-
-    const address = removeMoneyAndPsf(lines[addressLineIndex])
-    if (!address) return
-
-    const sizeLineIndex = lines.findIndex((line, lineIndex) => {
-      if (lineIndex <= addressLineIndex) return false
-      return /\b\d[\d,]*(?:\.\d+)?\s*sqft\b/i.test(line)
-    })
-    if (sizeLineIndex === -1) return
-
-    const sizeMatch = lines[sizeLineIndex].replace(/,/g, '').match(/\b(\d+(?:\.\d+)?)\s*sqft\b/i)
-    const floorAreaSqft = sizeMatch ? Math.round(Number(sizeMatch[1])) : 0
-    if (!floorAreaSqft) return
-
-    const unitTypeLine =
-      lines.find((line, lineIndex) => {
-        if (lineIndex <= sizeLineIndex) return false
-        if (!looksLikeUnitType(line)) return false
-        if (/\$/.test(line) || /PSF/i.test(line) || looksLikeNonTransactionDetail(line)) return false
-        return true
-      }) || ''
+    if (!projectName || !address) return
 
     rows.push({
       id: `uploaded-pdf-${index + 1}`,
       transaction_date: transactionDate,
-      display_name: address,
-      project_name: projectName,
-      address,
-      unit_type: unitTypeLine,
+      display_name: titleCaseFallback(address),
+      project_name: titleCaseFallback(projectName),
+      address: titleCaseFallback(address),
+      unit_type: extractUnitType(body),
       floor_area_sqft: floorAreaSqft,
       floor_level: extractFloorFromAddress(address),
       transaction_price: transactionPrice,
@@ -247,102 +260,19 @@ function parseRowsFromLineBlocks(rawText: string) {
     })
   })
 
-  return rows
-}
-
-function parseRowsFromFlatText(rawText: string) {
-  const text = rawText
-    .replace(/\r/g, '\n')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[ \t]+/g, ' ')
-
-  const rowPattern = /(\d{2}\/\d{2}\/\d{2})\s+([\s\S]*?)(?=\s+\d{2}\/\d{2}\/\d{2}\s+|\s+Transaction List|$)/g
-  const rows: ParsedTransaction[] = []
-  let match: RegExpExecArray | null
-  let index = 0
-
-  while ((match = rowPattern.exec(text)) !== null) {
-    const transactionDate = parseDate(match[1])
-    if (!transactionDate) continue
-
-    const block = normaliseText(match[2])
-    const transactionPrice = parseMoney(block)
-    const pricePsf = parsePsf(block)
-    const sizeMatch = block.replace(/,/g, '').match(/\b(\d+(?:\.\d+)?)\s*sqft\b/i)
-    const floorAreaSqft = sizeMatch ? Math.round(Number(sizeMatch[1])) : 0
-
-    if (!transactionPrice || !pricePsf || !floorAreaSqft) continue
-
-    const priceIndex = block.search(/\$\s*-?\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i)
-    const beforePrice = priceIndex >= 0 ? block.slice(0, priceIndex).trim() : block
-    const parts = beforePrice.split(/\s{2,}|(?=\d+\s+[A-Z][A-Za-z]+\s+#?\d)/).map((part) => part.trim()).filter(Boolean)
-
-    let projectName = ''
-    let address = ''
-
-    if (parts.length >= 2) {
-      projectName = removeMoneyAndPsf(parts[0])
-      address = removeMoneyAndPsf(parts[1])
-    }
-
-    if (!projectName || !address) {
-      const simpleMatch = beforePrice.match(/^(.+?)\s+((?:\d+[A-Za-z]?\s+).+?#?[A-Za-z0-9-]+)$/)
-      if (simpleMatch) {
-        projectName = removeMoneyAndPsf(simpleMatch[1])
-        address = removeMoneyAndPsf(simpleMatch[2])
-      }
-    }
-
-    if (!projectName || !address) continue
-
-    const unitTypeMatch = block.match(/(Apartment|Condominium|Executive Condominium)(?:\s*•\s*[^$\n]+)?/i)
-    const unitTypeLine = unitTypeMatch ? normaliseText(unitTypeMatch[0]) : ''
-
-    rows.push({
-      id: `uploaded-pdf-flat-${index + 1}`,
-      transaction_date: transactionDate,
-      display_name: address,
-      project_name: projectName,
-      address,
-      unit_type: unitTypeLine,
-      floor_area_sqft: floorAreaSqft,
-      floor_level: extractFloorFromAddress(address),
-      transaction_price: transactionPrice,
-      price_psf: pricePsf,
-      distance_m: -1,
-    })
-
-    index += 1
-  }
-
-  return rows
-}
-
-function dedupeRows(rows: ParsedTransaction[]) {
   const seen = new Set<string>()
-  const output: ParsedTransaction[] = []
-
-  for (const row of rows) {
-    const key = [row.transaction_date, row.address, row.floor_area_sqft, row.transaction_price].join('|')
-    if (seen.has(key)) continue
+  const deduped = rows.filter((row) => {
+    const key = [row.transaction_date, row.address.toUpperCase(), row.floor_area_sqft, row.transaction_price].join('|')
+    if (seen.has(key)) return false
     seen.add(key)
-    output.push(row)
-  }
-
-  return output
-}
-
-function parseRealAgentTransactions(rawText: string) {
-  const parsedRows = dedupeRows([
-    ...parseRowsFromLineBlocks(rawText),
-    ...parseRowsFromFlatText(rawText),
-  ])
+    return true
+  })
 
   const twelveMonthsAgo = new Date()
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
   twelveMonthsAgo.setHours(0, 0, 0, 0)
 
-  return parsedRows
+  return deduped
     .filter((row) => {
       const timestamp = getTransactionTimestamp(row.transaction_date)
       return timestamp > 0 && timestamp >= twelveMonthsAgo.getTime()
@@ -375,7 +305,17 @@ export async function POST(request: Request) {
     const transactions = parseRealAgentTransactions(parsed.text || '')
 
     if (transactions.length === 0) {
-      return NextResponse.json({ error: 'No usable transactions were found in this PDF.' }, { status: 422 })
+      return NextResponse.json(
+        {
+          error: 'No usable transactions were found in this PDF.',
+          debug: {
+            textLength: parsed.text?.length || 0,
+            textPreview: (parsed.text || '').slice(0, 1200),
+            rowBlocksFound: getRowBlocks(parsed.text || '').length,
+          },
+        },
+        { status: 422 }
+      )
     }
 
     return NextResponse.json({ transactions })
