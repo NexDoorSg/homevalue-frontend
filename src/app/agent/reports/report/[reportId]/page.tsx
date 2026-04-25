@@ -69,6 +69,12 @@ type ReportForm = {
   property_address: string
   unit_number: string
   property_type: string
+  property_category: string
+  subject_project_name: string
+  land_size_sqm: string
+  built_up_sqm: string
+  subject_is_strata: string
+  landed_ownership_type: string
   floor_area_sqm: string
   floor_level: string
   tenure: string
@@ -115,6 +121,11 @@ const EMPTY_LISTING: CompetingListing = {
   source: 'PropertyGuru',
   notes: '',
 }
+
+const LANDED_OWNERSHIP_OPTIONS = [
+  { label: 'Non-strata landed', value: 'non_strata' },
+  { label: 'Strata / cluster landed', value: 'strata_cluster' },
+]
 
 function toNumber(value: number | string | null | undefined) {
   if (value === null || value === undefined) return null
@@ -305,10 +316,43 @@ function getReportPropertyCategory(propertyType: string | null | undefined): 'hd
 
 function getLandedGroup(value: string | null | undefined) {
   const text = normaliseComparableText(value)
-  if (text.includes('TERRACE')) return 'terrace'
+  if (text.includes('GOOD CLASS') || text.includes('GCB')) return 'gcb'
+  if (text.includes('BUNGALOW')) return 'bungalow'
+  if (text.includes('DETACHED')) return 'detached'
   if (text.includes('SEMI')) return 'semi'
-  if (text.includes('DETACHED') || text.includes('BUNGALOW') || text.includes('GCB')) return 'detached'
+  if (text.includes('TERRACE')) return 'terrace'
   return 'other'
+}
+
+function getLandedOwnershipLabel(value: string | null | undefined) {
+  if (value === 'non_strata') return 'Non-strata landed'
+  if (value === 'strata_cluster') return 'Strata / cluster landed'
+  return ''
+}
+
+function getLandedOwnershipFromForm(form: ReportForm) {
+  if (form.landed_ownership_type === 'non_strata' || form.landed_ownership_type === 'strata_cluster') {
+    return form.landed_ownership_type
+  }
+
+  if (form.subject_is_strata === 'true') return 'strata_cluster'
+  if (form.subject_is_strata === 'false') return 'non_strata'
+
+  return ''
+}
+
+function getLandedSubtypeFromForm(form: ReportForm) {
+  const ownership = getLandedOwnershipFromForm(form)
+  if (ownership === 'non_strata') return 'landed_non_strata'
+  if (ownership === 'strata_cluster') return 'landed_strata'
+  return ''
+}
+
+function isSameLandedUnitType(subjectType: string | null | undefined, rowType: string | null | undefined) {
+  const subjectGroup = getLandedGroup(subjectType)
+  const rowGroup = getLandedGroup(rowType)
+  if (subjectGroup === 'other') return true
+  return rowGroup === subjectGroup
 }
 
 function isSameProject(form: ReportForm, projectName: string | null | undefined) {
@@ -338,6 +382,10 @@ function getTransactionSectionTitle(propertyCategory: 'hdb' | 'condo' | 'ec' | '
 function getTransactionSectionDescription(propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
   if (propertyCategory === 'condo' || propertyCategory === 'ec') {
     return 'Last 12 months · Showing up to 15 same-project transactions.'
+  }
+
+  if (propertyCategory === 'landed') {
+    return 'Last 12 months · Showing up to 15 same landed ownership and same landed type transactions.'
   }
 
   return 'Last 12 months · Showing up to 15 most relevant nearby transactions.'
@@ -424,7 +472,10 @@ async function resolveReferenceCoordinates(form: ReportForm, propertyCategory: '
   } else if (propertyCategory === 'ec') {
     query = query.eq('property_subtype', 'ec')
   } else {
-    query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+    const landedSubtype = getLandedSubtypeFromForm(form)
+    query = landedSubtype
+      ? query.eq('property_subtype', landedSubtype)
+      : query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
   }
 
   query = query.or(textFilter)
@@ -590,6 +641,12 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
     property_address: lead.address || '',
     unit_number: lead.unit_number || '',
     property_type: lead.unit_type || '',
+    property_category: getReportPropertyCategory(lead.unit_type),
+    subject_project_name: '',
+    land_size_sqm: '',
+    built_up_sqm: '',
+    subject_is_strata: '',
+    landed_ownership_type: '',
     floor_area_sqm: sqmToSqftInput(lead.floor_area_sqm),
     floor_level: lead.floor_level || getFloorCategoryFromUnitNumber(lead.unit_number),
     tenure: lead.tenure || inferTenureFromPropertyType(lead.unit_type),
@@ -622,6 +679,12 @@ function buildFormFromReport(report: any): ReportForm {
     property_address: report.property_address || '',
     unit_number: report.unit_number || '',
     property_type: report.property_type || '',
+    property_category: report.property_category || getReportPropertyCategory(report.property_type),
+    subject_project_name: report.subject_project_name || '',
+    land_size_sqm: sqmToSqftInput(report.land_size_sqm),
+    built_up_sqm: sqmToSqftInput(report.built_up_sqm),
+    subject_is_strata: typeof report.subject_is_strata === 'boolean' ? String(report.subject_is_strata) : '',
+    landed_ownership_type: report.landed_ownership_type || (typeof report.subject_is_strata === 'boolean' ? (report.subject_is_strata ? 'strata_cluster' : 'non_strata') : ''),
     floor_area_sqm: sqmToSqftInput(report.floor_area_sqm),
     floor_level: report.floor_level || getFloorCategoryFromUnitNumber(report.unit_number),
     tenure: report.tenure || inferTenureFromPropertyType(report.property_type),
@@ -658,6 +721,12 @@ function buildPayload(form: ReportForm) {
     property_address: form.property_address || null,
     unit_number: form.unit_number || null,
     property_type: form.property_type || null,
+    property_category: form.property_category || getReportPropertyCategory(form.property_type),
+    subject_project_name: form.subject_project_name || null,
+    land_size_sqm: sqftToSqm(form.land_size_sqm),
+    built_up_sqm: sqftToSqm(form.built_up_sqm),
+    subject_is_strata: getLandedOwnershipFromForm(form) ? getLandedOwnershipFromForm(form) === 'strata_cluster' : null,
+    landed_ownership_type: getLandedOwnershipFromForm(form) || null,
     floor_area_sqm: sqftToSqm(form.floor_area_sqm),
     floor_level: form.floor_level || null,
     tenure: form.tenure || null,
@@ -871,6 +940,13 @@ export default function AgentReportDetailPage() {
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
     const dateFilter = twelveMonthsAgo.toISOString().slice(0, 10)
 
+    if (propertyCategory === 'landed' && !getLandedSubtypeFromForm(currentForm)) {
+      setTransactionsError('Please select non-strata landed or strata / cluster landed before refreshing landed transactions.')
+      setForm((current) => (current ? { ...current, recent_transactions: [] } : current))
+      setTransactionsLoading(false)
+      return
+    }
+
     if (propertyCategory === 'condo' || propertyCategory === 'ec') {
       const projectSearchTerm = getProjectLikeSearchTerm(currentForm.property_address)
 
@@ -981,7 +1057,8 @@ export default function AgentReportDetailPage() {
     if (propertyCategory === 'hdb') {
       query = query.eq('property_group', 'hdb')
     } else {
-      query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+      const landedSubtype = getLandedSubtypeFromForm(currentForm)
+      query = query.eq('property_subtype', landedSubtype)
     }
 
     if (resolvedCoordinates.source === 'saved') {
@@ -1023,6 +1100,10 @@ export default function AgentReportDetailPage() {
         }
 
         if (propertyCategory === 'hdb' && normaliseComparableText(row.unit_type) !== subjectHdbType) {
+          return null
+        }
+
+        if (propertyCategory === 'landed' && !isSameLandedUnitType(currentForm.property_type, row.unit_type)) {
           return null
         }
 
@@ -1223,7 +1304,33 @@ export default function AgentReportDetailPage() {
               helperText="Floor category will auto-detect from the unit number where possible."
             />
             <Field label="Property type" value={form.property_type} onChange={(value) => updateForm('property_type', value)} />
-            <Field label="Floor area sqft" value={form.floor_area_sqm} onChange={(value) => updateForm('floor_area_sqm', value)} type="number" />
+            {propertyCategoryForDisplay === 'landed' ? (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[#7B6757]">Landed ownership type</span>
+                  <select
+                    value={getLandedOwnershipFromForm(form)}
+                    onChange={(event) => {
+                      const ownership = event.target.value
+                      updateForm('landed_ownership_type', ownership)
+                      updateForm('subject_is_strata', ownership === 'strata_cluster' ? 'true' : ownership === 'non_strata' ? 'false' : '')
+                    }}
+                    className="w-full rounded-2xl border border-[#E4D7C6] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#B55A1E]"
+                  >
+                    <option value="">Select landed ownership type</option>
+                    {LANDED_OWNERSHIP_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                  <span className="mt-2 block text-xs leading-5 text-[#7B6757]">Required for landed reports. This prevents mixing non-strata landed with strata / cluster landed transactions.</span>
+                </label>
+                <Field label="Land size sqft" value={form.land_size_sqm} onChange={(value) => updateForm('land_size_sqm', value)} type="number" />
+                <Field label="Built-up size sqft" value={form.built_up_sqm || form.floor_area_sqm} onChange={(value) => {
+                  updateForm('built_up_sqm', value)
+                  updateForm('floor_area_sqm', value)
+                }} type="number" />
+              </>
+            ) : (
+              <Field label="Floor area sqft" value={form.floor_area_sqm} onChange={(value) => updateForm('floor_area_sqm', value)} type="number" />
+            )}
             <Field
               label="Floor category"
               value={form.floor_level}
@@ -1284,7 +1391,7 @@ export default function AgentReportDetailPage() {
             </div>
           ) : form.recent_transactions.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-[#D7C6B5] bg-[#FBF7F1] p-5 text-sm leading-6 text-[#6F5C4E]">
-              {propertyCategoryForDisplay === 'condo' || propertyCategoryForDisplay === 'ec' ? 'No same-project transactions found in the last 12 months using the current property details.' : 'No relevant nearby transactions found in the last 12 months using the current property details.'}
+              {propertyCategoryForDisplay === 'condo' || propertyCategoryForDisplay === 'ec' ? 'No same-project transactions found in the last 12 months using the current property details.' : propertyCategoryForDisplay === 'landed' ? 'No same landed ownership / same landed type transactions found in the last 12 months using the current property details.' : 'No relevant nearby transactions found in the last 12 months using the current property details.'}
             </div>
           ) : (
             <div className="mt-5 overflow-x-auto rounded-2xl border border-[#EFE3D4]">
