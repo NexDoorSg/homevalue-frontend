@@ -25,6 +25,26 @@ type Lead = {
   plan: string | null
 }
 
+type ManualReport = {
+  id: number
+  created_at: string | null
+  client_name: string | null
+  client_phone: string | null
+  client_email: string | null
+  property_address: string | null
+  unit_number: string | null
+  property_type: string | null
+  floor_area_sqm: number | string | null
+  tenure: string | null
+  completion_year: number | null
+  homevalue_estimated_price: number | string | null
+  homevalue_estimated_low: number | string | null
+  homevalue_estimated_high: number | string | null
+  radius_used_m: number | null
+  num_of_comps: number | null
+  status: string | null
+}
+
 type AgentUser = {
   email: string
 }
@@ -74,6 +94,7 @@ export default function AgentReportsPage() {
   const [leadLoading, setLeadLoading] = useState(false)
   const [user, setUser] = useState<AgentUser | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
+  const [manualReports, setManualReports] = useState<ManualReport[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const isAuthorised = useMemo(() => {
@@ -81,23 +102,40 @@ export default function AgentReportsPage() {
     return AUTHORISED_EMAILS.includes(user.email.toLowerCase())
   }, [user])
 
-  async function loadLeads() {
+  async function loadReports() {
     setLeadLoading(true)
     setError(null)
 
-    const { data, error: leadsError } = await supabase
-      .from('leads')
-      .select(
-        'id, created_at, name, phone, email, address, unit_number, unit_type, floor_area_sqm, tenure, completion_year, estimated_price, estimated_low, estimated_high, radius_used_m, num_of_comps, status, plan'
-      )
-      .order('created_at', { ascending: false })
-      .limit(25)
+    const [leadsResult, manualReportsResult] = await Promise.all([
+      supabase
+        .from('leads')
+        .select(
+          'id, created_at, name, phone, email, address, unit_number, unit_type, floor_area_sqm, tenure, completion_year, estimated_price, estimated_low, estimated_high, radius_used_m, num_of_comps, status, plan'
+        )
+        .order('created_at', { ascending: false })
+        .limit(25),
+      supabase
+        .from('agent_valuation_reports')
+        .select(
+          'id, created_at, client_name, client_phone, client_email, property_address, unit_number, property_type, floor_area_sqm, tenure, completion_year, homevalue_estimated_price, homevalue_estimated_low, homevalue_estimated_high, radius_used_m, num_of_comps, status'
+        )
+        .eq('source_type', 'manual')
+        .order('created_at', { ascending: false })
+        .limit(25),
+    ])
 
-    if (leadsError) {
-      setError(leadsError.message)
+    if (leadsResult.error) {
+      setError(leadsResult.error.message)
       setLeads([])
     } else {
-      setLeads((data || []) as Lead[])
+      setLeads((leadsResult.data || []) as Lead[])
+    }
+
+    if (manualReportsResult.error) {
+      setError((current) => current || manualReportsResult.error?.message || null)
+      setManualReports([])
+    } else {
+      setManualReports((manualReportsResult.data || []) as ManualReport[])
     }
 
     setLeadLoading(false)
@@ -132,7 +170,7 @@ export default function AgentReportsPage() {
 
   useEffect(() => {
     if (isAuthorised) {
-      loadLeads()
+      loadReports()
     }
   }, [isAuthorised])
 
@@ -157,6 +195,7 @@ export default function AgentReportsPage() {
     await supabase.auth.signOut()
     setUser(null)
     setLeads([])
+    setManualReports([])
   }
 
   if (loading) {
@@ -248,12 +287,18 @@ export default function AgentReportsPage() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/agent/reports/new"
+              className="rounded-2xl bg-[#B55A1E] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#924818]"
+            >
+              Create Manual Report
+            </Link>
             <button
               type="button"
-              onClick={loadLeads}
+              onClick={loadReports}
               className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]"
             >
-              Refresh leads
+              Refresh reports
             </button>
             <button
               type="button"
@@ -269,13 +314,13 @@ export default function AgentReportsPage() {
           <div className="border-b border-[#EFE3D4] p-5 md:p-6">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <h2 className="text-xl font-semibold">Recent HomeValue Leads</h2>
+                <h2 className="text-xl font-semibold">Recent Reports</h2>
                 <p className="mt-1 text-sm text-[#6F5C4E]">
-                  Showing the latest 25 leads. Open any lead to create or edit its pre-consultation report.
+                  Showing recent HomeValue leads and manual reports. Open any item to create or edit its pre-consultation report.
                 </p>
               </div>
               <p className="text-sm text-[#6F5C4E]">
-                {leadLoading ? 'Loading...' : `${leads.length} leads loaded`}
+                {leadLoading ? 'Loading...' : `${leads.length + manualReports.length} reports loaded`}
               </p>
             </div>
           </div>
@@ -302,6 +347,7 @@ export default function AgentReportsPage() {
                   <tr key={lead.id} className="align-top">
                     <td className="px-5 py-5">
                       <p className="font-semibold text-[#231A14]">{lead.name || 'Unnamed lead'}</p>
+                      <p className="mt-1 inline-flex rounded-full bg-[#FBF7F1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B6757]">HomeValue Lead</p>
                       <p className="mt-1 text-[#6F5C4E]">{lead.phone || 'No phone'}</p>
                       <p className="mt-1 text-[#6F5C4E]">{lead.email || 'No email'}</p>
                       <p className="mt-2 text-xs text-[#8B7868]">{formatDate(lead.created_at)}</p>
@@ -338,10 +384,45 @@ export default function AgentReportsPage() {
                   </tr>
                 ))}
 
-                {!leadLoading && leads.length === 0 && (
+                {manualReports.map((report) => (
+                  <tr key={`manual-${report.id}`} className="align-top">
+                    <td className="px-5 py-5">
+                      <p className="font-semibold text-[#231A14]">{report.client_name || 'Unnamed client'}</p>
+                      <p className="mt-1 inline-flex rounded-full bg-[#FFF8EF] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B55A1E]">Manual Report</p>
+                      <p className="mt-2 text-[#6F5C4E]">{report.client_phone || 'No phone'}</p>
+                      <p className="mt-1 text-[#6F5C4E]">{report.client_email || 'No email'}</p>
+                      <p className="mt-2 text-xs text-[#8B7868]">{formatDate(report.created_at)}</p>
+                    </td>
+                    <td className="max-w-sm px-5 py-5">
+                      <p className="font-semibold text-[#231A14]">{report.property_address || 'No address'}</p>
+                      <p className="mt-1 text-[#6F5C4E]">Unit: {report.unit_number || '—'}</p>
+                    </td>
+                    <td className="px-5 py-5">
+                      <p>{report.property_type || '—'}</p>
+                      <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(report.floor_area_sqm)}</p>
+                      <p className="mt-1 text-[#6F5C4E]">Tenure: {report.tenure || '—'}</p>
+                      <p className="mt-1 text-[#6F5C4E]">Completion: {report.completion_year || '—'}</p>
+                    </td>
+                    <td className="px-5 py-5">
+                      <p className="font-semibold text-[#231A14]">{formatCurrency(report.homevalue_estimated_price)}</p>
+                      <p className="mt-1 text-[#6F5C4E]">{formatCurrency(report.homevalue_estimated_low)} – {formatCurrency(report.homevalue_estimated_high)}</p>
+                      <p className="mt-2 text-xs text-[#8B7868]">{report.num_of_comps || 0} comps · {report.radius_used_m || '—'}m radius</p>
+                    </td>
+                    <td className="px-5 py-5">
+                      <Link
+                        href={`/agent/reports/report/${report.id}`}
+                        className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
+                      >
+                        Open report
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+
+                {!leadLoading && leads.length === 0 && manualReports.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-5 py-10 text-center text-[#6F5C4E]">
-                      No leads found.
+                      No reports found.
                     </td>
                   </tr>
                 )}
