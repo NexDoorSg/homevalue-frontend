@@ -26,7 +26,10 @@ function normaliseText(value: string | null | undefined) {
 function parseMoney(value: string | null | undefined) {
   if (!value) return 0
 
-  const cleaned = value.replace(/[$,\s]/g, '').toUpperCase()
+  const moneyMatch = value.match(/\$[\s-]*\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i)
+  if (!moneyMatch) return 0
+
+  const cleaned = moneyMatch[0].replace(/[$,\s]/g, '').toUpperCase()
   const match = cleaned.match(/^(-?\d+(?:\.\d+)?)(M|K)?$/)
   if (!match) return 0
 
@@ -71,6 +74,14 @@ function extractFloorFromAddress(value: string) {
   return `Level ${level}`
 }
 
+function removeMoneyAndPsf(value: string) {
+  return normaliseText(value)
+    .replace(/\$[\s-]*\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/gi, ' ')
+    .replace(/\$?\s*\d[\d,.]*(?:\.\d+)?\s*PSF/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function cleanLine(line: string) {
   return normaliseText(line)
     .replace(/^https:\/\/tech-rea\.com\/realAgent\s*/i, '')
@@ -92,49 +103,138 @@ function isNoiseLine(line: string) {
   if (text.includes('source & activity')) return true
   if (text.includes('previous activity')) return true
   if (text.includes('gain/loss')) return true
+  if (/^\d+\s+of\s+\d+$/i.test(text)) return true
   return false
 }
 
-function parseRealAgentTransactions(rawText: string) {
+function looksLikeUnitType(line: string) {
+  const text = line.toUpperCase()
+  return (
+    text.includes('APARTMENT') ||
+    text.includes('CONDOMINIUM') ||
+    text.includes('EXECUTIVE CONDOMINIUM') ||
+    text.includes('TERRACE') ||
+    text.includes('SEMI-DETACHED') ||
+    text.includes('SEMI DETACHED') ||
+    text.includes('DETACHED') ||
+    text.includes('BUNGALOW') ||
+    text.includes('ROOM') ||
+    text.includes('BED')
+  )
+}
+
+function looksLikeNonTransactionDetail(line: string) {
+  const text = line.toUpperCase()
+  if (!text) return true
+  if (text === 'N.A') return true
+  if (text === 'URA') return true
+  if (text === 'AGENCY') return true
+  if (text === 'RESALE') return true
+  if (text === 'SUB SALE') return true
+  if (text === 'NEW LAUNCH') return true
+  if (/^\d{2}\/\d{2}\/\d{2}$/.test(text)) return true
+  if (/^-?\d+%$/.test(text)) return true
+  if (/^\d+\s+MONTHS$/i.test(text)) return true
+  return false
+}
+
+function splitRowsFromRealAgentText(rawText: string) {
   const normalised = rawText
     .replace(/\r/g, '\n')
     .replace(/\u00a0/g, ' ')
     .replace(/[ \t]+/g, ' ')
 
-  const rowPattern = /(\d{2}\/\d{2}\/\d{2})\s+([\s\S]*?)(?=\n\d{2}\/\d{2}\/\d{2}\s+|\nTransaction List|$)/g
+  const lines = normalised
+    .split('\n')
+    .map(cleanLine)
+    .filter((line) => !isNoiseLine(line))
+
+  const rowBlocks: { dateText: string; lines: string[] }[] = []
+  let current: { dateText: string; lines: string[] } | null = null
+
+  for (const line of lines) {
+    const dateMatch = line.match(/^(\d{2}\/\d{2}\/\d{2})(?:\s+(.*))?$/)
+
+    if (dateMatch) {
+      if (current) rowBlocks.push(current)
+      current = {
+        dateText: dateMatch[1],
+        lines: dateMatch[2] ? [dateMatch[2]] : [],
+      }
+      continue
+    }
+
+    if (current) current.lines.push(line)
+  }
+
+  if (current) rowBlocks.push(current)
+
+  return rowBlocks
+}
+
+function parseRealAgentTransactions(rawText: string) {
+  const rowBlocks = splitRowsFromRealAgentText(rawText)
   const rows: ParsedTransaction[] = []
-  let match: RegExpExecArray | null
-  let index = 0
 
-  while ((match = rowPattern.exec(normalised)) !== null) {
-    const dateText = match[1]
-    const blockText = match[2]
+  rowBlocks.forEach((rowBlock, index) => {
+    const transactionDate = parseDate(rowBlock.dateText)
+    if (!transactionDate) return
 
-    const lines = blockText
-      .split('\n')
+    const lines = rowBlock.lines
       .map(cleanLine)
       .filter((line) => !isNoiseLine(line))
 
-    if (lines.length < 5) continue
+    if (lines.length < 4) return
 
-    const projectName = lines[0]
-    const address = lines[1]
-    const sizeLineIndex = lines.findIndex((line, lineIndex) => lineIndex >= 2 && /\b\d[\d,]*(?:\.\d+)?\s*sqft\b/i.test(line))
-    if (sizeLineIndex === -1) continue
+    const firstMoneyLine = lines.find((line) => /\$[\s-]*\d[\d,.]*(?:\.\d+)?\s*(?:M|K)?/i.test(line) && !/PSF/i.test(line)) || ''
+    const firstPsfLine = lines.find((line) => /PSF/i.test(line)) || ''
+
+    const transactionPrice = parseMoney(firstMoneyLine)
+    const pricePsf = parsePsf(firstPsfLine)
+    if (!transactionPrice || !pricePsf) return
+
+    const projectLineIndex = lines.findIndex((line) => {
+      const cleaned = removeMoneyAndPsf(line)
+      return Boolean(cleaned && !/\bsqft\b/i.test(cleaned) && !looksLikeNonTransactionDetail(cleaned))
+    })
+
+    if (projectLineIndex === -1) return
+
+    const projectName = removeMoneyAndPsf(lines[projectLineIndex])
+    if (!projectName) return
+
+    const addressLineIndex = lines.findIndex((line, lineIndex) => {
+      if (lineIndex <= projectLineIndex) return false
+      const cleaned = removeMoneyAndPsf(line)
+      if (!cleaned || /\bsqft\b/i.test(cleaned) || looksLikeNonTransactionDetail(cleaned)) return false
+      if (looksLikeUnitType(cleaned)) return false
+      return true
+    })
+
+    if (addressLineIndex === -1) return
+
+    const address = removeMoneyAndPsf(lines[addressLineIndex])
+    if (!address) return
+
+    const sizeLineIndex = lines.findIndex((line, lineIndex) => {
+      if (lineIndex <= addressLineIndex) return false
+      return /\b\d[\d,]*(?:\.\d+)?\s*sqft\b/i.test(line)
+    })
+
+    if (sizeLineIndex === -1) return
 
     const sizeLine = lines[sizeLineIndex]
     const sizeMatch = sizeLine.replace(/,/g, '').match(/\b(\d+(?:\.\d+)?)\s*sqft\b/i)
     const floorAreaSqft = sizeMatch ? Math.round(Number(sizeMatch[1])) : 0
+    if (!floorAreaSqft) return
 
-    const unitTypeLine = lines[sizeLineIndex + 1] || ''
-    const amountLine = lines.find((line, lineIndex) => lineIndex > sizeLineIndex && /^\$\s*-?\d/i.test(line) && !/PSF/i.test(line)) || ''
-    const psfLine = lines.find((line, lineIndex) => lineIndex > sizeLineIndex && /PSF/i.test(line)) || ''
-
-    const transactionDate = parseDate(dateText)
-    const transactionPrice = parseMoney(amountLine)
-    const pricePsf = parsePsf(psfLine)
-
-    if (!transactionDate || !projectName || !address || !floorAreaSqft || !transactionPrice || !pricePsf) continue
+    const unitTypeLine =
+      lines.find((line, lineIndex) => {
+        if (lineIndex <= sizeLineIndex) return false
+        if (!looksLikeUnitType(line)) return false
+        if (/\$/.test(line) || /PSF/i.test(line) || looksLikeNonTransactionDetail(line)) return false
+        return true
+      }) || ''
 
     rows.push({
       id: `uploaded-pdf-${index + 1}`,
@@ -149,9 +249,7 @@ function parseRealAgentTransactions(rawText: string) {
       price_psf: pricePsf,
       distance_m: -1,
     })
-
-    index += 1
-  }
+  })
 
   const twelveMonthsAgo = new Date()
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
