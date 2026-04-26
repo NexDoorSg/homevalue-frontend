@@ -49,15 +49,12 @@ type CombinedReport =
   | { kind: 'lead'; created_at: string | null; lead: Lead }
   | { kind: 'manual'; created_at: string | null; report: ManualReport }
 
-type AgentUser = {
-  email: string
-}
+type AgentUser = { email: string }
 
-const AUTHORISED_EMAILS = [
-  'bjornlim@nexdoor.sg',
-  'abigailtang@nexdoor.sg',
-  'daveteo@nexdoor.sg',
-]
+const AUTHORISED_EMAILS = ['bjornlim@nexdoor.sg', 'abigailtang@nexdoor.sg', 'daveteo@nexdoor.sg']
+
+const LEAD_SELECT =
+  'id, created_at, name, phone, email, address, unit_number, unit_type, floor_area_sqm, tenure, completion_year, estimated_price, estimated_low, estimated_high, radius_used_m, num_of_comps, status, plan'
 
 const MANUAL_REPORT_SELECT =
   'id, created_at, client_name, client_phone, client_email, property_address, unit_number, property_type, floor_area_sqm, tenure, completion_year, homevalue_estimated_price, homevalue_estimated_low, homevalue_estimated_high, radius_used_m, num_of_comps, status'
@@ -65,35 +62,20 @@ const MANUAL_REPORT_SELECT =
 function formatCurrency(value: number | string | null | undefined) {
   const numberValue = Number(value)
   if (!Number.isFinite(numberValue) || numberValue <= 0) return '—'
-
-  return new Intl.NumberFormat('en-SG', {
-    style: 'currency',
-    currency: 'SGD',
-    maximumFractionDigits: 0,
-  }).format(numberValue)
+  return new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD', maximumFractionDigits: 0 }).format(numberValue)
 }
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '—'
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-
-  return new Intl.DateTimeFormat('en-SG', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+  return new Intl.DateTimeFormat('en-SG', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
 function formatAreaSqft(areaSqm: number | string | null | undefined) {
   const numberValue = Number(areaSqm)
   if (!Number.isFinite(numberValue) || numberValue <= 0) return '—'
-
-  const sqft = Math.round(numberValue * 10.7639)
-  return `${sqft.toLocaleString('en-SG')} sqft`
+  return `${Math.round(numberValue * 10.7639).toLocaleString('en-SG')} sqft`
 }
 
 function getCreatedTimestamp(value: string | null | undefined) {
@@ -102,15 +84,22 @@ function getCreatedTimestamp(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? 0 : date.getTime()
 }
 
+function sortNewestFirst<T extends { created_at: string | null }>(rows: T[]) {
+  return [...rows].sort((a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at))
+}
+
 export default function AgentReportsPage() {
   const [loading, setLoading] = useState(true)
   const [leadLoading, setLeadLoading] = useState(false)
   const [user, setUser] = useState<AgentUser | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
   const [manualReports, setManualReports] = useState<ManualReport[]>([])
+  const [archivedLeads, setArchivedLeads] = useState<Lead[]>([])
   const [archivedManualReports, setArchivedManualReports] = useState<ManualReport[]>([])
   const [showArchived, setShowArchived] = useState(false)
+  const [archivingLeadId, setArchivingLeadId] = useState<number | null>(null)
   const [archivingReportId, setArchivingReportId] = useState<number | null>(null)
+  const [restoringLeadId, setRestoringLeadId] = useState<number | null>(null)
   const [restoringReportId, setRestoringReportId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -122,22 +111,26 @@ export default function AgentReportsPage() {
   const combinedReports = useMemo<CombinedReport[]>(() => {
     const leadRows: CombinedReport[] = leads.map((lead) => ({ kind: 'lead', created_at: lead.created_at, lead }))
     const manualRows: CombinedReport[] = manualReports.map((report) => ({ kind: 'manual', created_at: report.created_at, report }))
-
-    return [...leadRows, ...manualRows].sort(
-      (a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at)
-    )
+    return [...leadRows, ...manualRows].sort((a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at))
   }, [leads, manualReports])
+
+  const archivedCount = archivedLeads.length + archivedManualReports.length
 
   async function loadReports() {
     setLeadLoading(true)
     setError(null)
 
-    const [leadsResult, manualReportsResult, archivedManualReportsResult] = await Promise.all([
+    const [leadsResult, archivedLeadsResult, manualReportsResult, archivedManualReportsResult] = await Promise.all([
       supabase
         .from('leads')
-        .select(
-          'id, created_at, name, phone, email, address, unit_number, unit_type, floor_area_sqm, tenure, completion_year, estimated_price, estimated_low, estimated_high, radius_used_m, num_of_comps, status, plan'
-        )
+        .select(LEAD_SELECT)
+        .or('status.is.null,status.neq.archived')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('leads')
+        .select(LEAD_SELECT)
+        .eq('status', 'archived')
         .order('created_at', { ascending: false })
         .limit(50),
       supabase
@@ -163,6 +156,13 @@ export default function AgentReportsPage() {
       setLeads((leadsResult.data || []) as Lead[])
     }
 
+    if (archivedLeadsResult.error) {
+      setError((current) => current || archivedLeadsResult.error?.message || null)
+      setArchivedLeads([])
+    } else {
+      setArchivedLeads((archivedLeadsResult.data || []) as Lead[])
+    }
+
     if (manualReportsResult.error) {
       setError((current) => current || manualReportsResult.error?.message || null)
       setManualReports([])
@@ -186,9 +186,7 @@ export default function AgentReportsPage() {
     async function initialiseAuth() {
       const { data } = await supabase.auth.getSession()
       const email = data.session?.user?.email || null
-
       if (!mounted) return
-
       setUser(email ? { email } : null)
       setLoading(false)
     }
@@ -208,26 +206,14 @@ export default function AgentReportsPage() {
   }, [])
 
   useEffect(() => {
-    if (isAuthorised) {
-      loadReports()
-    }
+    if (isAuthorised) loadReports()
   }, [isAuthorised])
 
   async function signInWithGoogle() {
     setError(null)
-
     const redirectTo = `${window.location.origin}/agent/reports`
-
-    const { error: signInError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo,
-      },
-    })
-
-    if (signInError) {
-      setError(signInError.message)
-    }
+    const { error: signInError } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
+    if (signInError) setError(signInError.message)
   }
 
   async function signOut() {
@@ -235,7 +221,57 @@ export default function AgentReportsPage() {
     setUser(null)
     setLeads([])
     setManualReports([])
+    setArchivedLeads([])
     setArchivedManualReports([])
+  }
+
+  async function archiveHomeValueLead(lead: Lead) {
+    const confirmed = window.confirm('Archive this HomeValue lead?')
+    if (!confirmed) return
+
+    setArchivingLeadId(lead.id)
+    setError(null)
+
+    const { error: archiveError } = await supabase
+      .from('leads')
+      .update({ status: 'archived' })
+      .eq('id', lead.id)
+
+    if (archiveError) {
+      setError(archiveError.message)
+      setArchivingLeadId(null)
+      return
+    }
+
+    const archivedLead = { ...lead, status: 'archived' }
+    setLeads((current) => current.filter((item) => item.id !== lead.id))
+    setArchivedLeads((current) => sortNewestFirst([archivedLead, ...current]))
+    setArchivingLeadId(null)
+  }
+
+  async function restoreHomeValueLead(lead: Lead) {
+    const confirmed = window.confirm('Restore this HomeValue lead to the main dashboard?')
+    if (!confirmed) return
+
+    setRestoringLeadId(lead.id)
+    setError(null)
+
+    const { error: restoreError } = await supabase
+      .from('leads')
+      .update({ status: 'new' })
+      .eq('id', lead.id)
+      .eq('status', 'archived')
+
+    if (restoreError) {
+      setError(restoreError.message)
+      setRestoringLeadId(null)
+      return
+    }
+
+    const restoredLead = { ...lead, status: 'new' }
+    setArchivedLeads((current) => current.filter((item) => item.id !== lead.id))
+    setLeads((current) => sortNewestFirst([restoredLead, ...current]))
+    setRestoringLeadId(null)
   }
 
   async function archiveManualReport(report: ManualReport) {
@@ -259,9 +295,7 @@ export default function AgentReportsPage() {
 
     const archivedReport = { ...report, status: 'archived' }
     setManualReports((current) => current.filter((item) => item.id !== report.id))
-    setArchivedManualReports((current) =>
-      [archivedReport, ...current].sort((a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at))
-    )
+    setArchivedManualReports((current) => sortNewestFirst([archivedReport, ...current]))
     setArchivingReportId(null)
   }
 
@@ -287,18 +321,18 @@ export default function AgentReportsPage() {
 
     const restoredReport = { ...report, status: 'draft' }
     setArchivedManualReports((current) => current.filter((item) => item.id !== report.id))
-    setManualReports((current) =>
-      [restoredReport, ...current].sort((a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at))
-    )
+    setManualReports((current) => sortNewestFirst([restoredReport, ...current]))
     setRestoringReportId(null)
   }
 
-  function renderHomeValueLeadRow(lead: Lead) {
+  function renderHomeValueLeadRow(lead: Lead, archived = false) {
     return (
-      <tr key={`lead-${lead.id}`} className="align-top">
+      <tr key={`${archived ? 'archived-lead' : 'lead'}-${lead.id}`} className="align-top">
         <td className="px-5 py-5">
           <p className="font-semibold text-[#231A14]">{lead.name || 'Unnamed lead'}</p>
-          <p className="mt-1 inline-flex rounded-full bg-[#FBF7F1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B6757]">HomeValue Lead</p>
+          <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${archived ? 'bg-[#F3EEE7] text-[#8B7868]' : 'bg-[#FBF7F1] text-[#7B6757]'}`}>
+            {archived ? 'Archived HomeValue Lead' : 'HomeValue Lead'}
+          </p>
           <p className="mt-1 text-[#6F5C4E]">{lead.phone || 'No phone'}</p>
           <p className="mt-1 text-[#6F5C4E]">{lead.email || 'No email'}</p>
           <p className="mt-2 text-xs text-[#8B7868]">{formatDate(lead.created_at)}</p>
@@ -319,12 +353,18 @@ export default function AgentReportsPage() {
           <p className="mt-2 text-xs text-[#8B7868]">{lead.num_of_comps || 0} comps · {lead.radius_used_m || '—'}m radius</p>
         </td>
         <td className="px-5 py-5">
-          <Link
-            href={`/agent/reports/${lead.id}`}
-            className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
-          >
-            Open report
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link href={`/agent/reports/${lead.id}`} className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]">Open report</Link>
+            {archived ? (
+              <button type="button" onClick={() => restoreHomeValueLead(lead)} disabled={restoringLeadId === lead.id} className="inline-flex rounded-2xl border border-[#B55A1E] px-4 py-3 text-xs font-semibold text-[#B55A1E] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60">
+                {restoringLeadId === lead.id ? 'Restoring...' : 'Restore'}
+              </button>
+            ) : (
+              <button type="button" onClick={() => archiveHomeValueLead(lead)} disabled={archivingLeadId === lead.id} className="inline-flex rounded-2xl border border-[#D7C6B5] px-4 py-3 text-xs font-semibold text-[#7B3F1A] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60">
+                {archivingLeadId === lead.id ? 'Archiving...' : 'Archive'}
+              </button>
+            )}
+          </div>
         </td>
       </tr>
     )
@@ -359,28 +399,13 @@ export default function AgentReportsPage() {
         </td>
         <td className="px-5 py-5">
           <div className="flex flex-col gap-2">
-            <Link
-              href={`/agent/reports/report/${report.id}`}
-              className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
-            >
-              Open report
-            </Link>
+            <Link href={`/agent/reports/report/${report.id}`} className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]">Open report</Link>
             {archived ? (
-              <button
-                type="button"
-                onClick={() => restoreManualReport(report)}
-                disabled={restoringReportId === report.id}
-                className="inline-flex rounded-2xl border border-[#B55A1E] px-4 py-3 text-xs font-semibold text-[#B55A1E] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              <button type="button" onClick={() => restoreManualReport(report)} disabled={restoringReportId === report.id} className="inline-flex rounded-2xl border border-[#B55A1E] px-4 py-3 text-xs font-semibold text-[#B55A1E] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60">
                 {restoringReportId === report.id ? 'Restoring...' : 'Restore'}
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => archiveManualReport(report)}
-                disabled={archivingReportId === report.id}
-                className="inline-flex rounded-2xl border border-[#D7C6B5] px-4 py-3 text-xs font-semibold text-[#7B3F1A] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              <button type="button" onClick={() => archiveManualReport(report)} disabled={archivingReportId === report.id} className="inline-flex rounded-2xl border border-[#D7C6B5] px-4 py-3 text-xs font-semibold text-[#7B3F1A] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60">
                 {archivingReportId === report.id ? 'Archiving...' : 'Archive'}
               </button>
             )}
@@ -444,7 +469,7 @@ export default function AgentReportsPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link href="/agent/reports/new" className="rounded-2xl bg-[#B55A1E] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#924818]">Create Manual Report</Link>
             <button type="button" onClick={() => setShowArchived((current) => !current)} className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">
-              {showArchived ? 'Hide Archived' : `Archived (${archivedManualReports.length})`}
+              {showArchived ? 'Hide Archived' : `Archived (${archivedCount})`}
             </button>
             <button type="button" onClick={loadReports} className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">Refresh reports</button>
             <button type="button" onClick={signOut} className="rounded-2xl bg-[#231A14] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#3A2B22]">Sign out</button>
@@ -488,10 +513,10 @@ export default function AgentReportsPage() {
             <div className="border-b border-[#EFE3D4] p-5 md:p-6">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">Archived Manual Reports</h2>
-                  <p className="mt-1 text-sm text-[#6F5C4E]">Archived reports are hidden from the main dashboard. Restore them here if needed.</p>
+                  <h2 className="text-xl font-semibold">Archived Reports</h2>
+                  <p className="mt-1 text-sm text-[#6F5C4E]">Archived HomeValue leads and manual reports are hidden from the main dashboard. Restore them here if needed.</p>
                 </div>
-                <p className="text-sm text-[#6F5C4E]">{archivedManualReports.length} archived</p>
+                <p className="text-sm text-[#6F5C4E]">{archivedCount} archived</p>
               </div>
             </div>
 
@@ -507,8 +532,9 @@ export default function AgentReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EFE3D4]">
-                  {archivedManualReports.map((report) => renderManualReportRow(report, true))}
-                  {archivedManualReports.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-[#6F5C4E]">No archived manual reports.</td></tr>}
+                  {sortNewestFirst(archivedLeads).map((lead) => renderHomeValueLeadRow(lead, true))}
+                  {sortNewestFirst(archivedManualReports).map((report) => renderManualReportRow(report, true))}
+                  {archivedCount === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-[#6F5C4E]">No archived reports.</td></tr>}
                 </tbody>
               </table>
             </div>
