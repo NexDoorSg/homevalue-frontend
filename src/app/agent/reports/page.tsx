@@ -59,6 +59,9 @@ const AUTHORISED_EMAILS = [
   'daveteo@nexdoor.sg',
 ]
 
+const MANUAL_REPORT_SELECT =
+  'id, created_at, client_name, client_phone, client_email, property_address, unit_number, property_type, floor_area_sqm, tenure, completion_year, homevalue_estimated_price, homevalue_estimated_low, homevalue_estimated_high, radius_used_m, num_of_comps, status'
+
 function formatCurrency(value: number | string | null | undefined) {
   const numberValue = Number(value)
   if (!Number.isFinite(numberValue) || numberValue <= 0) return '—'
@@ -105,7 +108,10 @@ export default function AgentReportsPage() {
   const [user, setUser] = useState<AgentUser | null>(null)
   const [leads, setLeads] = useState<Lead[]>([])
   const [manualReports, setManualReports] = useState<ManualReport[]>([])
+  const [archivedManualReports, setArchivedManualReports] = useState<ManualReport[]>([])
+  const [showArchived, setShowArchived] = useState(false)
   const [archivingReportId, setArchivingReportId] = useState<number | null>(null)
+  const [restoringReportId, setRestoringReportId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const isAuthorised = useMemo(() => {
@@ -126,7 +132,7 @@ export default function AgentReportsPage() {
     setLeadLoading(true)
     setError(null)
 
-    const [leadsResult, manualReportsResult] = await Promise.all([
+    const [leadsResult, manualReportsResult, archivedManualReportsResult] = await Promise.all([
       supabase
         .from('leads')
         .select(
@@ -136,11 +142,16 @@ export default function AgentReportsPage() {
         .limit(50),
       supabase
         .from('agent_valuation_reports')
-        .select(
-          'id, created_at, client_name, client_phone, client_email, property_address, unit_number, property_type, floor_area_sqm, tenure, completion_year, homevalue_estimated_price, homevalue_estimated_low, homevalue_estimated_high, radius_used_m, num_of_comps, status'
-        )
+        .select(MANUAL_REPORT_SELECT)
         .eq('source_type', 'manual')
         .or('status.is.null,status.neq.archived')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('agent_valuation_reports')
+        .select(MANUAL_REPORT_SELECT)
+        .eq('source_type', 'manual')
+        .eq('status', 'archived')
         .order('created_at', { ascending: false })
         .limit(50),
     ])
@@ -157,6 +168,13 @@ export default function AgentReportsPage() {
       setManualReports([])
     } else {
       setManualReports((manualReportsResult.data || []) as ManualReport[])
+    }
+
+    if (archivedManualReportsResult.error) {
+      setError((current) => current || archivedManualReportsResult.error?.message || null)
+      setArchivedManualReports([])
+    } else {
+      setArchivedManualReports((archivedManualReportsResult.data || []) as ManualReport[])
     }
 
     setLeadLoading(false)
@@ -217,6 +235,7 @@ export default function AgentReportsPage() {
     setUser(null)
     setLeads([])
     setManualReports([])
+    setArchivedManualReports([])
   }
 
   async function archiveManualReport(report: ManualReport) {
@@ -238,8 +257,137 @@ export default function AgentReportsPage() {
       return
     }
 
+    const archivedReport = { ...report, status: 'archived' }
     setManualReports((current) => current.filter((item) => item.id !== report.id))
+    setArchivedManualReports((current) =>
+      [archivedReport, ...current].sort((a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at))
+    )
     setArchivingReportId(null)
+  }
+
+  async function restoreManualReport(report: ManualReport) {
+    const confirmed = window.confirm('Restore this manual report to the main dashboard?')
+    if (!confirmed) return
+
+    setRestoringReportId(report.id)
+    setError(null)
+
+    const { error: restoreError } = await supabase
+      .from('agent_valuation_reports')
+      .update({ status: 'draft' })
+      .eq('id', report.id)
+      .eq('source_type', 'manual')
+      .eq('status', 'archived')
+
+    if (restoreError) {
+      setError(restoreError.message)
+      setRestoringReportId(null)
+      return
+    }
+
+    const restoredReport = { ...report, status: 'draft' }
+    setArchivedManualReports((current) => current.filter((item) => item.id !== report.id))
+    setManualReports((current) =>
+      [restoredReport, ...current].sort((a, b) => getCreatedTimestamp(b.created_at) - getCreatedTimestamp(a.created_at))
+    )
+    setRestoringReportId(null)
+  }
+
+  function renderHomeValueLeadRow(lead: Lead) {
+    return (
+      <tr key={`lead-${lead.id}`} className="align-top">
+        <td className="px-5 py-5">
+          <p className="font-semibold text-[#231A14]">{lead.name || 'Unnamed lead'}</p>
+          <p className="mt-1 inline-flex rounded-full bg-[#FBF7F1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B6757]">HomeValue Lead</p>
+          <p className="mt-1 text-[#6F5C4E]">{lead.phone || 'No phone'}</p>
+          <p className="mt-1 text-[#6F5C4E]">{lead.email || 'No email'}</p>
+          <p className="mt-2 text-xs text-[#8B7868]">{formatDate(lead.created_at)}</p>
+        </td>
+        <td className="max-w-sm px-5 py-5">
+          <p className="font-semibold text-[#231A14]">{lead.address || 'No address'}</p>
+          <p className="mt-1 text-[#6F5C4E]">Unit: {lead.unit_number || '—'}</p>
+        </td>
+        <td className="px-5 py-5">
+          <p>{lead.unit_type || '—'}</p>
+          <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(lead.floor_area_sqm)}</p>
+          <p className="mt-1 text-[#6F5C4E]">Tenure: {lead.tenure || '—'}</p>
+          <p className="mt-1 text-[#6F5C4E]">Completion: {lead.completion_year || '—'}</p>
+        </td>
+        <td className="px-5 py-5">
+          <p className="font-semibold text-[#231A14]">{formatCurrency(lead.estimated_price)}</p>
+          <p className="mt-1 text-[#6F5C4E]">{formatCurrency(lead.estimated_low)} – {formatCurrency(lead.estimated_high)}</p>
+          <p className="mt-2 text-xs text-[#8B7868]">{lead.num_of_comps || 0} comps · {lead.radius_used_m || '—'}m radius</p>
+        </td>
+        <td className="px-5 py-5">
+          <Link
+            href={`/agent/reports/${lead.id}`}
+            className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
+          >
+            Open report
+          </Link>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderManualReportRow(report: ManualReport, archived = false) {
+    return (
+      <tr key={`${archived ? 'archived' : 'manual'}-${report.id}`} className="align-top">
+        <td className="px-5 py-5">
+          <p className="font-semibold text-[#231A14]">{report.client_name || 'Unnamed client'}</p>
+          <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${archived ? 'bg-[#F3EEE7] text-[#8B7868]' : 'bg-[#FFF8EF] text-[#B55A1E]'}`}>
+            {archived ? 'Archived Manual Report' : 'Manual Report'}
+          </p>
+          <p className="mt-2 text-[#6F5C4E]">{report.client_phone || 'No phone'}</p>
+          <p className="mt-1 text-[#6F5C4E]">{report.client_email || 'No email'}</p>
+          <p className="mt-2 text-xs text-[#8B7868]">{formatDate(report.created_at)}</p>
+        </td>
+        <td className="max-w-sm px-5 py-5">
+          <p className="font-semibold text-[#231A14]">{report.property_address || 'No address'}</p>
+          <p className="mt-1 text-[#6F5C4E]">Unit: {report.unit_number || '—'}</p>
+        </td>
+        <td className="px-5 py-5">
+          <p>{report.property_type || '—'}</p>
+          <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(report.floor_area_sqm)}</p>
+          <p className="mt-1 text-[#6F5C4E]">Tenure: {report.tenure || '—'}</p>
+          <p className="mt-1 text-[#6F5C4E]">Completion: {report.completion_year || '—'}</p>
+        </td>
+        <td className="px-5 py-5">
+          <p className="font-semibold text-[#231A14]">{formatCurrency(report.homevalue_estimated_price)}</p>
+          <p className="mt-1 text-[#6F5C4E]">{formatCurrency(report.homevalue_estimated_low)} – {formatCurrency(report.homevalue_estimated_high)}</p>
+          <p className="mt-2 text-xs text-[#8B7868]">{report.num_of_comps || 0} comps · {report.radius_used_m || '—'}m radius</p>
+        </td>
+        <td className="px-5 py-5">
+          <div className="flex flex-col gap-2">
+            <Link
+              href={`/agent/reports/report/${report.id}`}
+              className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
+            >
+              Open report
+            </Link>
+            {archived ? (
+              <button
+                type="button"
+                onClick={() => restoreManualReport(report)}
+                disabled={restoringReportId === report.id}
+                className="inline-flex rounded-2xl border border-[#B55A1E] px-4 py-3 text-xs font-semibold text-[#B55A1E] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {restoringReportId === report.id ? 'Restoring...' : 'Restore'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => archiveManualReport(report)}
+                disabled={archivingReportId === report.id}
+                className="inline-flex rounded-2xl border border-[#D7C6B5] px-4 py-3 text-xs font-semibold text-[#7B3F1A] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {archivingReportId === report.id ? 'Archiving...' : 'Archive'}
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+    )
   }
 
   if (loading) {
@@ -257,29 +405,11 @@ export default function AgentReportsPage() {
       <main className="min-h-screen bg-[#F7F1E8] px-6 py-10 text-[#231A14]">
         <section className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center">
           <div className="w-full rounded-3xl border border-[#E4D7C6] bg-white p-8 shadow-sm md:p-10">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#B55A1E]">
-              NexDoor Internal
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Agent Valuation Reports
-            </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-[#6F5C4E]">
-              Sign in with your authorised NexDoor Google account to access lead-based valuation reports.
-            </p>
-
-            <button
-              type="button"
-              onClick={signInWithGoogle}
-              className="mt-8 w-full rounded-2xl bg-[#231A14] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#3A2B22] md:w-auto"
-            >
-              Continue with Google
-            </button>
-
-            {error && (
-              <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </p>
-            )}
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#B55A1E]">NexDoor Internal</p>
+            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Agent Valuation Reports</h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-[#6F5C4E]">Sign in with your authorised NexDoor Google account to access lead-based valuation reports.</p>
+            <button type="button" onClick={signInWithGoogle} className="mt-8 w-full rounded-2xl bg-[#231A14] px-5 py-4 text-sm font-semibold text-white transition hover:bg-[#3A2B22] md:w-auto">Continue with Google</button>
+            {error && <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
           </div>
         </section>
       </main>
@@ -291,23 +421,10 @@ export default function AgentReportsPage() {
       <main className="min-h-screen bg-[#F7F1E8] px-6 py-10 text-[#231A14]">
         <section className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center">
           <div className="w-full rounded-3xl border border-[#E4D7C6] bg-white p-8 shadow-sm md:p-10">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#B55A1E]">
-              Access denied
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              This page is only for authorised NexDoor agents.
-            </h1>
-            <p className="mt-4 text-sm leading-6 text-[#6F5C4E]">
-              You are signed in as <span className="font-semibold text-[#231A14]">{user.email}</span>, but this email is not on the approved access list.
-            </p>
-
-            <button
-              type="button"
-              onClick={signOut}
-              className="mt-8 rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]"
-            >
-              Sign out
-            </button>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#B55A1E]">Access denied</p>
+            <h1 className="text-3xl font-semibold tracking-tight">This page is only for authorised NexDoor agents.</h1>
+            <p className="mt-4 text-sm leading-6 text-[#6F5C4E]">You are signed in as <span className="font-semibold text-[#231A14]">{user.email}</span>, but this email is not on the approved access list.</p>
+            <button type="button" onClick={signOut} className="mt-8 rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">Sign out</button>
           </div>
         </section>
       </main>
@@ -319,38 +436,18 @@ export default function AgentReportsPage() {
       <div className="mx-auto max-w-7xl">
         <header className="mb-8 flex flex-col gap-5 rounded-3xl border border-[#E4D7C6] bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between md:p-8">
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-[#B55A1E]">
-              HomeValue by NexDoor
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Agent Reports
-            </h1>
-            <p className="mt-3 text-sm text-[#6F5C4E]">
-              Signed in as <span className="font-semibold text-[#231A14]">{user.email}</span>
-            </p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-[#B55A1E]">HomeValue by NexDoor</p>
+            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Agent Reports</h1>
+            <p className="mt-3 text-sm text-[#6F5C4E]">Signed in as <span className="font-semibold text-[#231A14]">{user.email}</span></p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/agent/reports/new"
-              className="rounded-2xl bg-[#B55A1E] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#924818]"
-            >
-              Create Manual Report
-            </Link>
-            <button
-              type="button"
-              onClick={loadReports}
-              className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]"
-            >
-              Refresh reports
+            <Link href="/agent/reports/new" className="rounded-2xl bg-[#B55A1E] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#924818]">Create Manual Report</Link>
+            <button type="button" onClick={() => setShowArchived((current) => !current)} className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">
+              {showArchived ? 'Hide Archived' : `Archived (${archivedManualReports.length})`}
             </button>
-            <button
-              type="button"
-              onClick={signOut}
-              className="rounded-2xl bg-[#231A14] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#3A2B22]"
-            >
-              Sign out
-            </button>
+            <button type="button" onClick={loadReports} className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">Refresh reports</button>
+            <button type="button" onClick={signOut} className="rounded-2xl bg-[#231A14] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#3A2B22]">Sign out</button>
           </div>
         </header>
 
@@ -359,21 +456,13 @@ export default function AgentReportsPage() {
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Recent Reports</h2>
-                <p className="mt-1 text-sm text-[#6F5C4E]">
-                  Showing HomeValue leads and manual reports together, sorted from newest to oldest.
-                </p>
+                <p className="mt-1 text-sm text-[#6F5C4E]">Showing HomeValue leads and manual reports together, sorted from newest to oldest.</p>
               </div>
-              <p className="text-sm text-[#6F5C4E]">
-                {leadLoading ? 'Loading...' : `${combinedReports.length} reports loaded`}
-              </p>
+              <p className="text-sm text-[#6F5C4E]">{leadLoading ? 'Loading...' : `${combinedReports.length} reports loaded`}</p>
             </div>
           </div>
 
-          {error && (
-            <div className="m-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:m-6">
-              {error}
-            </div>
-          )}
+          {error && <div className="m-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:m-6">{error}</div>}
 
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
@@ -387,111 +476,44 @@ export default function AgentReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EFE3D4]">
-                {combinedReports.map((item) => {
-                  if (item.kind === 'lead') {
-                    const lead = item.lead
-
-                    return (
-                      <tr key={`lead-${lead.id}`} className="align-top">
-                        <td className="px-5 py-5">
-                          <p className="font-semibold text-[#231A14]">{lead.name || 'Unnamed lead'}</p>
-                          <p className="mt-1 inline-flex rounded-full bg-[#FBF7F1] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7B6757]">HomeValue Lead</p>
-                          <p className="mt-1 text-[#6F5C4E]">{lead.phone || 'No phone'}</p>
-                          <p className="mt-1 text-[#6F5C4E]">{lead.email || 'No email'}</p>
-                          <p className="mt-2 text-xs text-[#8B7868]">{formatDate(lead.created_at)}</p>
-                        </td>
-                        <td className="max-w-sm px-5 py-5">
-                          <p className="font-semibold text-[#231A14]">{lead.address || 'No address'}</p>
-                          <p className="mt-1 text-[#6F5C4E]">Unit: {lead.unit_number || '—'}</p>
-                        </td>
-                        <td className="px-5 py-5">
-                          <p>{lead.unit_type || '—'}</p>
-                          <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(lead.floor_area_sqm)}</p>
-                          <p className="mt-1 text-[#6F5C4E]">Tenure: {lead.tenure || '—'}</p>
-                          <p className="mt-1 text-[#6F5C4E]">Completion: {lead.completion_year || '—'}</p>
-                        </td>
-                        <td className="px-5 py-5">
-                          <p className="font-semibold text-[#231A14]">
-                            {formatCurrency(lead.estimated_price)}
-                          </p>
-                          <p className="mt-1 text-[#6F5C4E]">
-                            {formatCurrency(lead.estimated_low)} – {formatCurrency(lead.estimated_high)}
-                          </p>
-                          <p className="mt-2 text-xs text-[#8B7868]">
-                            {lead.num_of_comps || 0} comps · {lead.radius_used_m || '—'}m radius
-                          </p>
-                        </td>
-                        <td className="px-5 py-5">
-                          <Link
-                            href={`/agent/reports/${lead.id}`}
-                            className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
-                          >
-                            Open report
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  }
-
-                  const report = item.report
-
-                  return (
-                    <tr key={`manual-${report.id}`} className="align-top">
-                      <td className="px-5 py-5">
-                        <p className="font-semibold text-[#231A14]">{report.client_name || 'Unnamed client'}</p>
-                        <p className="mt-1 inline-flex rounded-full bg-[#FFF8EF] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#B55A1E]">Manual Report</p>
-                        <p className="mt-2 text-[#6F5C4E]">{report.client_phone || 'No phone'}</p>
-                        <p className="mt-1 text-[#6F5C4E]">{report.client_email || 'No email'}</p>
-                        <p className="mt-2 text-xs text-[#8B7868]">{formatDate(report.created_at)}</p>
-                      </td>
-                      <td className="max-w-sm px-5 py-5">
-                        <p className="font-semibold text-[#231A14]">{report.property_address || 'No address'}</p>
-                        <p className="mt-1 text-[#6F5C4E]">Unit: {report.unit_number || '—'}</p>
-                      </td>
-                      <td className="px-5 py-5">
-                        <p>{report.property_type || '—'}</p>
-                        <p className="mt-1 text-[#6F5C4E]">{formatAreaSqft(report.floor_area_sqm)}</p>
-                        <p className="mt-1 text-[#6F5C4E]">Tenure: {report.tenure || '—'}</p>
-                        <p className="mt-1 text-[#6F5C4E]">Completion: {report.completion_year || '—'}</p>
-                      </td>
-                      <td className="px-5 py-5">
-                        <p className="font-semibold text-[#231A14]">{formatCurrency(report.homevalue_estimated_price)}</p>
-                        <p className="mt-1 text-[#6F5C4E]">{formatCurrency(report.homevalue_estimated_low)} – {formatCurrency(report.homevalue_estimated_high)}</p>
-                        <p className="mt-2 text-xs text-[#8B7868]">{report.num_of_comps || 0} comps · {report.radius_used_m || '—'}m radius</p>
-                      </td>
-                      <td className="px-5 py-5">
-                        <div className="flex flex-col gap-2">
-                          <Link
-                            href={`/agent/reports/report/${report.id}`}
-                            className="inline-flex rounded-2xl bg-[#231A14] px-4 py-3 text-xs font-semibold text-white transition hover:bg-[#3A2B22]"
-                          >
-                            Open report
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => archiveManualReport(report)}
-                            disabled={archivingReportId === report.id}
-                            className="inline-flex rounded-2xl border border-[#D7C6B5] px-4 py-3 text-xs font-semibold text-[#7B3F1A] transition hover:bg-[#FFF8EF] disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {archivingReportId === report.id ? 'Archiving...' : 'Archive'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-
-                {!leadLoading && combinedReports.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-[#6F5C4E]">
-                      No reports found.
-                    </td>
-                  </tr>
-                )}
+                {combinedReports.map((item) => item.kind === 'lead' ? renderHomeValueLeadRow(item.lead) : renderManualReportRow(item.report))}
+                {!leadLoading && combinedReports.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-[#6F5C4E]">No reports found.</td></tr>}
               </tbody>
             </table>
           </div>
         </section>
+
+        {showArchived && (
+          <section className="mt-8 rounded-3xl border border-[#E4D7C6] bg-white shadow-sm">
+            <div className="border-b border-[#EFE3D4] p-5 md:p-6">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Archived Manual Reports</h2>
+                  <p className="mt-1 text-sm text-[#6F5C4E]">Archived reports are hidden from the main dashboard. Restore them here if needed.</p>
+                </div>
+                <p className="text-sm text-[#6F5C4E]">{archivedManualReports.length} archived</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-[#FBF7F1] text-xs uppercase tracking-[0.12em] text-[#7B6757]">
+                  <tr>
+                    <th className="px-5 py-4 font-semibold">Lead</th>
+                    <th className="px-5 py-4 font-semibold">Property</th>
+                    <th className="px-5 py-4 font-semibold">Details</th>
+                    <th className="px-5 py-4 font-semibold">Estimated Range</th>
+                    <th className="px-5 py-4 font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EFE3D4]">
+                  {archivedManualReports.map((report) => renderManualReportRow(report, true))}
+                  {archivedManualReports.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-[#6F5C4E]">No archived manual reports.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   )
