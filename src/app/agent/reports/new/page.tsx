@@ -80,6 +80,29 @@ function normaliseText(value: string | null | undefined) {
   return (value || '').toUpperCase().replace(/[-_/]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+function normaliseHdbAddress(value: string | null | undefined) {
+  return normaliseText(value)
+    .replace(/\bSINGAPORE\b/g, ' ')
+    .replace(/\b\d{6}\b/g, ' ')
+    .replace(/\bAVENUE\b/g, 'AVE')
+    .replace(/\bROAD\b/g, 'RD')
+    .replace(/\bSTREET\b/g, 'ST')
+    .replace(/\bDRIVE\b/g, 'DR')
+    .replace(/\bCRESCENT\b/g, 'CRES')
+    .replace(/\bCLOSE\b/g, 'CL')
+    .replace(/\bPLACE\b/g, 'PL')
+    .replace(/\bBUKIT\b/g, 'BT')
+    .replace(/\bCOMMONWEALTH\b/g, "C'WEALTH")
+    .replace(/\bCENTRAL\b/g, 'CTRL')
+    .replace(/\bNORTH\b/g, 'NTH')
+    .replace(/\bSOUTH\b/g, 'STH')
+    .replace(/\bUPPER\b/g, 'UPP')
+    .replace(/\bTANJONG\b/g, 'TG')
+    .replace(/\bKAMPONG\b/g, 'KG')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function sqftToSqm(value: string | number | null | undefined) {
   const sqft = Number(value)
   if (!Number.isFinite(sqft) || sqft <= 0) return null
@@ -234,7 +257,7 @@ async function resolveCanonicalProjectName(params: {
 
 async function getHdbCompletionYear(address: string) {
   const blockNo = extractBlockNumber(address)
-  const addressKey = normaliseText(address)
+  const addressKey = normaliseHdbAddress(address)
   if (!blockNo || !addressKey) return null
 
   const { data } = await supabase
@@ -247,22 +270,12 @@ async function getHdbCompletionYear(address: string) {
 
   if (!data || data.length === 0) return null
 
-  const exactAddress = data.find((row: any) => normaliseText(row.address) === addressKey)
+  const exactAddress = data.find((row: any) => normaliseHdbAddress(row.address) === addressKey)
   if (exactAddress?.completion_year) return Number(exactAddress.completion_year)
 
-  const addressWithoutPostal = addressKey
-    .replace(/\bSINGAPORE\b/g, ' ')
-    .replace(/\b\d{6}\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
   const matchingAddress = data.find((row: any) => {
-    const rowAddress = normaliseText(row.address)
-    return (
-      rowAddress === addressWithoutPostal ||
-      addressWithoutPostal.includes(rowAddress) ||
-      rowAddress.includes(addressWithoutPostal)
-    )
+    const rowAddress = normaliseHdbAddress(row.address)
+    return addressKey.startsWith(rowAddress) || rowAddress.startsWith(addressKey)
   })
 
   return matchingAddress?.completion_year ? Number(matchingAddress.completion_year) : null
