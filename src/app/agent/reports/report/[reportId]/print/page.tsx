@@ -21,7 +21,6 @@ type RecentTransaction = {
 
 type CompetingListing = {
   title?: string
-  listing_url?: string
   asking_price?: string | number
   size_sqft?: string | number
   psf?: string | number
@@ -35,8 +34,6 @@ type Report = {
   created_at: string | null
   updated_at: string | null
   client_name: string | null
-  client_phone: string | null
-  client_email: string | null
   agent_name: string | null
   property_address: string | null
   unit_number: string | null
@@ -61,11 +58,7 @@ type Report = {
   consultant_notes: string | null
 }
 
-const AUTHORISED_EMAILS = [
-  'bjornlim@nexdoor.sg',
-  'abigailtang@nexdoor.sg',
-  'daveteo@nexdoor.sg',
-]
+const AUTHORISED_EMAILS = ['bjornlim@nexdoor.sg', 'abigailtang@nexdoor.sg', 'daveteo@nexdoor.sg']
 
 function toNumber(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === '') return null
@@ -75,18 +68,13 @@ function toNumber(value: number | string | null | undefined) {
 
 function sqmToSqft(value: number | string | null | undefined) {
   const sqm = toNumber(value)
-  if (!sqm || sqm <= 0) return null
-  return Math.round(sqm * 10.7639)
+  return sqm && sqm > 0 ? Math.round(sqm * 10.7639) : null
 }
 
 function formatCurrency(value: number | string | null | undefined) {
   const numberValue = toNumber(value)
   if (!numberValue || numberValue <= 0) return '—'
-  return new Intl.NumberFormat('en-SG', {
-    style: 'currency',
-    currency: 'SGD',
-    maximumFractionDigits: 0,
-  }).format(numberValue)
+  return new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD', maximumFractionDigits: 0 }).format(numberValue)
 }
 
 function formatDate(value: string | null | undefined) {
@@ -98,10 +86,8 @@ function formatDate(value: string | null | undefined) {
 
 function formatPreparedDate(value: string | null | undefined) {
   const date = value ? new Date(value) : new Date()
-  if (Number.isNaN(date.getTime())) {
-    return new Date().toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })
-  }
-  return date.toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date
+  return safeDate.toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function formatDistance(value: number | string | null | undefined) {
@@ -118,7 +104,6 @@ function normaliseText(value: string | null | undefined) {
 function getPropertyCategory(report: Report) {
   const saved = report.property_category as 'hdb' | 'condo' | 'ec' | 'landed' | null
   if (saved === 'hdb' || saved === 'condo' || saved === 'ec' || saved === 'landed') return saved
-
   const text = normaliseText(report.property_type)
   if (/\b[2345]\s*ROOM\b/.test(text) || text === 'EXECUTIVE') return 'hdb'
   if (text.includes('TERRACE') || text.includes('SEMI') || text.includes('DETACHED') || text.includes('BUNGALOW') || text.includes('GCB')) return 'landed'
@@ -130,11 +115,7 @@ function getRemainingLease(tenure: string | null | undefined, completionYear: st
   const text = normaliseText(tenure)
   const year = toNumber(completionYear)
   if (text.includes('FREEHOLD')) return 'Not applicable'
-
-  let leaseTerm: number | null = null
-  if (text.includes('999')) leaseTerm = 999
-  else if (text.includes('99')) leaseTerm = 99
-
+  const leaseTerm = text.includes('999') ? 999 : text.includes('99') ? 99 : null
   if (!leaseTerm || !year) return '—'
   return `${Math.max(0, Math.round(year + leaseTerm - new Date().getFullYear()))} years remaining`
 }
@@ -238,13 +219,8 @@ export default function PrintableReportPage() {
   const transactions = useMemo(() => normaliseTransactions(report?.recent_transactions), [report])
   const listings = useMemo(() => normaliseListings(report?.competing_listings), [report])
 
-  if (loading) {
-    return <main className="screen-shell"><div className="loading-card">Loading print preview…</div></main>
-  }
-
-  if (error || !report) {
-    return <main className="screen-shell"><div className="loading-card">{error || 'Report not found.'}</div></main>
-  }
+  if (loading) return <main className="screen-shell"><div className="loading-card">Loading print preview…</div></main>
+  if (error || !report) return <main className="screen-shell"><div className="loading-card">{error || 'Report not found.'}</div></main>
 
   const isLanded = category === 'landed'
   const sizeSqft = sqmToSqft(report.floor_area_sqm)
@@ -258,11 +234,11 @@ export default function PrintableReportPage() {
         <button type="button" onClick={() => window.print()}>Print / Save as PDF</button>
       </div>
 
-      <section className="page page-one">
+      <section className="print-page page-one">
         <header className="report-header">
           <div>
             <div className="eyebrow">NexDoor HomeValue Report</div>
-            <h1>Pre-consultation Valuation Report</h1>
+            <h1>NexDoor HomeValue Report</h1>
             <p>Prepared for {report.client_name || 'Client'}</p>
           </div>
           <div className="header-meta">
@@ -286,13 +262,8 @@ export default function PrintableReportPage() {
         </section>
 
         <section className="section transactions-section">
-          <div className="section-heading-row">
-            <div>
-              <div className="section-title">2. {category === 'condo' || category === 'ec' ? 'Recent Project Transactions' : 'Recent Nearby Transactions'}</div>
-              <p className="section-subtitle">Last 12 months · Showing up to 15 transactions.</p>
-            </div>
-          </div>
-
+          <div className="section-title">2. {category === 'condo' || category === 'ec' ? 'Recent Project Transactions' : 'Recent Nearby Transactions'}</div>
+          <p className="section-subtitle">Last 12 months · Showing up to 15 transactions.</p>
           <table className={isLanded ? 'transactions landed-table' : 'transactions'}>
             <thead>
               <tr>
@@ -310,10 +281,7 @@ export default function PrintableReportPage() {
               {transactions.length > 0 ? transactions.map((transaction) => (
                 <tr key={transaction.id}>
                   <td>{formatDate(transaction.transaction_date)}</td>
-                  <td>
-                    <strong>{transaction.display_name || transaction.project_name || transaction.address || '—'}</strong>
-                    <span>{getSecondaryLine(transaction, category)}</span>
-                  </td>
+                  <td><strong>{transaction.display_name || transaction.project_name || transaction.address || '—'}</strong><span>{getSecondaryLine(transaction, category)}</span></td>
                   {!isLanded && <td>{transaction.unit_type || '—'}</td>}
                   <td>{transaction.floor_area_sqft ? `${transaction.floor_area_sqft.toLocaleString()} sqft` : '—'}</td>
                   <td>{transaction.floor_level || '—'}</td>
@@ -321,16 +289,14 @@ export default function PrintableReportPage() {
                   <td>{transaction.price_psf ? `$${transaction.price_psf.toLocaleString()} psf` : '—'}</td>
                   <td>{formatDistance(transaction.distance_m)}</td>
                 </tr>
-              )) : (
-                <tr><td colSpan={isLanded ? 7 : 8}>No recent transactions saved for this report.</td></tr>
-              )}
+              )) : <tr><td colSpan={isLanded ? 7 : 8}>No recent transactions saved for this report.</td></tr>}
             </tbody>
           </table>
         </section>
       </section>
 
-      <section className="page page-two">
-        <section className="section">
+      <section className="print-page page-two">
+        <section className="section first-section">
           <div className="section-title">3. Current Competing Listings</div>
           <div className="listing-grid">
             {[0, 1, 2].map((index) => {
@@ -342,9 +308,7 @@ export default function PrintableReportPage() {
                 <div className="listing-card" key={index}>
                   <div className="listing-number">Listing {index + 1}</div>
                   <strong>{listing.title || '—'}</strong>
-                  <div className="listing-meta">
-                    <span>{asking}</span><span>{size}</span><span>{psf}</span>
-                  </div>
+                  <div className="listing-meta"><span>{asking}</span><span>{size}</span><span>{psf}</span></div>
                   <p>{listing.condition || 'Condition not stated'} · {listing.source || 'Source not stated'}</p>
                   <p>{listing.notes || '—'}</p>
                 </div>
@@ -376,21 +340,20 @@ export default function PrintableReportPage() {
 
       <style jsx global>{`
         * { box-sizing: border-box; }
-        body { margin: 0; background: #f5efe6; color: #221915; font-family: Arial, Helvetica, sans-serif; }
+        html, body { margin: 0; background: #f5efe6; color: #221915; font-family: Arial, Helvetica, sans-serif; }
         .screen-shell { min-height: 100vh; display: grid; place-items: center; padding: 40px; }
         .loading-card { background: #fffaf3; border: 1px solid #ddc7ad; border-radius: 18px; padding: 28px; }
         .print-shell { padding: 24px 0 48px; }
         .toolbar { width: 794px; margin: 0 auto 16px; display: flex; justify-content: space-between; gap: 12px; }
         .toolbar a, .toolbar button { border: 1px solid #c9a889; background: #fffaf3; border-radius: 999px; color: #221915; padding: 10px 16px; font-weight: 700; text-decoration: none; cursor: pointer; }
         .toolbar button { background: #221915; color: #fffaf3; }
-        .page { width: 794px; min-height: 1123px; margin: 0 auto 24px; background: #fffaf7; border: 1px solid #ddc7ad; box-shadow: 0 8px 24px rgba(50, 30, 10, 0.12); padding: 22px 24px; page-break-after: always; overflow: hidden; }
-        .page-one { display: flex; flex-direction: column; }
-        .page-two { page-break-after: auto; position: relative; padding-bottom: 64px; }
+        .print-page { width: 794px; min-height: 1123px; margin: 0 auto 24px; background: #fffaf7; border: 1px solid #ddc7ad; box-shadow: 0 8px 24px rgba(50, 30, 10, 0.12); padding: 22px 24px; overflow: hidden; }
+        .page-two { break-before: page; page-break-before: always; }
         .report-header { display: flex; justify-content: space-between; gap: 22px; border-bottom: 2px solid #eadbc9; padding-bottom: 10px; margin-bottom: 10px; }
         .eyebrow { color: #b97935; text-transform: uppercase; font-size: 8px; font-weight: 800; letter-spacing: 1.6px; }
         h1 { margin: 3px 0 3px; font-size: 21px; line-height: 1.05; }
         .report-header p { margin: 0; color: #735f50; font-size: 11px; }
-        .header-meta { display: grid; grid-template-columns: 1fr; gap: 5px; min-width: 178px; text-align: right; }
+        .header-meta { display: grid; gap: 5px; min-width: 178px; text-align: right; }
         .header-meta span { display: block; color: #8a7361; text-transform: uppercase; font-size: 7px; letter-spacing: 1.1px; font-weight: 800; }
         .header-meta strong { font-size: 11px; }
         .section { margin-top: 10px; }
@@ -401,22 +364,22 @@ export default function PrintableReportPage() {
         .label { color: #836b58; text-transform: uppercase; font-size: 6.8px; letter-spacing: 1px; font-weight: 800; margin-bottom: 2px; }
         .value { font-size: 10px; font-weight: 700; line-height: 1.18; }
         .transactions-section { margin-top: 10px; }
-        table.transactions { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #e3cdb7; border-radius: 10px; overflow: hidden; font-size: 8.35px; table-layout: fixed; line-height: 1.16; }
-        .transactions th { background: #f8f0e6; color: #806854; text-transform: uppercase; letter-spacing: 0.8px; font-size: 6.8px; text-align: left; padding: 5px 5px; }
-        .transactions td { border-top: 1px solid #ecdccc; padding: 4.2px 5px; vertical-align: top; color: #5a493d; }
-        .transactions strong { color: #241a15; font-size: 8.5px; }
-        .transactions td span { display: block; color: #7c6756; font-size: 7.3px; margin-top: 1px; }
+        table.transactions { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #e3cdb7; border-radius: 10px; overflow: hidden; font-size: 8.9px; table-layout: fixed; line-height: 1.22; }
+        .transactions th { background: #f8f0e6; color: #806854; text-transform: uppercase; letter-spacing: 0.55px; font-size: 6.9px; text-align: left; padding: 5.5px 5px; white-space: nowrap; }
+        .transactions td { border-top: 1px solid #ecdccc; padding: 5.2px 5px; vertical-align: top; color: #5a493d; }
+        .transactions strong { color: #241a15; font-size: 8.95px; }
+        .transactions td span { display: block; color: #7c6756; font-size: 7.5px; margin-top: 1px; }
         .transactions th:nth-child(1), .transactions td:nth-child(1) { width: 9%; }
-        .transactions th:nth-child(2), .transactions td:nth-child(2) { width: 24%; }
-        .transactions th:nth-child(3), .transactions td:nth-child(3) { width: 18%; }
-        .transactions th:nth-child(4), .transactions td:nth-child(4) { width: 11%; }
-        .transactions th:nth-child(5), .transactions td:nth-child(5) { width: 10%; }
-        .transactions th:nth-child(6), .transactions td:nth-child(6) { width: 13%; }
+        .transactions th:nth-child(2), .transactions td:nth-child(2) { width: 23%; }
+        .transactions th:nth-child(3), .transactions td:nth-child(3) { width: 17%; }
+        .transactions th:nth-child(4), .transactions td:nth-child(4) { width: 10.5%; }
+        .transactions th:nth-child(5), .transactions td:nth-child(5) { width: 9.5%; }
+        .transactions th:nth-child(6), .transactions td:nth-child(6) { width: 12.5%; }
         .transactions th:nth-child(7), .transactions td:nth-child(7) { width: 10%; }
-        .transactions th:nth-child(8), .transactions td:nth-child(8) { width: 5%; }
+        .transactions th:nth-child(8), .transactions td:nth-child(8) { width: 8.5%; }
         .landed-table th:nth-child(2), .landed-table td:nth-child(2) { width: 34%; }
-        .page-two .section { margin-top: 18px; }
-        .listing-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .first-section { margin-top: 0; }
+        .listing-grid { display: grid; gap: 8px; }
         .listing-card { border: 1px solid #e3cdb7; border-radius: 12px; padding: 10px 12px; background: #fffdf9; }
         .listing-number { color: #b97935; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
         .listing-card strong { font-size: 12px; }
@@ -429,14 +392,14 @@ export default function PrintableReportPage() {
         .range-card strong { font-size: 14px; line-height: 1.2; }
         .suggested-price { margin-top: 10px; border: 1px dashed #d2b598; border-radius: 12px; padding: 10px 12px; font-size: 11px; }
         .notes-box { min-height: 125px; max-height: 210px; overflow: hidden; border: 1px solid #e3cdb7; border-radius: 12px; padding: 12px; font-size: 11px; color: #5b493b; line-height: 1.45; white-space: pre-wrap; background: #fffdf9; }
-        .footer-note { position: absolute; bottom: 22px; left: 24px; right: 24px; border-top: 1px solid #eadbc9; padding-top: 9px; color: #806854; font-size: 8px; line-height: 1.35; }
+        .footer-note { margin-top: 18px; border-top: 1px solid #eadbc9; padding-top: 9px; color: #806854; font-size: 8px; line-height: 1.35; }
         @page { size: A4 portrait; margin: 0; }
         @media print {
-          body { background: white; }
+          html, body { width: 210mm; margin: 0; background: white; }
           .no-print { display: none !important; }
           .print-shell { padding: 0; }
-          .page { width: 210mm; min-height: 297mm; margin: 0; border: none; box-shadow: none; border-radius: 0; page-break-after: always; }
-          .page-two { page-break-after: auto; }
+          .print-page { width: 210mm; min-height: 297mm; margin: 0; border: none; box-shadow: none; border-radius: 0; }
+          .page-two { break-before: page; page-break-before: always; }
         }
       `}</style>
     </main>
