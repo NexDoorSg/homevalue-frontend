@@ -136,6 +136,17 @@ function getSecondaryLine(transaction: RecentTransaction, category: string) {
   return ''
 }
 
+function hasListingContent(listing: CompetingListing) {
+  return Boolean(
+    listing.title?.trim() ||
+    listing.asking_price ||
+    listing.size_sqft ||
+    listing.psf ||
+    listing.condition?.trim() ||
+    listing.notes?.trim()
+  )
+}
+
 function normaliseTransactions(value: unknown) {
   if (!Array.isArray(value)) return []
   return value.slice(0, 15).map((row, index) => {
@@ -218,11 +229,14 @@ export default function PrintableReportPage() {
   const category = useMemo(() => (report ? getPropertyCategory(report) : 'condo'), [report])
   const transactions = useMemo(() => normaliseTransactions(report?.recent_transactions), [report])
   const listings = useMemo(() => normaliseListings(report?.competing_listings), [report])
+  const visibleListings = useMemo(() => listings.filter(hasListingContent), [listings])
 
   if (loading) return <main className="screen-shell"><div className="loading-card">Loading print preview…</div></main>
   if (error || !report) return <main className="screen-shell"><div className="loading-card">{error || 'Report not found.'}</div></main>
 
   const isLanded = category === 'landed'
+  const showDistanceColumn = category === 'hdb' || category === 'landed'
+  const transactionColSpan = isLanded ? (showDistanceColumn ? 7 : 6) : (showDistanceColumn ? 8 : 7)
   const sizeSqft = sqmToSqft(report.floor_area_sqm)
   const landSizeSqft = sqmToSqft(report.land_size_sqm)
   const builtUpSqft = sqmToSqft(report.built_up_sqm)
@@ -264,7 +278,7 @@ export default function PrintableReportPage() {
         <section className="section transactions-section">
           <div className="section-title">2. {category === 'condo' || category === 'ec' ? 'Recent Project Transactions' : 'Recent Nearby Transactions'}</div>
           <p className="section-subtitle">Last 12 months · Showing up to 15 transactions.</p>
-          <table className={isLanded ? 'transactions landed-table' : 'transactions'}>
+          <table className={`${isLanded ? 'transactions landed-table' : 'transactions'} ${showDistanceColumn ? '' : 'no-distance-table'}`}>
             <thead>
               <tr>
                 <th>Date</th>
@@ -274,7 +288,7 @@ export default function PrintableReportPage() {
                 <th>Floor</th>
                 <th>Price</th>
                 <th>PSF</th>
-                <th>Distance</th>
+                {showDistanceColumn && <th>Distance</th>}
               </tr>
             </thead>
             <tbody>
@@ -287,9 +301,9 @@ export default function PrintableReportPage() {
                   <td>{transaction.floor_level || '—'}</td>
                   <td><strong>{formatCurrency(transaction.transaction_price)}</strong></td>
                   <td>{transaction.price_psf ? `$${transaction.price_psf.toLocaleString()} psf` : '—'}</td>
-                  <td>{formatDistance(transaction.distance_m)}</td>
+                  {showDistanceColumn && <td>{formatDistance(transaction.distance_m)}</td>}
                 </tr>
-              )) : <tr><td colSpan={isLanded ? 7 : 8}>No recent transactions saved for this report.</td></tr>}
+              )) : <tr><td colSpan={transactionColSpan}>No recent transactions saved for this report.</td></tr>}
             </tbody>
           </table>
         </section>
@@ -298,23 +312,29 @@ export default function PrintableReportPage() {
       <section className="print-page page-two">
         <section className="section first-section">
           <div className="section-title">3. Current Competing Listings</div>
-          <div className="listing-grid">
-            {[0, 1, 2].map((index) => {
-              const listing = listings[index] || {}
-              const asking = listing.asking_price ? formatCurrency(listing.asking_price) : '—'
-              const size = listing.size_sqft ? `${Number(listing.size_sqft).toLocaleString()} sqft` : '—'
-              const psf = listing.psf || (toNumber(listing.asking_price) && toNumber(listing.size_sqft) ? `$${Math.round((toNumber(listing.asking_price) || 0) / (toNumber(listing.size_sqft) || 1)).toLocaleString()} psf` : '—')
-              return (
-                <div className="listing-card" key={index}>
-                  <div className="listing-number">Listing {index + 1}</div>
-                  <strong>{listing.title || '—'}</strong>
-                  <div className="listing-meta"><span>{asking}</span><span>{size}</span><span>{psf}</span></div>
-                  <p>{listing.condition || 'Condition not stated'} · {listing.source || 'Source not stated'}</p>
-                  <p>{listing.notes || '—'}</p>
-                </div>
-              )
-            })}
-          </div>
+          {visibleListings.length > 0 ? (
+            <div className="listing-grid">
+              {visibleListings.map((listing, index) => {
+                const asking = listing.asking_price ? formatCurrency(listing.asking_price) : '—'
+                const size = listing.size_sqft ? `${Number(listing.size_sqft).toLocaleString()} sqft` : '—'
+                const psf = listing.psf || (toNumber(listing.asking_price) && toNumber(listing.size_sqft) ? `$${Math.round((toNumber(listing.asking_price) || 0) / (toNumber(listing.size_sqft) || 1)).toLocaleString()} psf` : '—')
+                return (
+                  <div className="listing-card" key={index}>
+                    <div className="listing-number">Listing {index + 1}</div>
+                    <strong>{listing.title || '—'}</strong>
+                    <div className="listing-meta"><span>{asking}</span><span>{size}</span><span>{psf}</span></div>
+                    <p>{listing.condition || 'Condition not stated'} · {listing.source || 'Source not stated'}</p>
+                    <p>{listing.notes || '—'}</p>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="empty-listing-card">
+              <strong>No competing listings added yet.</strong>
+              <p>Active listings can be reviewed manually before the consultation.</p>
+            </div>
+          )}
         </section>
 
         <section className="section market-range-section">
@@ -377,10 +397,19 @@ export default function PrintableReportPage() {
         .transactions th:nth-child(6), .transactions td:nth-child(6) { width: 12.5%; }
         .transactions th:nth-child(7), .transactions td:nth-child(7) { width: 10%; }
         .transactions th:nth-child(8), .transactions td:nth-child(8) { width: 8.5%; }
+        .no-distance-table th:nth-child(1), .no-distance-table td:nth-child(1) { width: 9%; }
+        .no-distance-table th:nth-child(2), .no-distance-table td:nth-child(2) { width: 27%; }
+        .no-distance-table th:nth-child(3), .no-distance-table td:nth-child(3) { width: 19%; }
+        .no-distance-table th:nth-child(4), .no-distance-table td:nth-child(4) { width: 11%; }
+        .no-distance-table th:nth-child(5), .no-distance-table td:nth-child(5) { width: 10%; }
+        .no-distance-table th:nth-child(6), .no-distance-table td:nth-child(6) { width: 14%; }
+        .no-distance-table th:nth-child(7), .no-distance-table td:nth-child(7) { width: 10%; }
         .landed-table th:nth-child(2), .landed-table td:nth-child(2) { width: 34%; }
         .first-section { margin-top: 0; }
         .listing-grid { display: grid; gap: 8px; }
-        .listing-card { border: 1px solid #e3cdb7; border-radius: 12px; padding: 10px 12px; background: #fffdf9; }
+        .listing-card, .empty-listing-card { border: 1px solid #e3cdb7; border-radius: 12px; padding: 10px 12px; background: #fffdf9; }
+        .empty-listing-card strong { font-size: 12px; }
+        .empty-listing-card p { margin: 5px 0 0; font-size: 10px; color: #705d4e; line-height: 1.35; }
         .listing-number { color: #b97935; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
         .listing-card strong { font-size: 12px; }
         .listing-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 7px 0; font-size: 10px; font-weight: 800; }
