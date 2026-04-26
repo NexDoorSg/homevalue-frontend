@@ -234,17 +234,38 @@ async function resolveCanonicalProjectName(params: {
 
 async function getHdbCompletionYear(address: string) {
   const blockNo = extractBlockNumber(address)
-  if (!blockNo) return null
+  const addressKey = normaliseText(address)
+  if (!blockNo || !addressKey) return null
 
   const { data } = await supabase
     .from('property_transactions_v2')
-    .select('completion_year')
+    .select('address, completion_year')
     .eq('property_group', 'hdb')
     .ilike('address', `${blockNo} %`)
     .not('completion_year', 'is', null)
-    .limit(1)
+    .limit(200)
 
-  return data?.[0]?.completion_year ? Number(data[0].completion_year) : null
+  if (!data || data.length === 0) return null
+
+  const exactAddress = data.find((row: any) => normaliseText(row.address) === addressKey)
+  if (exactAddress?.completion_year) return Number(exactAddress.completion_year)
+
+  const addressWithoutPostal = addressKey
+    .replace(/\bSINGAPORE\b/g, ' ')
+    .replace(/\b\d{6}\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const matchingAddress = data.find((row: any) => {
+    const rowAddress = normaliseText(row.address)
+    return (
+      rowAddress === addressWithoutPostal ||
+      addressWithoutPostal.includes(rowAddress) ||
+      rowAddress.includes(addressWithoutPostal)
+    )
+  })
+
+  return matchingAddress?.completion_year ? Number(matchingAddress.completion_year) : null
 }
 
 function buildCacheKey(params: {
