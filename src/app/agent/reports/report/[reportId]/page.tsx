@@ -96,6 +96,7 @@ type ReportForm = {
   competing_listings: CompetingListing[]
   suggested_asking_price: string
   consultant_notes: string
+  recent_transactions_source: string
   status: 'draft' | 'ready' | 'archived'
 }
 
@@ -330,6 +331,24 @@ function getLandedGroup(value: string | null | undefined) {
 function getLandedOwnershipLabel(value: string | null | undefined) {
   if (value === 'non_strata') return 'Non-strata landed'
   if (value === 'strata_cluster') return 'Strata / cluster landed'
+  return ''
+}
+
+function getTransactionSecondaryLine(transaction: RecentTransaction, propertyCategory: 'hdb' | 'condo' | 'ec' | 'landed') {
+  if (propertyCategory === 'landed') return transaction.unit_type || ''
+
+  const displayKey = normaliseComparableText(transaction.display_name)
+  const projectKey = normaliseComparableText(transaction.project_name)
+  const addressKey = normaliseComparableText(transaction.address)
+
+  if (transaction.project_name && projectKey && displayKey && projectKey !== displayKey) {
+    return transaction.project_name
+  }
+
+  if (transaction.address && addressKey && displayKey && addressKey !== displayKey) {
+    return transaction.address
+  }
+
   return ''
 }
 
@@ -666,6 +685,7 @@ function buildFormFromLead(lead: Lead, userEmail: string): ReportForm {
     competing_listings: Array.from({ length: DEFAULT_COMPETING_LISTINGS }, () => ({ ...EMPTY_LISTING })),
     suggested_asking_price: '',
     consultant_notes: '',
+    recent_transactions_source: 'auto',
     status: 'draft',
   }
 }
@@ -709,6 +729,7 @@ function buildFormFromReport(report: any): ReportForm {
     competing_listings: normaliseListings(report.competing_listings),
     suggested_asking_price: toInputValue(report.suggested_asking_price),
     consultant_notes: report.consultant_notes || '',
+    recent_transactions_source: report.recent_transactions_source || 'auto',
     status: report.status || 'draft',
   }
 }
@@ -751,6 +772,7 @@ function buildPayload(form: ReportForm) {
     competing_listings: form.competing_listings,
     suggested_asking_price: toNumber(form.suggested_asking_price),
     consultant_notes: form.consultant_notes || null,
+    recent_transactions_source: form.recent_transactions_source || 'auto',
     status: form.status,
   }
 }
@@ -805,6 +827,10 @@ export default function AgentReportDetailPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [transactionsError, setTransactionsError] = useState<string | null>(null)
+  const [pdfUploadLoading, setPdfUploadLoading] = useState(false)
+  const [pdfUploadError, setPdfUploadError] = useState<string | null>(null)
+  const [pdfUploadSuccess, setPdfUploadSuccess] = useState<string | null>(null)
+  const [pdfPreviewRows, setPdfPreviewRows] = useState<RecentTransaction[]>([])
 
   const isAuthorised = useMemo(() => {
     if (!user?.email) return false
@@ -967,7 +993,7 @@ export default function AgentReportDetailPage() {
 
     if (propertyCategory === 'landed' && !getLandedSubtypeFromForm(currentForm)) {
       setTransactionsError('Please select non-strata landed or strata / cluster landed before refreshing landed transactions.')
-      setForm((current) => (current ? { ...current, recent_transactions: [] } : current))
+      setForm((current) => (current ? { ...current, recent_transactions: [], recent_transactions_source: 'auto' } : current))
       setTransactionsLoading(false)
       return
     }
@@ -977,7 +1003,7 @@ export default function AgentReportDetailPage() {
 
       if (!projectSearchTerm) {
         setTransactionsError('Unable to identify the project name from this property address. Please check the address format.')
-        setForm((current) => (current ? { ...current, recent_transactions: [] } : current))
+        setForm((current) => (current ? { ...current, recent_transactions: [], recent_transactions_source: 'auto' } : current))
         setTransactionsLoading(false)
         return
       }
@@ -1048,7 +1074,7 @@ export default function AgentReportDetailPage() {
         .sort((a, b) => getTransactionTimestamp(b.transaction_date) - getTransactionTimestamp(a.transaction_date))
         .slice(0, 15)
 
-      setForm((current) => (current ? { ...current, recent_transactions: projectRows } : current))
+      setForm((current) => (current ? { ...current, recent_transactions: projectRows, recent_transactions_source: 'auto' } : current))
       setTransactionsLoading(false)
       return
     }
@@ -1175,6 +1201,7 @@ export default function AgentReportDetailPage() {
         subject_lat: String(lat),
         subject_lon: String(lon),
         recent_transactions: rows,
+        recent_transactions_source: 'auto',
       }
     })
 
@@ -1183,6 +1210,76 @@ export default function AgentReportDetailPage() {
     }
 
     setTransactionsLoading(false)
+  }
+
+  async function handleTransactionPdfUpload(file: File | null) {
+    if (!file) return
+    if (!form) return
+
+    const propertyCategory = getReportPropertyCategory(form.property_type)
+    if (propertyCategory !== 'condo' && propertyCategory !== 'ec') {
+      setPdfUploadError('PDF upload is currently enabled for condo and EC reports only.')
+      return
+    }
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setPdfUploadError('Please upload a PDF file.')
+      return
+    }
+
+    setPdfUploadLoading(true)
+    setPdfUploadError(null)
+    setPdfUploadSuccess(null)
+    setPdfPreviewRows([])
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/agent/parse-transactions-pdf', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result?.error || 'Unable to extract transactions from this PDF.')
+      }
+
+      const rows = normaliseRecentTransactions(result?.transactions || [])
+
+      if (rows.length === 0) {
+        setPdfUploadError('No usable transaction rows were found in this PDF. Please check the PDF format or use the automated transactions instead.')
+      } else {
+        setPdfPreviewRows(rows)
+        setPdfUploadSuccess(`Extracted ${rows.length} transactions. Review them below, then click “Use uploaded transactions”.`)
+      }
+    } catch (uploadError) {
+      setPdfUploadError(uploadError instanceof Error ? uploadError.message : 'Unable to extract transactions from this PDF.')
+    }
+
+    setPdfUploadLoading(false)
+  }
+
+  function useUploadedTransactions() {
+    if (pdfPreviewRows.length === 0) return
+
+    setForm((current) => current ? {
+      ...current,
+      recent_transactions: pdfPreviewRows,
+      recent_transactions_source: 'uploaded_pdf',
+    } : current)
+
+    setPdfUploadSuccess('Uploaded transactions applied. Click Save Draft to keep them in this report.')
+    setPdfUploadError(null)
+    setPdfPreviewRows([])
+  }
+
+  function cancelUploadedTransactionsPreview() {
+    setPdfPreviewRows([])
+    setPdfUploadError(null)
+    setPdfUploadSuccess(null)
   }
 
   async function saveReport() {
@@ -1300,6 +1397,9 @@ export default function AgentReportDetailPage() {
               <Link href="/agent/reports" className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-center text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">
                 Back to Reports
               </Link>
+              <Link href={`/agent/reports/report/${reportId}/print`} target="_blank" className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-center text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">
+                Preview PDF
+              </Link>
               <button type="button" onClick={saveReport} disabled={saving} className="rounded-2xl bg-[#231A14] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#3A2B22] disabled:opacity-60">
                 {saving ? 'Saving...' : 'Save Draft'}
               </button>
@@ -1403,6 +1503,105 @@ export default function AgentReportDetailPage() {
               {transactionsLoading ? 'Refreshing...' : 'Refresh transactions'}
             </button>
           </div>
+
+          {(propertyCategoryForDisplay === 'condo' || propertyCategoryForDisplay === 'ec') && (
+            <div className="mt-5 rounded-3xl border border-[#EFE3D4] bg-[#FBF7F1] p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#231A14]">Optional: Upload transaction PDF</p>
+                  <p className="mt-1 text-sm leading-6 text-[#6F5C4E]">
+                    Upload a RealAgent transaction PDF if you want to use richer block/unit-level project transactions. If you do not upload anything, the automated same-project transactions will remain.
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-[#7B6757]">
+                    Uploaded rows replace the transaction table only after you review and click “Use uploaded transactions”.
+                  </p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-[#D7C6B5] bg-white px-4 py-3 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">
+                  {pdfUploadLoading ? 'Extracting...' : 'Choose PDF'}
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    disabled={pdfUploadLoading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null
+                      handleTransactionPdfUpload(file)
+                      event.target.value = ''
+                    }}
+                  />
+                </label>
+              </div>
+
+              {pdfUploadError && (
+                <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {pdfUploadError}
+                </p>
+              )}
+
+              {pdfUploadSuccess && (
+                <p className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  {pdfUploadSuccess}
+                </p>
+              )}
+
+              {pdfPreviewRows.length > 0 && (
+                <div className="mt-5 rounded-2xl border border-[#E4D7C6] bg-white p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <p className="text-sm font-semibold text-[#231A14]">Preview extracted transactions</p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={cancelUploadedTransactionsPreview}
+                        className="rounded-2xl border border-[#D7C6B5] px-4 py-2 text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={useUploadedTransactions}
+                        className="rounded-2xl bg-[#231A14] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3A2B22]"
+                      >
+                        Use uploaded transactions
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-4 max-h-72 overflow-auto rounded-2xl border border-[#EFE3D4]">
+                    <table className="min-w-full divide-y divide-[#EFE3D4] text-left text-xs">
+                      <thead className="bg-[#FBF7F1] uppercase tracking-[0.12em] text-[#7B6757]">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">Date</th>
+                          <th className="px-3 py-2 font-semibold">Address / Project</th>
+                          <th className="px-3 py-2 font-semibold">Unit Type</th>
+                          <th className="px-3 py-2 font-semibold">Size</th>
+                          <th className="px-3 py-2 font-semibold">Floor</th>
+                          <th className="px-3 py-2 font-semibold">Price</th>
+                          <th className="px-3 py-2 font-semibold">PSF</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#EFE3D4] bg-white">
+                        {pdfPreviewRows.map((transaction) => (
+                          <tr key={transaction.id} className="align-top">
+                            <td className="whitespace-nowrap px-3 py-2 text-[#6F5C4E]">{formatDate(transaction.transaction_date)}</td>
+                            <td className="px-3 py-2">
+                              <div className="font-semibold text-[#231A14]">{transaction.display_name || transaction.address || '—'}</div>
+                              {getTransactionSecondaryLine(transaction, propertyCategoryForDisplay) && (
+                                <div className="mt-1 text-[#7B6757]">{getTransactionSecondaryLine(transaction, propertyCategoryForDisplay)}</div>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-[#6F5C4E]">{transaction.unit_type || '—'}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-[#6F5C4E]">{transaction.floor_area_sqft ? `${transaction.floor_area_sqft.toLocaleString()} sqft` : '—'}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-[#6F5C4E]">{transaction.floor_level || '—'}</td>
+                            <td className="whitespace-nowrap px-3 py-2 font-semibold">{formatCurrency(transaction.transaction_price)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-[#6F5C4E]">{transaction.price_psf ? `${transaction.price_psf.toLocaleString()} psf` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {transactionsError && (
             <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -1564,10 +1763,13 @@ export default function AgentReportDetailPage() {
         </section>
 
         <div className="flex flex-col gap-3 rounded-3xl border border-[#E4D7C6] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#6F5C4E]">PDF export will be added after this editable draft page is stable.</p>
+          <p className="text-sm text-[#6F5C4E]">Preview the print-ready PDF after saving your latest edits.</p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link href="/agent/reports" className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-center text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">
               Back to Reports
+            </Link>
+            <Link href={`/agent/reports/report/${reportId}/print`} target="_blank" className="rounded-2xl border border-[#D7C6B5] px-5 py-3 text-center text-sm font-semibold text-[#231A14] transition hover:bg-[#F7F1E8]">
+              Preview PDF
             </Link>
             <button type="button" onClick={saveReport} disabled={saving} className="rounded-2xl bg-[#231A14] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#3A2B22] disabled:opacity-60">
               {saving ? 'Saving...' : 'Save Draft'}
