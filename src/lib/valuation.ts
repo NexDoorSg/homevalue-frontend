@@ -755,6 +755,58 @@ function getCondoEcAnchorSpread(rows: CleanedRow[], daysOld: number | null) {
   return Math.max(freshnessSpread, Math.min(stdDevPct, 0.12))
 }
 
+
+function applyCondoEcSameProjectMarketCalibration(
+  anchorPsm: number,
+  sameProjectRows: CleanedRow[],
+  anchorRows: CleanedRow[],
+  latestDaysOld: number | null
+) {
+  if (!anchorPsm || !Number.isFinite(anchorPsm)) return anchorPsm
+
+  // HomeValue is client-facing. For condo/EC same-project valuations,
+  // keep the estimate realistic but avoid presenting an overly conservative
+  // headline that makes sellers feel we are pricing their unit too low.
+  // This is intentionally small and only applies after a same-project anchor
+  // has already been established.
+  let uplift = 0.025
+
+  if (sameProjectRows.length <= 8 || anchorRows.length <= 3) {
+    uplift = 0.04
+  } else if (sameProjectRows.length <= 15 || anchorRows.length <= 5) {
+    uplift = 0.035
+  }
+
+  // If the project data is older, do not stack too much optimism on top of
+  // the separate market-movement adjustment.
+  if (latestDaysOld !== null && latestDaysOld > 365) {
+    uplift = Math.min(uplift, 0.03)
+  }
+
+  let calibratedPsm = anchorPsm * (1 + uplift)
+
+  const sameProjectPsmValues = sameProjectRows
+    .map((row) => row.pricePerSqm)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+
+  const p75 = percentile(sameProjectPsmValues, 0.75)
+  const p90 = percentile(sameProjectPsmValues, 0.90)
+
+  // Keep the seller-friendly calibration within the project's own PSF reality.
+  // It can lift a conservative size-curve anchor, but it should not recreate
+  // the old issue where nearby higher-PSF condos overpower the subject project.
+  if (p75 && Number.isFinite(p75) && anchorPsm < p75) {
+    calibratedPsm = Math.min(calibratedPsm, p75 * 1.02)
+  }
+
+  if (p90 && Number.isFinite(p90)) {
+    calibratedPsm = Math.min(calibratedPsm, p90)
+  }
+
+  return Math.max(anchorPsm, calibratedPsm)
+}
+
 function pickSameProjectAnchorRows(
   sameProjectRows: CleanedRow[],
   floorAreaSqm: number
@@ -1159,7 +1211,13 @@ function buildSameProjectCondoEcCandidate(
     Math.min(1 + movementCap, rawMovement)
   )
 
-  const adjustedPsm = anchorPsm * marketMovement
+  const calibratedAnchorPsm = applyCondoEcSameProjectMarketCalibration(
+    anchorPsm,
+    sameProjectRows,
+    anchorRows,
+    latestDaysOld
+  )
+  const adjustedPsm = calibratedAnchorPsm * marketMovement
   const estimated = adjustedPsm * floorAreaSqm
   const biasedEstimate = estimated * 1.01
   const floorAdjusted = applyFloorAdjustment(
@@ -1178,8 +1236,8 @@ function buildSameProjectCondoEcCandidate(
     radius,
     method:
       latestDaysOld !== null && latestDaysOld > 365
-        ? 'condo_ec_same_project_size_curve_market_adjusted'
-        : 'condo_ec_same_project_size_curve',
+        ? 'condo_ec_same_project_size_curve_calibrated_market_adjusted'
+        : 'condo_ec_same_project_size_curve_calibrated',
   }
 }
 
