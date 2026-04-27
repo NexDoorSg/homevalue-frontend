@@ -319,6 +319,27 @@ function sqmToSqft(value: number | string | null) {
   return Math.round(num * 10.7639).toString()
 }
 
+function normalizeUnitPart(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  if (!/^\d+$/.test(trimmed)) return trimmed
+
+  const numberValue = Number(trimmed)
+  if (!Number.isFinite(numberValue) || numberValue < 0) return trimmed
+
+  return String(numberValue).padStart(2, '0')
+}
+
+function buildUnitNumber(floor: string, stack: string, withHash = false) {
+  const normalizedFloor = normalizeUnitPart(floor)
+  const normalizedStack = normalizeUnitPart(stack)
+
+  if (!normalizedFloor || !normalizedStack) return ''
+
+  return `${withHash ? '#' : ''}${normalizedFloor}-${normalizedStack}`
+}
+
 function formatTeaserMoney(value: number | null) {
   if (!value) return '$4XX,XXX'
 
@@ -1244,9 +1265,7 @@ export default function Home() {
         }
       }
 
-      const unitNumber = (floorLevel.trim() && stackNumber.trim())
-        ? `${floorLevel.trim()}-${stackNumber.trim()}`
-        : ''
+      const unitNumber = buildUnitNumber(floorLevel, stackNumber)
 
       // Keep the 30-day cache stable only for the same valuation inputs.
       // This prevents a wrong sqft / land size entry from being reused for the same address.
@@ -1372,10 +1391,7 @@ export default function Home() {
     email: string,
     extra?: { plan?: string | null }
   ) => {
-    const fullUnitNumber =
-      floorLevel.trim() && stackNumber.trim()
-        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
-        : null
+    const fullUnitNumber = buildUnitNumber(floorLevel, stackNumber, true) || null
 
     const propertyContextExists = hasPropertyContext()
     const normalizedEmail = email.trim().toLowerCase()
@@ -1406,10 +1422,7 @@ export default function Home() {
     num_of_comps: number
     radius_used_m: number
   }) => {
-    const fullUnitNumber =
-      floorLevel.trim() && stackNumber.trim()
-        ? `#${floorLevel.trim()}-${stackNumber.trim()}`
-        : null
+    const fullUnitNumber = buildUnitNumber(floorLevel, stackNumber, true) || null
 
     return {
       source_page: '/free-property-valuation-singapore',
