@@ -687,9 +687,9 @@ function splitRowsByRecency(rows: CleanedRow[]) {
   for (const row of rows) {
     const daysOld = getDaysOld(row.transaction_date)
 
-    if (daysOld === null || daysOld <= 180) {
+    if (daysOld === null || daysOld <= 365) {
       fresh.push(row)
-    } else if (daysOld <= 365) {
+    } else if (daysOld <= 730) {
       moderate.push(row)
     } else {
       stale.push(row)
@@ -697,6 +697,313 @@ function splitRowsByRecency(rows: CleanedRow[]) {
   }
 
   return { fresh, moderate, stale }
+}
+
+function getMedian(values: number[]) {
+  const sorted = values
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+
+  return percentile(sorted, 0.5)
+}
+
+function getMedianPsm(rows: CleanedRow[]) {
+  return getMedian(rows.map((row) => row.pricePerSqm))
+}
+
+function getMostRecentDaysOld(rows: CleanedRow[]) {
+  const dayValues = rows
+    .map((row) => getDaysOld(row.transaction_date))
+    .filter((value): value is number => value !== null && Number.isFinite(value))
+
+  if (dayValues.length === 0) return null
+  return Math.min(...dayValues)
+}
+
+function getCondoEcMarketMovementCap(daysOld: number | null) {
+  if (daysOld === null || daysOld <= 365) return 0.03
+  if (daysOld <= 730) return 0.06
+  if (daysOld <= 1095) return 0.08
+  return 0.12
+}
+
+function getCondoEcAnchorSpread(rows: CleanedRow[], daysOld: number | null) {
+  const freshnessSpread =
+    daysOld === null || daysOld <= 365
+      ? 0.04
+      : daysOld <= 730
+      ? 0.06
+      : daysOld <= 1095
+      ? 0.08
+      : 0.10
+
+  const psmValues = rows
+    .map((row) => row.pricePerSqm)
+    .filter((value) => Number.isFinite(value) && value > 0)
+
+  if (psmValues.length < 2) return freshnessSpread
+
+  const mean = psmValues.reduce((sum, value) => sum + value, 0) / psmValues.length
+  if (!mean || !Number.isFinite(mean)) return freshnessSpread
+
+  const stdDev = Math.sqrt(
+    psmValues.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
+      psmValues.length
+  )
+  const stdDevPct = stdDev / mean
+
+  return Math.max(freshnessSpread, Math.min(stdDevPct, 0.12))
+}
+
+function pickSameProjectAnchorRows(
+  sameProjectRows: CleanedRow[],
+  floorAreaSqm: number
+) {
+  const areaBands = getCondoEcAreaBands(floorAreaSqm)
+
+  const strict = filterByAreaRatio(
+    sameProjectRows,
+    floorAreaSqm,
+    areaBands.strict.min,
+    areaBands.strict.max
+  )
+  if (strict.length >= 1) return strict
+
+  const medium = filterByAreaRatio(
+    sameProjectRows,
+    floorAreaSqm,
+    areaBands.medium.min,
+    areaBands.medium.max
+  )
+  if (medium.length >= 1) return medium
+
+  const wide = filterByAreaRatio(
+    sameProjectRows,
+    floorAreaSqm,
+    areaBands.wide.min,
+    areaBands.wide.max
+  )
+  if (wide.length >= 1) return wide
+
+  const broad = filterByAreaRatio(sameProjectRows, floorAreaSqm, 0.6, 1.6)
+  return broad.length >= 1 ? broad : []
+}
+
+function getCondoEcNearbySupportRows(
+  rows: CleanedRow[],
+  floorAreaSqm: number,
+  subjectProjectName?: string | null,
+  subjectCompletionYear?: number | null,
+  subjectTenureBucket?: string
+) {
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
+  const areaBands = getCondoEcAreaBands(floorAreaSqm)
+
+  let supportRows = normalizedSubjectProject
+    ? rows.filter((row) => normalizeText(row.project_name) !== normalizedSubjectProject)
+    : [...rows]
+
+  if (subjectCompletionYear) {
+    const similarAgeRows = supportRows.filter((row) => {
+      if (!row.completion_year) return false
+      return Math.abs(row.completion_year - subjectCompletionYear) <= 10
+    })
+
+    if (similarAgeRows.length >= 3) {
+      supportRows = similarAgeRows
+    } else {
+      const broaderAgeRows = supportRows.filter((row) => {
+        if (!row.completion_year) return false
+        return Math.abs(row.completion_year - subjectCompletionYear) <= 15
+      })
+
+      if (broaderAgeRows.length >= 3) {
+        supportRows = broaderAgeRows
+      } else {
+        const antiNewLaunchRows = supportRows.filter((row) => {
+          if (!row.completion_year) return true
+          return row.completion_year <= subjectCompletionYear + 8
+        })
+
+        if (antiNewLaunchRows.length >= 3) {
+          supportRows = antiNewLaunchRows
+        }
+      }
+    }
+  }
+
+  if (subjectTenureBucket && subjectTenureBucket !== 'UNKNOWN') {
+    const sameTenureRows = supportRows.filter(
+      (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
+    )
+
+    if (sameTenureRows.length >= 3) {
+      supportRows = sameTenureRows
+    }
+  }
+
+  const strictAreaRows = filterByAreaRatio(
+    supportRows,
+    floorAreaSqm,
+    areaBands.strict.min,
+    areaBands.strict.max
+  )
+  if (strictAreaRows.length >= 3) {
+    supportRows = strictAreaRows
+  } else {
+    const mediumAreaRows = filterByAreaRatio(
+      supportRows,
+      floorAreaSqm,
+      areaBands.medium.min,
+      areaBands.medium.max
+    )
+
+    if (mediumAreaRows.length >= 3) {
+      supportRows = mediumAreaRows
+    } else {
+      const wideAreaRows = filterByAreaRatio(
+        supportRows,
+        floorAreaSqm,
+        areaBands.wide.min,
+        areaBands.wide.max
+      )
+
+      if (wideAreaRows.length >= 3) {
+        supportRows = wideAreaRows
+      }
+    }
+  }
+
+  return trimCondoEcOutliers(supportRows)
+    .sort((a, b) => a.distanceM - b.distanceM)
+    .slice(0, 30)
+}
+
+function getCondoEcMarketMovement(anchorRows: CleanedRow[], supportRows: CleanedRow[]) {
+  const latestAnchorDate = getMostRecentDate(anchorRows)
+  if (!latestAnchorDate || supportRows.length < 6) return 1
+
+  const dayMs = 24 * 60 * 60 * 1000
+  const now = Date.now()
+  const anchorTime = latestAnchorDate.getTime()
+
+  const recentSupportRows = supportRows.filter((row) => {
+    if (!row.transaction_date) return false
+    const time = new Date(row.transaction_date).getTime()
+    return Number.isFinite(time) && time >= now - 365 * dayMs
+  })
+
+  const anchorPeriodSupportRows = supportRows.filter((row) => {
+    if (!row.transaction_date) return false
+    const time = new Date(row.transaction_date).getTime()
+    return (
+      Number.isFinite(time) &&
+      time >= anchorTime - 183 * dayMs &&
+      time <= anchorTime + 183 * dayMs
+    )
+  })
+
+  if (recentSupportRows.length < 3 || anchorPeriodSupportRows.length < 3) return 1
+
+  const recentMedian = getMedianPsm(recentSupportRows)
+  const anchorPeriodMedian = getMedianPsm(anchorPeriodSupportRows)
+
+  if (!recentMedian || !anchorPeriodMedian || anchorPeriodMedian <= 0) return 1
+
+  const movement = recentMedian / anchorPeriodMedian
+  return Number.isFinite(movement) && movement > 0 ? movement : 1
+}
+
+function buildSameProjectCondoEcCandidate(
+  rows: CleanedRow[],
+  radius: number,
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel?: number,
+  subjectProjectName?: string | null,
+  subjectCompletionYear?: number | null,
+  subjectTenureBucket?: string
+): CandidateResult | null {
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
+  if (!normalizedSubjectProject) return null
+
+  const sameProjectRows = rows.filter(
+    (row) => normalizeText(row.project_name) === normalizedSubjectProject
+  )
+
+  if (sameProjectRows.length === 0) return null
+
+  const anchorRows = trimCondoEcOutliers(
+    pickSameProjectAnchorRows(sameProjectRows, floorAreaSqm)
+  )
+
+  if (anchorRows.length === 0) return null
+
+  const values = anchorRows.map((row) => row.pricePerSqm)
+  const weights = anchorRows.map((row) => {
+    const areaRatio = row.floor_area_sqm / floorAreaSqm
+    const sizeWeight =
+      areaRatio >= 0.95 && areaRatio <= 1.05
+        ? 1.25
+        : areaRatio >= 0.9 && areaRatio <= 1.1
+        ? 1.16
+        : areaRatio >= 0.8 && areaRatio <= 1.2
+        ? 1.08
+        : 0.9
+
+    const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
+    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
+
+    return sizeWeight * recencyWeight * floorWeight
+  })
+
+  const weightedPsm = weightedAverage(values, weights)
+  const medianPsm = getMedianPsm(anchorRows)
+  const anchorPsm = weightedPsm && Number.isFinite(weightedPsm) ? weightedPsm : medianPsm
+
+  if (!anchorPsm || !Number.isFinite(anchorPsm)) return null
+
+  const latestDaysOld = getMostRecentDaysOld(anchorRows)
+  const supportRows = getCondoEcNearbySupportRows(
+    rows,
+    floorAreaSqm,
+    subjectProjectName,
+    subjectCompletionYear,
+    subjectTenureBucket
+  )
+
+  const rawMovement =
+    latestDaysOld !== null && latestDaysOld > 365
+      ? getCondoEcMarketMovement(anchorRows, supportRows)
+      : 1
+  const movementCap = getCondoEcMarketMovementCap(latestDaysOld)
+  const marketMovement = Math.max(
+    1 - movementCap,
+    Math.min(1 + movementCap, rawMovement)
+  )
+
+  const adjustedPsm = anchorPsm * marketMovement
+  const estimated = adjustedPsm * floorAreaSqm
+  const biasedEstimate = estimated * 1.01
+  const floorAdjusted = applyFloorAdjustment(
+    biasedEstimate,
+    subjectFloorLevel,
+    propertyCategory
+  )
+
+  const halfSpread = getCondoEcAnchorSpread(anchorRows, latestDaysOld)
+
+  return {
+    estimated: floorAdjusted,
+    low: floorAdjusted * (1 - halfSpread),
+    high: floorAdjusted * (1 + halfSpread),
+    comparables: anchorRows.length,
+    radius,
+    method:
+      latestDaysOld !== null && latestDaysOld > 365
+        ? 'condo_ec_same_project_market_adjusted'
+        : 'condo_ec_same_project_anchor',
+  }
 }
 
 function selectCondoEcComparablePool(
@@ -707,144 +1014,22 @@ function selectCondoEcComparablePool(
   subjectTenureBucket?: string
 ) {
   const normalizedSubjectProject = normalizeText(subjectProjectName)
-  const areaBands = getCondoEcAreaBands(floorAreaSqm)
-
   const sameProjectRows = normalizedSubjectProject
-    ? rows.filter(
-        (row) => normalizeText(row.project_name) === normalizedSubjectProject
-      )
+    ? rows.filter((row) => normalizeText(row.project_name) === normalizedSubjectProject)
     : []
 
-  let preferredSameProjectRows: CleanedRow[] = []
-
-  if (sameProjectRows.length >= 2) {
-    const sameProjectStrict = filterByAreaRatio(
-      sameProjectRows,
-      floorAreaSqm,
-      areaBands.strict.min,
-      areaBands.strict.max
-    )
-    const sameProjectMedium = filterByAreaRatio(
-      sameProjectRows,
-      floorAreaSqm,
-      areaBands.medium.min,
-      areaBands.medium.max
-    )
-    const sameProjectWide = filterByAreaRatio(
-      sameProjectRows,
-      floorAreaSqm,
-      areaBands.wide.min,
-      areaBands.wide.max
-    )
-
-    const sameProjectCandidates =
-      sameProjectStrict.length >= 2
-        ? sameProjectStrict
-        : sameProjectMedium.length >= 2
-        ? sameProjectMedium
-        : sameProjectWide.length >= 2
-        ? sameProjectWide
-        : []
-
-    if (sameProjectCandidates.length >= 2) {
-      const { fresh, moderate } = splitRowsByRecency(sameProjectCandidates)
-
-      if (fresh.length >= 2) return fresh
-      if (fresh.length + moderate.length >= 2) {
-        preferredSameProjectRows = [...fresh, ...moderate]
-      }
-    }
+  if (sameProjectRows.length > 0) {
+    const anchorRows = pickSameProjectAnchorRows(sameProjectRows, floorAreaSqm)
+    if (anchorRows.length > 0) return anchorRows
   }
 
-  let pool = [...rows]
-
-  if (subjectCompletionYear) {
-    const ageFiltered = pool.filter((row) => {
-      if (!row.completion_year) return false
-      return Math.abs(row.completion_year - subjectCompletionYear) <= 10
-    })
-
-    if (ageFiltered.length >= 3) {
-      pool = ageFiltered
-    } else {
-      const broaderAgeFiltered = pool.filter((row) => {
-        if (!row.completion_year) return false
-        return Math.abs(row.completion_year - subjectCompletionYear) <= 15
-      })
-
-      if (broaderAgeFiltered.length >= 3) {
-        pool = broaderAgeFiltered
-      } else {
-        const antiNewLaunch = pool.filter((row) => {
-          if (!subjectCompletionYear) return true
-          if (!row.completion_year) return true
-          return row.completion_year <= subjectCompletionYear + 8
-        })
-
-        if (antiNewLaunch.length >= 3) {
-          pool = antiNewLaunch
-        }
-      }
-    }
-  }
-
-  if (subjectTenureBucket && subjectTenureBucket !== 'UNKNOWN') {
-    const sameTenureRows = pool.filter(
-      (row) => normalizeTenureBucket(row.tenure) === subjectTenureBucket
-    )
-
-    if (sameTenureRows.length >= 3) {
-      pool = sameTenureRows
-    }
-  }
-
-  const tight = filterByAreaRatio(
-    pool,
+  return getCondoEcNearbySupportRows(
+    rows,
     floorAreaSqm,
-    areaBands.strict.min,
-    areaBands.strict.max
+    subjectProjectName,
+    subjectCompletionYear,
+    subjectTenureBucket
   )
-  if (tight.length >= 3) {
-    pool = tight
-  } else {
-    const medium = filterByAreaRatio(
-      pool,
-      floorAreaSqm,
-      areaBands.medium.min,
-      areaBands.medium.max
-    )
-    if (medium.length >= 3) {
-      pool = medium
-    } else {
-      const broad = filterByAreaRatio(
-        pool,
-        floorAreaSqm,
-        areaBands.wide.min,
-        areaBands.wide.max
-      )
-      if (broad.length >= 3) {
-        pool = broad
-      }
-    }
-  }
-
-  if (preferredSameProjectRows.length > 0) {
-    const preferredKeys = new Set(
-      preferredSameProjectRows.map(
-        (row) =>
-          `${row.address}|${row.transaction_date}|${row.transaction_price}`
-      )
-    )
-
-    const others = pool.filter((row) => {
-      const key = `${row.address}|${row.transaction_date}|${row.transaction_price}`
-      return !preferredKeys.has(key)
-    })
-
-    return [...preferredSameProjectRows, ...others]
-  }
-
-  return pool
 }
 
 function buildCondoEcCandidate(
@@ -858,6 +1043,19 @@ function buildCondoEcCandidate(
   subjectTenureBucket?: string
 ): CandidateResult | null {
   if (rows.length === 0) return null
+
+  const sameProjectCandidate = buildSameProjectCondoEcCandidate(
+    rows,
+    radius,
+    floorAreaSqm,
+    propertyCategory,
+    subjectFloorLevel,
+    subjectProjectName,
+    subjectCompletionYear,
+    subjectTenureBucket
+  )
+
+  if (sameProjectCandidate) return sameProjectCandidate
 
   const selectedPool = selectCondoEcComparablePool(
     rows,
@@ -884,7 +1082,6 @@ function buildCondoEcCandidate(
         ? 1.06
         : 0.9
 
-    const projectWeight = getCondoEcProjectWeight(row, subjectProjectName)
     const ageWeight = getCondoEcAgeWeight(row, subjectCompletionYear)
     const tenureWeight = getCondoEcTenureWeight(row, subjectTenureBucket)
     const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
@@ -893,7 +1090,6 @@ function buildCondoEcCandidate(
     return (
       distanceWeight *
       sizeWeight *
-      projectWeight *
       ageWeight *
       tenureWeight *
       recencyWeight *
@@ -933,7 +1129,7 @@ function buildCondoEcCandidate(
     high: floorAdjusted * (high / biasedEstimate),
     comparables: usable.length,
     radius,
-    method: 'condo_ec_hybrid',
+    method: 'condo_ec_strict_nearby',
   }
 }
 
@@ -947,6 +1143,19 @@ function buildCondoEcFallback(
   subjectTenureBucket?: string
 ): CandidateResult | null {
   if (rows.length === 0) return null
+
+  const sameProjectCandidate = buildSameProjectCondoEcCandidate(
+    rows,
+    3000,
+    floorAreaSqm,
+    propertyCategory,
+    subjectFloorLevel,
+    subjectProjectName,
+    subjectCompletionYear,
+    subjectTenureBucket
+  )
+
+  if (sameProjectCandidate) return sameProjectCandidate
 
   const pool = selectCondoEcComparablePool(
     rows,
@@ -976,7 +1185,6 @@ function buildCondoEcFallback(
         ? 1
         : 0.88
 
-    const projectWeight = getCondoEcProjectWeight(row, subjectProjectName)
     const ageWeight = getCondoEcAgeWeight(row, subjectCompletionYear)
     const tenureWeight = getCondoEcTenureWeight(row, subjectTenureBucket)
     const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
@@ -985,7 +1193,6 @@ function buildCondoEcFallback(
     return (
       distanceWeight *
       sizeWeight *
-      projectWeight *
       ageWeight *
       tenureWeight *
       recencyWeight *
@@ -1006,8 +1213,13 @@ function buildCondoEcFallback(
     high: floorAdjusted * 1.07,
     comparables: usable.length,
     radius: Math.round(usable[usable.length - 1].distanceM),
-    method: 'condo_ec_fallback',
+    method: 'condo_ec_strict_nearby_fallback',
   }
+}
+
+
+function isSameProjectCondoEcCandidate(candidate: CandidateResult | null) {
+  return candidate?.method?.startsWith('condo_ec_same_project') === true
 }
 
 function pickPreferredNonLandedRows(
@@ -1709,10 +1921,21 @@ export async function getValuation({
 
     let valuationPool = cleanedRows
 
+    const normalizedSubjectProject = normalizeText(subjectProjectName)
+    const sameProjectRowsInRadius = normalizedSubjectProject
+      ? cleanedRows.filter(
+          (row) => normalizeText(row.project_name) === normalizedSubjectProject
+        )
+      : []
+
     const sameTypeRows = cleanedRows.filter((row) =>
       isMatchingNonLandedType(row.unit_type, propertyType)
     )
-    if (sameTypeRows.length >= 2) {
+
+    // For condo/EC, same-project data should not be lost just because
+    // the bedroom/unit_type label is messy. If same-project rows exist,
+    // pass the full cleaned pool so the same-project anchor can use floor area first.
+    if (sameProjectRowsInRadius.length === 0 && sameTypeRows.length >= 2) {
       valuationPool = sameTypeRows
     }
 
@@ -1733,6 +1956,18 @@ export async function getValuation({
 
     if (!bestCandidate) {
       bestCandidate = candidate
+      continue
+    }
+
+    const currentSameProject = isSameProjectCondoEcCandidate(bestCandidate)
+    const nextSameProject = isSameProjectCondoEcCandidate(candidate)
+
+    if (!currentSameProject && nextSameProject) {
+      bestCandidate = candidate
+      continue
+    }
+
+    if (currentSameProject && !nextSameProject) {
       continue
     }
 
@@ -1782,10 +2017,17 @@ export async function getValuation({
   let fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
   if (fallbackRows.length === 0) return null
 
+  const normalizedSubjectProject = normalizeText(subjectProjectName)
+  const sameProjectRowsInFallback = normalizedSubjectProject
+    ? fallbackRows.filter(
+        (row) => normalizeText(row.project_name) === normalizedSubjectProject
+      )
+    : []
+
   const sameTypeRows = fallbackRows.filter((row) =>
     isMatchingNonLandedType(row.unit_type, propertyType)
   )
-  if (sameTypeRows.length >= 2) {
+  if (sameProjectRowsInFallback.length === 0 && sameTypeRows.length >= 2) {
     fallbackRows = sameTypeRows
   }
 
