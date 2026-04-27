@@ -789,6 +789,199 @@ function pickSameProjectAnchorRows(
   return broad.length >= 1 ? broad : []
 }
 
+
+function getWeightedPsmForRows(
+  rows: CleanedRow[],
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel?: number
+) {
+  if (rows.length === 0) return null
+
+  const values = rows.map((row) => row.pricePerSqm)
+  const weights = rows.map((row) => {
+    const areaRatio = row.floor_area_sqm / floorAreaSqm
+    const sizeCloseness = 1 / (Math.abs(Math.log(Math.max(areaRatio, 0.01))) + 0.08)
+    const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
+    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
+
+    return sizeCloseness * recencyWeight * floorWeight
+  })
+
+  return weightedAverage(values, weights)
+}
+
+function getWeightedAreaForRows(rows: CleanedRow[], floorAreaSqm: number) {
+  if (rows.length === 0) return null
+
+  const values = rows.map((row) => row.floor_area_sqm)
+  const weights = rows.map((row) => {
+    const areaRatio = row.floor_area_sqm / floorAreaSqm
+    return 1 / (Math.abs(Math.log(Math.max(areaRatio, 0.01))) + 0.08)
+  })
+
+  return weightedAverage(values, weights)
+}
+
+function getSameProjectSizeCurveRows(
+  sameProjectRows: CleanedRow[],
+  floorAreaSqm: number
+) {
+  const usefulRows = filterByAreaRatio(sameProjectRows, floorAreaSqm, 0.45, 1.90)
+  const baseRows = usefulRows.length >= 2 ? usefulRows : sameProjectRows
+
+  const trimmed = trimCondoEcOutliers(baseRows)
+  return trimmed.length > 0 ? trimmed : baseRows
+}
+
+function getSideAnchorForSizeCurve(
+  rows: CleanedRow[],
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel: number | undefined,
+  side: 'lower' | 'upper'
+) {
+  const sideRows = rows
+    .filter((row) =>
+      side === 'lower'
+        ? row.floor_area_sqm <= floorAreaSqm
+        : row.floor_area_sqm >= floorAreaSqm
+    )
+    .sort((a, b) =>
+      Math.abs(Math.log(a.floor_area_sqm / floorAreaSqm)) -
+      Math.abs(Math.log(b.floor_area_sqm / floorAreaSqm))
+    )
+    .slice(0, 3)
+
+  if (sideRows.length === 0) return null
+
+  const psm = getWeightedPsmForRows(
+    sideRows,
+    floorAreaSqm,
+    propertyCategory,
+    subjectFloorLevel
+  )
+  const area = getWeightedAreaForRows(sideRows, floorAreaSqm)
+
+  if (!psm || !area || !Number.isFinite(psm) || !Number.isFinite(area)) {
+    return null
+  }
+
+  return { psm, area, rows: sideRows }
+}
+
+function getSameProjectSizeAdjustedPsm(
+  sameProjectRows: CleanedRow[],
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory,
+  subjectFloorLevel?: number
+) {
+  const curveRows = getSameProjectSizeCurveRows(sameProjectRows, floorAreaSqm)
+  if (curveRows.length === 0) return null
+
+  const lowerAnchor = getSideAnchorForSizeCurve(
+    curveRows,
+    floorAreaSqm,
+    propertyCategory,
+    subjectFloorLevel,
+    'lower'
+  )
+  const upperAnchor = getSideAnchorForSizeCurve(
+    curveRows,
+    floorAreaSqm,
+    propertyCategory,
+    subjectFloorLevel,
+    'upper'
+  )
+
+  let curvePsm: number | null = null
+  let curveAnchorRows: CleanedRow[] = []
+
+  if (
+    lowerAnchor &&
+    upperAnchor &&
+    Math.abs(Math.log(upperAnchor.area / lowerAnchor.area)) > 0.02
+  ) {
+    const lowerAreaLog = Math.log(lowerAnchor.area)
+    const upperAreaLog = Math.log(upperAnchor.area)
+    const subjectAreaLog = Math.log(floorAreaSqm)
+    const t = Math.max(
+      0,
+      Math.min(1, (subjectAreaLog - lowerAreaLog) / (upperAreaLog - lowerAreaLog))
+    )
+
+    // Log interpolation respects the usual condo/EC size effect:
+    // smaller units tend to command higher PSF, larger units lower PSF.
+    curvePsm = Math.exp(
+      Math.log(lowerAnchor.psm) * (1 - t) + Math.log(upperAnchor.psm) * t
+    )
+    curveAnchorRows = [...lowerAnchor.rows, ...upperAnchor.rows]
+  } else {
+    const nearestRows = [...curveRows]
+      .sort((a, b) =>
+        Math.abs(Math.log(a.floor_area_sqm / floorAreaSqm)) -
+        Math.abs(Math.log(b.floor_area_sqm / floorAreaSqm))
+      )
+      .slice(0, Math.min(3, curveRows.length))
+
+    const nearestPsm = getWeightedPsmForRows(
+      nearestRows,
+      floorAreaSqm,
+      propertyCategory,
+      subjectFloorLevel
+    )
+    const nearestArea = getWeightedAreaForRows(nearestRows, floorAreaSqm)
+
+    if (nearestPsm && nearestArea) {
+      const sizeGap = Math.abs(Math.log(floorAreaSqm / nearestArea))
+      const maxAdjustment = Math.min(0.08, sizeGap * 0.08)
+      const extrapolationAdjustment =
+        floorAreaSqm > nearestArea ? 1 - maxAdjustment : 1 + maxAdjustment
+
+      curvePsm = nearestPsm * extrapolationAdjustment
+      curveAnchorRows = nearestRows
+    }
+  }
+
+  if (!curvePsm || !Number.isFinite(curvePsm)) return null
+
+  const similarRows = trimCondoEcOutliers(
+    pickSameProjectAnchorRows(sameProjectRows, floorAreaSqm)
+  )
+  const similarWeightedPsm = getWeightedPsmForRows(
+    similarRows,
+    floorAreaSqm,
+    propertyCategory,
+    subjectFloorLevel
+  )
+
+  let finalPsm =
+    similarWeightedPsm && Number.isFinite(similarWeightedPsm)
+      ? curvePsm * 0.75 + similarWeightedPsm * 0.25
+      : curvePsm
+
+  const sameProjectPsmValues = sameProjectRows
+    .map((row) => row.pricePerSqm)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+
+  const minPsm = sameProjectPsmValues[0]
+  const maxPsm = sameProjectPsmValues[sameProjectPsmValues.length - 1]
+
+  if (minPsm && maxPsm) {
+    // Allow mild extrapolation, but stop one very small or very large unit
+    // from dragging the entire project valuation too far.
+    finalPsm = Math.max(minPsm * 0.92, Math.min(maxPsm * 1.08, finalPsm))
+  }
+
+  const anchorRows = curveAnchorRows.length > 0 ? curveAnchorRows : curveRows
+
+  return {
+    psm: finalPsm,
+    anchorRows,
+  }
+}
+
 function getCondoEcNearbySupportRows(
   rows: CleanedRow[],
   floorAreaSqm: number,
@@ -933,33 +1126,17 @@ function buildSameProjectCondoEcCandidate(
 
   if (sameProjectRows.length === 0) return null
 
-  const anchorRows = trimCondoEcOutliers(
-    pickSameProjectAnchorRows(sameProjectRows, floorAreaSqm)
+  const sizeAdjustedAnchor = getSameProjectSizeAdjustedPsm(
+    sameProjectRows,
+    floorAreaSqm,
+    propertyCategory,
+    subjectFloorLevel
   )
 
-  if (anchorRows.length === 0) return null
+  if (!sizeAdjustedAnchor) return null
 
-  const values = anchorRows.map((row) => row.pricePerSqm)
-  const weights = anchorRows.map((row) => {
-    const areaRatio = row.floor_area_sqm / floorAreaSqm
-    const sizeWeight =
-      areaRatio >= 0.95 && areaRatio <= 1.05
-        ? 1.25
-        : areaRatio >= 0.9 && areaRatio <= 1.1
-        ? 1.16
-        : areaRatio >= 0.8 && areaRatio <= 1.2
-        ? 1.08
-        : 0.9
-
-    const recencyWeight = getRecencyWeight(row.transaction_date, propertyCategory)
-    const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
-
-    return sizeWeight * recencyWeight * floorWeight
-  })
-
-  const weightedPsm = weightedAverage(values, weights)
-  const medianPsm = getMedianPsm(anchorRows)
-  const anchorPsm = weightedPsm && Number.isFinite(weightedPsm) ? weightedPsm : medianPsm
+  const anchorRows = sizeAdjustedAnchor.anchorRows
+  const anchorPsm = sizeAdjustedAnchor.psm
 
   if (!anchorPsm || !Number.isFinite(anchorPsm)) return null
 
@@ -1001,8 +1178,8 @@ function buildSameProjectCondoEcCandidate(
     radius,
     method:
       latestDaysOld !== null && latestDaysOld > 365
-        ? 'condo_ec_same_project_market_adjusted'
-        : 'condo_ec_same_project_anchor',
+        ? 'condo_ec_same_project_size_curve_market_adjusted'
+        : 'condo_ec_same_project_size_curve',
   }
 }
 
