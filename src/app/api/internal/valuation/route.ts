@@ -68,12 +68,7 @@ function getBoundingBox(lat: number, lon: number, radiusM: number) {
   const cosLat = Math.cos((lat * Math.PI) / 180)
   const safeCosLat = Math.max(Math.abs(cosLat), 0.2)
   const lonDelta = radiusM / (111000 * safeCosLat)
-  return {
-    minLat: lat - latDelta,
-    maxLat: lat + latDelta,
-    minLon: lon - lonDelta,
-    maxLon: lon + lonDelta,
-  }
+  return { minLat: lat - latDelta, maxLat: lat + latDelta, minLon: lon - lonDelta, maxLon: lon + lonDelta }
 }
 
 function extractBlockNumber(address: string | null | undefined) {
@@ -138,7 +133,7 @@ async function getComparableTransactions(body: Payload) {
   } else if (category === 'ec') {
     query = query.eq('property_subtype', 'ec')
   } else {
-    query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+    query = query.eq('property_subtype', body.subjectIsStrata ? 'landed_strata' : 'landed_non_strata')
   }
 
   const { data, error } = await query
@@ -163,9 +158,7 @@ async function getComparableTransactions(body: Payload) {
 
   if (category === 'condo' || category === 'ec') {
     const subjectProject = normalizeText(body.subjectProjectName)
-    const primary = subjectProject
-      ? cleaned.filter((row) => normalizeText(row.projectName) === subjectProject).slice(0, 12)
-      : []
+    const primary = subjectProject ? cleaned.filter((row) => normalizeText(row.projectName) === subjectProject).slice(0, 12) : []
     const nearby = cleaned.filter((row) => !subjectProject || normalizeText(row.projectName) !== subjectProject).slice(0, 12)
     return { primary, nearby }
   }
@@ -175,14 +168,8 @@ async function getComparableTransactions(body: Payload) {
 
 export async function POST(request: NextRequest) {
   const expectedKey = process.env.NEXDOOR_OFFICE_INTERNAL_API_KEY
-
-  if (!expectedKey) {
-    return NextResponse.json({ error: 'Internal valuation access is not configured.' }, { status: 503 })
-  }
-
-  if (readKey(request) !== expectedKey) {
-    return NextResponse.json({ error: 'Access denied.' }, { status: 401 })
-  }
+  if (!expectedKey) return NextResponse.json({ error: 'Internal valuation access is not configured.' }, { status: 503 })
+  if (readKey(request) !== expectedKey) return NextResponse.json({ error: 'Access denied.' }, { status: 401 })
 
   try {
     const body = await request.json()
@@ -209,7 +196,6 @@ export async function POST(request: NextRequest) {
     })
 
     const comparables = await getComparableTransactions(body)
-
     return NextResponse.json({ result, comparables })
   } catch (error) {
     console.error('Internal valuation error:', error)
