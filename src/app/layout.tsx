@@ -18,9 +18,6 @@ export const metadata: Metadata = {
   title: "Free Property Valuation Singapore | HDB, Condo & Landed | NexDoor",
   description:
     "Get a free instant property valuation in Singapore using recent HDB and URA transaction data. Estimate the value of your HDB, condo, EC or landed home before you sell.",
-  alternates: {
-    canonical: "/",
-  },
   openGraph: {
     title: "Free Property Valuation Singapore | HDB, Condo & Landed | NexDoor",
     description:
