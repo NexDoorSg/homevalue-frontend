@@ -2,6 +2,18 @@ export const metadata = {
   title: "How Property Valuation Works in Singapore (2026 Guide) | HomeValue",
   description:
     "Learn how HDB, condo, EC and landed property valuation works in Singapore. Understand what affects your home value and how recent transactions influence pricing.",
+  alternates: {
+    canonical: "/how-property-valuation-works-singapore",
+  },
+  openGraph: {
+    title: "How Property Valuation Works in Singapore (2026 Guide) | HomeValue",
+    description:
+      "Learn how HDB, condo, EC and landed property valuation works in Singapore. Understand what affects your home value and how recent transactions influence pricing.",
+    url: "https://homevalue.nexdoor.sg/how-property-valuation-works-singapore",
+    siteName: "HomeValue by NexDoor",
+    locale: "en_SG",
+    type: "article",
+  },
 }
 
 export default function HowPropertyValuationWorksSingaporePage() {
@@ -25,7 +37,7 @@ export default function HowPropertyValuationWorksSingaporePage() {
           {/* CTA */}
           <div className="mt-6">
             <a
-              href="/"
+              href="/free-property-valuation-singapore"
               className="inline-block rounded-full bg-[#8b6b52] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
             >
               Get Your Free Property Valuation
@@ -133,7 +145,7 @@ export default function HowPropertyValuationWorksSingaporePage() {
 
             <div className="mt-6">
               <a
-                href="/"
+                href="/free-property-valuation-singapore"
                 className="inline-block rounded-full bg-[#8b6b52] px-6 py-3 text-sm font-medium text-white transition hover:opacity-90"
               >
                 Check Your Property Value Now
@@ -150,6 +162,11 @@ export default function HowPropertyValuationWorksSingaporePage() {
             </h2>
 
             <ul className="mt-6 space-y-2 text-sm">
+              <li>
+                <a href="/free-property-valuation-singapore" className="underline text-[#8b6b52]">
+                  Free Property Valuation Singapore
+                </a>
+              </li>
               <li>
                 <a href="/hdb-valuation-singapore" className="underline text-[#8b6b52]">
                   HDB Valuation Singapore
