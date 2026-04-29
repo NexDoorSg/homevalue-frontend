@@ -3,6 +3,27 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+function displayValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-";
+  return String(value);
+}
+
+function formatMoney(value: unknown) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue <= 0) return "-";
+  return `$${Math.round(numberValue).toLocaleString("en-SG")}`;
+}
+
+function formatSqftFromSqm(value: unknown) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue) || numberValue <= 0) return "-";
+  return `${Math.round(numberValue * 10.7639).toLocaleString("en-SG")} sqft`;
+}
+
+function getFirstAvailable(...values: unknown[]) {
+  return values.find((value) => value !== null && value !== undefined && value !== "");
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -16,22 +37,48 @@ export async function POST(req: Request) {
       unit_type,
       floor_area_sqm,
       plan,
+      estimated_price,
+      estimated_low,
+      estimated_high,
+      estimatedPrice,
+      estimatedLow,
+      estimatedHigh,
     } = body;
+
+    const intent = displayValue(plan || "Pending");
+    const estimatedValue = getFirstAvailable(estimated_price, estimatedPrice);
+    const lowRange = getFirstAvailable(estimated_low, estimatedLow);
+    const highRange = getFirstAvailable(estimated_high, estimatedHigh);
+    const rangeText =
+      formatMoney(lowRange) === "-" && formatMoney(highRange) === "-"
+        ? "-"
+        : `${formatMoney(lowRange)} - ${formatMoney(highRange)}`;
+
+    const isIntentUpdate = !!plan;
+    const subject = isIntentUpdate
+      ? `HomeValue Intent - ${intent}`
+      : `New HomeValue Lead - ${address || "Valuation Completed"}`;
 
     const { data, error } = await resend.emails.send({
       from: "NexDoor <onboarding@resend.dev>",
       to: ["admin@nexdoor.sg"],
-      subject: `New Lead: ${plan || "HomeValue"}`,
+      subject,
       html: `
-        <h2>New Lead Received</h2>
-        <p><strong>Plan:</strong> ${plan || "-"}</p>
-        <p><strong>Name:</strong> ${name || "-"}</p>
-        <p><strong>Phone:</strong> ${phone || "-"}</p>
-        <p><strong>Email:</strong> ${email || "-"}</p>
-        <p><strong>Address:</strong> ${address || "-"}</p>
-        <p><strong>Unit Number:</strong> ${unit_number || "-"}</p>
-        <p><strong>Unit Type:</strong> ${unit_type || "-"}</p>
-        <p><strong>Floor Area (sqm):</strong> ${floor_area_sqm || "-"}</p>
+        <h2>${isIntentUpdate ? "HomeValue lead intent updated." : "New HomeValue lead received."}</h2>
+
+        <p><strong>Name:</strong> ${displayValue(name)}</p>
+        <p><strong>Phone:</strong> ${displayValue(phone)}</p>
+        <p><strong>Email:</strong> ${displayValue(email)}</p>
+
+        <p><strong>Address:</strong> ${displayValue(address)}</p>
+        <p><strong>Unit:</strong> ${displayValue(unit_number)}</p>
+        <p><strong>Property Type:</strong> ${displayValue(unit_type)}</p>
+        <p><strong>Floor Area:</strong> ${formatSqftFromSqm(floor_area_sqm)}</p>
+
+        <p><strong>Estimated Value:</strong> ${formatMoney(estimatedValue)}</p>
+        <p><strong>Range:</strong> ${rangeText}</p>
+
+        <p><strong>Intent:</strong> ${intent}</p>
       `,
     });
 
