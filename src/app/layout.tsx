@@ -60,6 +60,109 @@ export default function RootLayout({
             fbq('track', 'PageView');
           `}
         </Script>
+        <Script id="homevalue-lead-modal-experiment" strategy="afterInteractive">
+          {`
+            (function () {
+              var TARGET_PATHS = ['/', '/free-property-valuation-singapore'];
+              var currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+              if (TARGET_PATHS.indexOf(currentPath) === -1) return;
+
+              var autoClicked = false;
+              var autoClickTimer = null;
+
+              function normaliseText(value) {
+                return (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+              }
+
+              function hideMaybeLaterOptions() {
+                var clickableElements = document.querySelectorAll('button, a');
+                clickableElements.forEach(function (element) {
+                  var text = normaliseText(element.textContent);
+                  if (text === 'maybe later' || text === 'maybe later.') {
+                    element.style.display = 'none';
+                    element.setAttribute('aria-hidden', 'true');
+                    element.setAttribute('tabindex', '-1');
+                  }
+                });
+              }
+
+              function findViewFullReportButton() {
+                var buttons = Array.prototype.slice.call(document.querySelectorAll('button'));
+                return buttons.find(function (button) {
+                  if (button.disabled) return false;
+                  var text = normaliseText(button.textContent);
+                  return text === 'view full report' || text === 'view my full report' || text === 'unlock full report' || text === 'unlock my full report';
+                });
+              }
+
+              function isLeadModalAlreadyOpen() {
+                var bodyText = normaliseText(document.body ? document.body.textContent : '');
+                return bodyText.indexOf('enter your details') !== -1 ||
+                  bodyText.indexOf('unlock your full report') !== -1 ||
+                  bodyText.indexOf('unlock my full report') !== -1;
+              }
+
+              function scheduleAutoOpenLeadModal() {
+                hideMaybeLaterOptions();
+                if (autoClicked || autoClickTimer || isLeadModalAlreadyOpen()) return;
+
+                var button = findViewFullReportButton();
+                if (!button) return;
+
+                autoClickTimer = window.setTimeout(function () {
+                  autoClickTimer = null;
+                  hideMaybeLaterOptions();
+                  if (autoClicked || isLeadModalAlreadyOpen()) return;
+
+                  var latestButton = findViewFullReportButton();
+                  if (!latestButton) return;
+
+                  autoClicked = true;
+                  latestButton.click();
+                  window.setTimeout(hideMaybeLaterOptions, 50);
+                  window.setTimeout(hideMaybeLaterOptions, 250);
+                }, 900);
+              }
+
+              function resetAutoClickWhenGeneratingAgain(event) {
+                var target = event.target;
+                if (!target || !target.closest) return;
+
+                var clickedButton = target.closest('button');
+                if (!clickedButton) return;
+
+                var text = normaliseText(clickedButton.textContent);
+                if (
+                  text.indexOf('generate') !== -1 ||
+                  text.indexOf('calculate') !== -1 ||
+                  text.indexOf('estimate') !== -1 ||
+                  text.indexOf('get my') !== -1
+                ) {
+                  autoClicked = false;
+                  if (autoClickTimer) {
+                    window.clearTimeout(autoClickTimer);
+                    autoClickTimer = null;
+                  }
+                }
+              }
+
+              document.addEventListener('click', resetAutoClickWhenGeneratingAgain, true);
+              hideMaybeLaterOptions();
+              scheduleAutoOpenLeadModal();
+
+              var observer = new MutationObserver(function () {
+                hideMaybeLaterOptions();
+                scheduleAutoOpenLeadModal();
+              });
+
+              observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                characterData: true
+              });
+            })();
+          `}
+        </Script>
         <noscript>
           <img
             height="1"
