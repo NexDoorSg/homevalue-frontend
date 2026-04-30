@@ -64,6 +64,7 @@ export default function RootLayout({
           {`
             (function () {
               var TARGET_PATHS = ['/', '/free-property-valuation-singapore'];
+              var STANDARD_UNLOCK_CTA = 'Unlock Full Home Value';
               var currentPath = window.location.pathname.replace(/\/$/, '') || '/';
               if (TARGET_PATHS.indexOf(currentPath) === -1) return;
 
@@ -72,6 +73,17 @@ export default function RootLayout({
 
               function normaliseText(value) {
                 return (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+              }
+
+              function isUnlockButtonText(text) {
+                return text === 'view full report' ||
+                  text === 'view my full report' ||
+                  text === 'unlock full report' ||
+                  text === 'unlock my full report' ||
+                  text === 'see full home value' ||
+                  text === 'see my full home value' ||
+                  text === 'unlock full home value' ||
+                  text === 'unlock my full home value';
               }
 
               function hideMaybeLaterOptions() {
@@ -86,23 +98,29 @@ export default function RootLayout({
                 });
               }
 
+              function standardiseUnlockButtons() {
+                var buttons = Array.prototype.slice.call(document.querySelectorAll('button'));
+                buttons.forEach(function (button) {
+                  var text = normaliseText(button.textContent);
+                  if (isUnlockButtonText(text) && button.textContent.trim() !== STANDARD_UNLOCK_CTA) {
+                    button.textContent = STANDARD_UNLOCK_CTA;
+                  }
+                });
+              }
+
               function findViewFullReportButton() {
                 var buttons = Array.prototype.slice.call(document.querySelectorAll('button'));
                 return buttons.find(function (button) {
                   if (button.disabled) return false;
                   var text = normaliseText(button.textContent);
-                  return text === 'view full report' ||
-                    text === 'view my full report' ||
-                    text === 'unlock full report' ||
-                    text === 'unlock my full report' ||
-                    text === 'unlock full home value' ||
-                    text === 'unlock my full home value';
+                  return isUnlockButtonText(text);
                 });
               }
 
               function isLeadModalAlreadyOpen() {
                 var bodyText = normaliseText(document.body ? document.body.textContent : '');
                 return bodyText.indexOf('enter your details') !== -1 ||
+                  bodyText.indexOf('contact details') !== -1 ||
                   bodyText.indexOf('unlock your full report') !== -1 ||
                   bodyText.indexOf('unlock my full report') !== -1 ||
                   bodyText.indexOf('unlock your full home value') !== -1 ||
@@ -111,6 +129,7 @@ export default function RootLayout({
 
               function scheduleAutoOpenLeadModal() {
                 hideMaybeLaterOptions();
+                standardiseUnlockButtons();
                 if (autoClicked || autoClickTimer || isLeadModalAlreadyOpen()) return;
 
                 var button = findViewFullReportButton();
@@ -119,6 +138,7 @@ export default function RootLayout({
                 autoClickTimer = window.setTimeout(function () {
                   autoClickTimer = null;
                   hideMaybeLaterOptions();
+                  standardiseUnlockButtons();
                   if (autoClicked || isLeadModalAlreadyOpen()) return;
 
                   var latestButton = findViewFullReportButton();
@@ -126,8 +146,14 @@ export default function RootLayout({
 
                   autoClicked = true;
                   latestButton.click();
-                  window.setTimeout(hideMaybeLaterOptions, 50);
-                  window.setTimeout(hideMaybeLaterOptions, 250);
+                  window.setTimeout(function () {
+                    hideMaybeLaterOptions();
+                    standardiseUnlockButtons();
+                  }, 50);
+                  window.setTimeout(function () {
+                    hideMaybeLaterOptions();
+                    standardiseUnlockButtons();
+                  }, 250);
                 }, 900);
               }
 
@@ -155,10 +181,12 @@ export default function RootLayout({
 
               document.addEventListener('click', resetAutoClickWhenGeneratingAgain, true);
               hideMaybeLaterOptions();
+              standardiseUnlockButtons();
               scheduleAutoOpenLeadModal();
 
               var observer = new MutationObserver(function () {
                 hideMaybeLaterOptions();
+                standardiseUnlockButtons();
                 scheduleAutoOpenLeadModal();
               });
 
