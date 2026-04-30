@@ -119,12 +119,12 @@ export default function RootLayout({
 
               function isLeadModalAlreadyOpen() {
                 var bodyText = normaliseText(document.body ? document.body.textContent : '');
-                return bodyText.indexOf('enter your details') !== -1 ||
-                  bodyText.indexOf('contact details') !== -1 ||
+                return bodyText.indexOf('enter your details to unlock') !== -1 ||
                   bodyText.indexOf('unlock your full report') !== -1 ||
                   bodyText.indexOf('unlock my full report') !== -1 ||
                   bodyText.indexOf('unlock your full home value') !== -1 ||
-                  bodyText.indexOf('unlock my full home value') !== -1;
+                  bodyText.indexOf('unlock my full home value') !== -1 ||
+                  bodyText.indexOf('full name') !== -1 && bodyText.indexOf('mobile number') !== -1;
               }
 
               function scheduleAutoOpenLeadModal() {
