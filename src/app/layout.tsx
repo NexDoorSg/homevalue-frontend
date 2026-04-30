@@ -91,7 +91,12 @@ export default function RootLayout({
                 return buttons.find(function (button) {
                   if (button.disabled) return false;
                   var text = normaliseText(button.textContent);
-                  return text === 'view full report' || text === 'view my full report' || text === 'unlock full report' || text === 'unlock my full report';
+                  return text === 'view full report' ||
+                    text === 'view my full report' ||
+                    text === 'unlock full report' ||
+                    text === 'unlock my full report' ||
+                    text === 'unlock full home value' ||
+                    text === 'unlock my full home value';
                 });
               }
 
@@ -99,7 +104,9 @@ export default function RootLayout({
                 var bodyText = normaliseText(document.body ? document.body.textContent : '');
                 return bodyText.indexOf('enter your details') !== -1 ||
                   bodyText.indexOf('unlock your full report') !== -1 ||
-                  bodyText.indexOf('unlock my full report') !== -1;
+                  bodyText.indexOf('unlock my full report') !== -1 ||
+                  bodyText.indexOf('unlock your full home value') !== -1 ||
+                  bodyText.indexOf('unlock my full home value') !== -1;
               }
 
               function scheduleAutoOpenLeadModal() {
