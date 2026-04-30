@@ -24,6 +24,38 @@ function getFirstAvailable(...values: unknown[]) {
   return values.find((value) => value !== null && value !== undefined && value !== "");
 }
 
+async function syncLeadToOffice(body: any) {
+  const officeUrl = process.env.NEXDOOR_OFFICE_URL;
+  const syncToken = process.env.HOMEVALUE_OFFICE_SYNC_TOKEN;
+
+  if (!officeUrl || !syncToken) {
+    console.warn("Office lead sync skipped: missing environment variables");
+    return { ok: false, skipped: true };
+  }
+
+  const response = await fetch(`${officeUrl.replace(/\/$/, "")}/api/leads`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-nexdoor-source": "HomeValue",
+      "x-nexdoor-sync-token": syncToken,
+    },
+    body: JSON.stringify({
+      ...body,
+      source: "HomeValue",
+      pageSource: body.pageSource || body.page_source || "HomeValue",
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "Unknown Office sync error");
+    console.error("Office lead sync failed:", errorText);
+    return { ok: false, skipped: false };
+  }
+
+  return { ok: true, skipped: false };
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -54,6 +86,11 @@ export async function POST(req: Request) {
         ? "-"
         : `${formatMoney(lowRange)} - ${formatMoney(highRange)}`;
 
+    const officeSync = await syncLeadToOffice(body).catch((error) => {
+      console.error("Office lead sync crash:", error);
+      return { ok: false, skipped: false };
+    });
+
     const isIntentUpdate = !!plan;
     const subject = isIntentUpdate
       ? `HomeValue Intent - ${intent}`
@@ -79,6 +116,7 @@ export async function POST(req: Request) {
         <p><strong>Range:</strong> ${rangeText}</p>
 
         <p><strong>Intent:</strong> ${intent}</p>
+        <p><strong>Office Sync:</strong> ${officeSync.ok ? "Synced" : officeSync.skipped ? "Skipped" : "Failed"}</p>
       `,
     });
 
@@ -90,7 +128,7 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data, officeSync });
   } catch (err: any) {
     console.error("Send lead route error:", err);
     return NextResponse.json(
