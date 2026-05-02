@@ -30,7 +30,7 @@ async function syncLeadToOffice(body: any) {
 
   if (!officeUrl || !syncToken) {
     console.warn("Office lead sync skipped: missing environment variables");
-    return { ok: false, skipped: true };
+    return { ok: false, skipped: true, assignedTo: null as string | null };
   }
 
   const response = await fetch(`${officeUrl.replace(/\/$/, "")}/api/leads`, {
@@ -50,10 +50,16 @@ async function syncLeadToOffice(body: any) {
   if (!response.ok) {
     const errorText = await response.text().catch(() => "Unknown Office sync error");
     console.error("Office lead sync failed:", errorText);
-    return { ok: false, skipped: false };
+    return { ok: false, skipped: false, assignedTo: null as string | null };
   }
 
-  return { ok: true, skipped: false };
+  const officeLead = await response.json().catch(() => null);
+
+  return {
+    ok: true,
+    skipped: false,
+    assignedTo: officeLead?.assignedTo || null,
+  };
 }
 
 export async function POST(req: Request) {
@@ -88,7 +94,7 @@ export async function POST(req: Request) {
 
     const officeSync = await syncLeadToOffice(body).catch((error) => {
       console.error("Office lead sync crash:", error);
-      return { ok: false, skipped: false };
+      return { ok: false, skipped: false, assignedTo: null as string | null };
     });
 
     const isIntentUpdate = !!plan;
@@ -116,6 +122,7 @@ export async function POST(req: Request) {
         <p><strong>Range:</strong> ${rangeText}</p>
 
         <p><strong>Intent:</strong> ${intent}</p>
+        <p><strong>Assigned To:</strong> ${displayValue(officeSync.assignedTo)}</p>
         <p><strong>Office Sync:</strong> ${officeSync.ok ? "Synced" : officeSync.skipped ? "Skipped" : "Failed"}</p>
       `,
     });
