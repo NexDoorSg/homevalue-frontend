@@ -24,3 +24,44 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.free-property-valuation-page .bg-\[\#fbf5ee\] {
+  background-color: #f8f1e7 !important;
+}
+
+.free-property-valuation-page .bg-white\/90 {
+  background-color: #fffaf5 !important;
+}
+
+.free-property-valuation-page .border-\[\#f0dfcf\],
+.free-property-valuation-page .border-\[\#eddccc\],
+.free-property-valuation-page .border-\[\#efddcc\] {
+  border-color: #ead7c6 !important;
+}
+
+.free-property-valuation-page .bg-\[\#efddcc\] {
+  background-color: #ead7c6 !important;
+}
+
+.free-property-valuation-page .text-\[\#bf6d34\] {
+  color: #b76633 !important;
+}
+
+.free-property-valuation-page .border-\[\#bf6d34\],
+.free-property-valuation-page .border-\[\#c79267\] {
+  border-color: #b76633 !important;
+}
+
+.free-property-valuation-page .bg-\[\#bf6d34\] {
+  background-color: #b76633 !important;
+}
+
+.free-property-valuation-page .sk {
+  background: linear-gradient(90deg, #f0ece6 25%, #e8e2da 50%, #f0ece6 75%) !important;
+  background-size: 600px 100% !important;
+}
+
+.free-property-valuation-page .load-bar-fill {
+  background: linear-gradient(90deg, #b76633, #b08060, #b76633) !important;
+  background-size: 400px 100% !important;
+}
