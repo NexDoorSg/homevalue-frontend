@@ -44,16 +44,13 @@ export default function FreePropertyValuationSingaporeLayout({
   children: React.ReactNode
 }) {
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+    <div className="free-property-valuation-page">
+      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       {children}
-      <section className="bg-[#fbf5ee] px-6 pb-16 md:px-10">
-        <div className="mx-auto max-w-[1440px] rounded-[28px] border border-[#f0dfcf] bg-white/90 p-6 shadow-[0_20px_60px_rgba(54,69,79,0.06)] sm:p-8">
+      <section className="bg-[#f8f1e7] px-6 pb-16 md:px-10">
+        <div className="mx-auto max-w-[1440px] rounded-[28px] border border-[#ead7c6] bg-[#fffaf5] p-6 shadow-[0_20px_60px_rgba(73,47,28,0.06)] sm:p-8">
           <div className="max-w-4xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#bf6d34]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b76633]">
               Free property valuation Singapore
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#2d3135] sm:text-3xl">
@@ -86,6 +83,6 @@ export default function FreePropertyValuationSingaporeLayout({
           </div>
         </div>
       </section>
-    </>
+    </div>
   )
 }
