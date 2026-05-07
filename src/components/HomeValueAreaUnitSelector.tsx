@@ -13,6 +13,9 @@ type ManagedAreaField = {
   unitSelect: HTMLSelectElement
   warning: HTMLDivElement
   kind: AreaFieldKind
+  row: HTMLDivElement
+  helper: HTMLSpanElement
+  wrapper: HTMLElement | null
 }
 
 function normaliseText(value: string | null | undefined) {
@@ -106,6 +109,83 @@ function cleanAreaLabelText() {
   })
 }
 
+function injectResponsiveStyles() {
+  if (document.getElementById('homevalue-area-unit-mobile-styles')) return
+
+  const style = document.createElement('style')
+  style.id = 'homevalue-area-unit-mobile-styles'
+  style.textContent = `
+    @media (max-width: 767px) {
+      [data-homevalue-landed-area-group='true'] {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 18px !important;
+      }
+
+      [data-homevalue-landed-area-wrapper='true'] {
+        grid-column: 1 / -1 !important;
+        width: 100% !important;
+      }
+
+      [data-homevalue-landed-shared-note='true'] {
+        display: block !important;
+        grid-column: 1 / -1 !important;
+        margin: 2px 0 -4px !important;
+        color: #5f666d !important;
+        font-size: 13px !important;
+        line-height: 1.45 !important;
+      }
+
+      [data-homevalue-area-unit-row='landed'] {
+        display: block !important;
+        margin-top: 10px !important;
+      }
+
+      [data-homevalue-area-unit-row='landed'] [data-homevalue-area-helper='true'] {
+        display: none !important;
+      }
+
+      [data-homevalue-area-unit-row='landed'] select {
+        width: 100% !important;
+        min-height: 44px !important;
+        font-size: 15px !important;
+        padding: 10px 14px !important;
+      }
+    }
+  `
+
+  document.head.appendChild(style)
+}
+
+function findLikelyFieldWrapper(input: HTMLInputElement) {
+  return input.closest('label') as HTMLElement | null || input.parentElement
+}
+
+function markLandedMobileGroup(fields: Set<ManagedAreaField>) {
+  const landedFields = Array.from(fields).filter((field) => field.kind === 'land' || field.kind === 'builtUp')
+  if (landedFields.length === 0) return
+
+  const wrappers = landedFields.map((field) => field.wrapper).filter(Boolean) as HTMLElement[]
+  wrappers.forEach((wrapper) => {
+    wrapper.dataset.homevalueLandedAreaWrapper = 'true'
+  })
+
+  const firstWrapper = wrappers[0]
+  const commonParent = wrappers.find((wrapper) => wrapper.parentElement)?.parentElement
+  if (!firstWrapper || !commonParent) return
+
+  commonParent.dataset.homevalueLandedAreaGroup = 'true'
+
+  if (commonParent.querySelector('[data-homevalue-landed-shared-note="true"]')) return
+
+  const note = document.createElement('p')
+  note.dataset.homevalueLandedSharedNote = 'true'
+  note.textContent = 'Choose sqft or sqm for each size.'
+  note.style.display = 'none'
+
+  commonParent.insertBefore(note, firstWrapper)
+}
+
 function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): ManagedAreaField | null {
   if (input.dataset.homevalueAreaUnitAttached === 'true') return null
   if (input.type && !['text', 'number', 'tel'].includes(input.type)) return null
@@ -113,6 +193,7 @@ function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): Manag
   input.dataset.homevalueAreaUnitAttached = 'true'
 
   const row = document.createElement('div')
+  row.dataset.homevalueAreaUnitRow = kind === 'land' || kind === 'builtUp' ? 'landed' : 'standard'
   row.style.display = 'flex'
   row.style.alignItems = 'center'
   row.style.justifyContent = 'space-between'
@@ -122,6 +203,7 @@ function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): Manag
   row.style.color = '#5f666d'
 
   const helper = document.createElement('span')
+  helper.dataset.homevalueAreaHelper = 'true'
   helper.textContent = 'Select sqft or sqm before entering your size.'
   helper.style.lineHeight = '1.4'
 
@@ -157,7 +239,16 @@ function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): Manag
   input.insertAdjacentElement('afterend', row)
   row.insertAdjacentElement('afterend', warning)
 
-  const field: ManagedAreaField = { input, unitSelect: select, warning, kind }
+  const field: ManagedAreaField = {
+    input,
+    unitSelect: select,
+    warning,
+    kind,
+    row,
+    helper,
+    wrapper: findLikelyFieldWrapper(input),
+  }
+
   input.addEventListener('input', () => updateWarning(field))
   select.addEventListener('change', () => updateWarning(field))
   updateWarning(field)
@@ -168,6 +259,8 @@ export default function HomeValueAreaUnitSelector() {
   useEffect(() => {
     const currentPath = window.location.pathname.replace(/\/$/, '') || '/'
     if (!TARGET_PATHS.has(currentPath)) return
+
+    injectResponsiveStyles()
 
     const managedFields = new Set<ManagedAreaField>()
     let replayingClick = false
@@ -181,6 +274,7 @@ export default function HomeValueAreaUnitSelector() {
         const field = attachUnitSelector(input, kind)
         if (field) managedFields.add(field)
       })
+      markLandedMobileGroup(managedFields)
     }
 
     const convertSelectedSqmFields = () => {
