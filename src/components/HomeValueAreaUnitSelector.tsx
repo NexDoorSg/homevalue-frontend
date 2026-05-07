@@ -59,19 +59,51 @@ function shouldWarn(input: HTMLInputElement, unit: AreaUnit) {
   return unit === 'sqft' && Number.isFinite(numberValue) && numberValue >= 20 && numberValue <= 200
 }
 
+function getPlaceholder(kind: AreaFieldKind, unit: AreaUnit) {
+  if (unit === 'sqm') {
+    if (kind === 'land') return 'e.g. 250'
+    if (kind === 'builtUp') return 'e.g. 420'
+    return 'e.g. 92'
+  }
+
+  if (kind === 'land') return 'e.g. 2700'
+  if (kind === 'builtUp') return 'e.g. 4500'
+  return 'e.g. 990'
+}
+
+function updateInputPlaceholder(field: ManagedAreaField) {
+  field.input.placeholder = getPlaceholder(field.kind, field.unitSelect.value as AreaUnit)
+}
+
 function updateWarning(field: ManagedAreaField) {
+  updateInputPlaceholder(field)
+
   if (!shouldWarn(field.input, field.unitSelect.value as AreaUnit)) {
     field.warning.style.display = 'none'
     field.warning.textContent = ''
     return
   }
 
-  const sqftValue = convertSqmToSqft(field.input.value)
-  const approx = sqftValue ? Math.round(Number(sqftValue)).toLocaleString('en-SG') : ''
   const label = field.kind === 'land' ? 'land size' : field.kind === 'builtUp' ? 'built-up size' : 'floor area'
 
   field.warning.style.display = 'block'
-  field.warning.textContent = `This ${label} looks unusually small. Did you mean ${field.input.value} sqm${approx ? `, about ${approx} sqft` : ''}? Change the unit to sqm if that is correct.`
+  field.warning.textContent = `This ${label} looks small for sqft. If your size is in sqm, change the unit to sqm.`
+}
+
+function cleanAreaLabelText() {
+  const elements = Array.from(document.querySelectorAll('label, p, span, div')) as HTMLElement[]
+
+  elements.forEach((element) => {
+    if (element.children.length > 0) return
+    const text = element.textContent || ''
+    const cleaned = text
+      .replace(/floor area\s*\(sqft\)/i, 'Floor Area')
+      .replace(/land size\s*\(sqft\)/i, 'Land Size')
+      .replace(/built-up size\s*\(sqft\)/i, 'Built-up Size')
+      .replace(/built up size\s*\(sqft\)/i, 'Built-up Size')
+
+    if (cleaned !== text) element.textContent = cleaned
+  })
 }
 
 function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): ManagedAreaField | null {
@@ -84,24 +116,27 @@ function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): Manag
   row.style.display = 'flex'
   row.style.alignItems = 'center'
   row.style.justifyContent = 'space-between'
-  row.style.gap = '10px'
-  row.style.marginTop = '8px'
+  row.style.gap = '12px'
+  row.style.marginTop = '10px'
   row.style.fontSize = '12px'
   row.style.color = '#5f666d'
 
   const helper = document.createElement('span')
-  helper.textContent = 'Enter your size in sqft or sqm. We will convert it automatically.'
+  helper.textContent = 'Select sqft or sqm before entering your size.'
   helper.style.lineHeight = '1.4'
 
   const select = document.createElement('select')
   select.value = 'sqft'
   select.setAttribute('aria-label', 'Area unit')
-  select.style.border = '1px solid #ead7c6'
+  select.style.minWidth = '86px'
+  select.style.minHeight = '38px'
+  select.style.border = '1.5px solid #b76633'
   select.style.borderRadius = '999px'
   select.style.background = '#fffaf5'
   select.style.color = '#2d3135'
-  select.style.fontWeight = '700'
-  select.style.padding = '6px 10px'
+  select.style.fontWeight = '800'
+  select.style.fontSize = '13px'
+  select.style.padding = '8px 12px'
 
   select.innerHTML = '<option value="sqft">sqft</option><option value="sqm">sqm</option>'
 
@@ -138,6 +173,7 @@ export default function HomeValueAreaUnitSelector() {
     let replayingClick = false
 
     const scan = () => {
+      cleanAreaLabelText()
       Array.from(document.querySelectorAll('input')).forEach((element) => {
         const input = element as HTMLInputElement
         const kind = getAreaFieldKind(input)
