@@ -22,6 +22,35 @@ function normaliseText(value: string | null | undefined) {
   return (value || '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
+function isVisibleElement(element: HTMLElement) {
+  const rect = element.getBoundingClientRect()
+  const style = window.getComputedStyle(element)
+
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    style.display !== 'none' &&
+    style.visibility !== 'hidden' &&
+    style.opacity !== '0'
+  )
+}
+
+function findLikelyFieldWrapper(input: HTMLInputElement) {
+  return input.closest('label') as HTMLElement | null || input.parentElement
+}
+
+function isUsableAreaInput(input: HTMLInputElement) {
+  if (!document.body.contains(input)) return false
+  if (input.disabled) return false
+  if (input.type && !['text', 'number', 'tel'].includes(input.type)) return false
+  if (!isVisibleElement(input)) return false
+
+  const wrapper = findLikelyFieldWrapper(input)
+  if (wrapper && !isVisibleElement(wrapper)) return false
+
+  return true
+}
+
 function getAssociatedFieldText(input: HTMLInputElement) {
   const id = input.id
   const labelByFor = id
@@ -43,8 +72,11 @@ function getAssociatedFieldText(input: HTMLInputElement) {
 }
 
 function getAreaFieldKind(input: HTMLInputElement): AreaFieldKind | null {
+  if (!isUsableAreaInput(input)) return null
+
   const text = getAssociatedFieldText(input)
 
+  if (text.includes('property type') || text.includes('tenure')) return null
   if (text.includes('floor level') || text.includes('stack number')) return null
   if (text.includes('built-up') || text.includes('built up')) return 'builtUp'
   if (text.includes('land size')) return 'land'
@@ -190,11 +222,23 @@ function injectResponsiveStyles() {
   document.head.appendChild(style)
 }
 
-function findLikelyFieldWrapper(input: HTMLInputElement) {
-  return input.closest('label') as HTMLElement | null || input.parentElement
+function resetLandedMobileGroups() {
+  document.querySelectorAll('[data-homevalue-landed-area-group="true"]').forEach((element) => {
+    delete (element as HTMLElement).dataset.homevalueLandedAreaGroup
+  })
+
+  document.querySelectorAll('[data-homevalue-landed-area-wrapper="true"]').forEach((element) => {
+    delete (element as HTMLElement).dataset.homevalueLandedAreaWrapper
+  })
+
+  document.querySelectorAll('[data-homevalue-landed-shared-note="true"]').forEach((element) => {
+    element.remove()
+  })
 }
 
 function markLandedMobileGroup(fields: Set<ManagedAreaField>) {
+  resetLandedMobileGroups()
+
   const landedFields = Array.from(fields).filter((field) => field.kind === 'land' || field.kind === 'builtUp')
   if (landedFields.length === 0) return
 
@@ -219,9 +263,30 @@ function markLandedMobileGroup(fields: Set<ManagedAreaField>) {
   commonParent.insertBefore(note, firstWrapper)
 }
 
+function removeManagedField(field: ManagedAreaField, managedFields: Set<ManagedAreaField>) {
+  field.input.dataset.homevalueAreaUnitAttached = 'false'
+  field.row.remove()
+  field.warning.remove()
+  managedFields.delete(field)
+}
+
+function cleanupManagedFields(managedFields: Set<ManagedAreaField>) {
+  Array.from(managedFields).forEach((field) => {
+    if (!isUsableAreaInput(field.input)) {
+      removeManagedField(field, managedFields)
+      return
+    }
+
+    const currentKind = getAreaFieldKind(field.input)
+    if (!currentKind || currentKind !== field.kind) {
+      removeManagedField(field, managedFields)
+    }
+  })
+}
+
 function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): ManagedAreaField | null {
   if (input.dataset.homevalueAreaUnitAttached === 'true') return null
-  if (input.type && !['text', 'number', 'tel'].includes(input.type)) return null
+  if (!isUsableAreaInput(input)) return null
 
   input.dataset.homevalueAreaUnitAttached = 'true'
 
@@ -301,6 +366,7 @@ export default function HomeValueAreaUnitSelector() {
 
     const scan = () => {
       cleanAreaLabelText()
+      cleanupManagedFields(managedFields)
       Array.from(document.querySelectorAll('input')).forEach((element) => {
         const input = element as HTMLInputElement
         const kind = getAreaFieldKind(input)
@@ -314,7 +380,7 @@ export default function HomeValueAreaUnitSelector() {
     const convertSelectedSqmFields = () => {
       let didConvert = false
       managedFields.forEach((field) => {
-        if (!document.body.contains(field.input) || field.unitSelect.value !== 'sqm') return
+        if (!document.body.contains(field.input) || !isUsableAreaInput(field.input) || field.unitSelect.value !== 'sqm') return
         const sqftValue = convertSqmToSqft(field.input.value)
         if (!sqftValue) return
         setNativeInputValue(field.input, sqftValue)
@@ -341,12 +407,22 @@ export default function HomeValueAreaUnitSelector() {
 
     scan()
     const observer = new MutationObserver(scan)
-    observer.observe(document.body, { childList: true, subtree: true })
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'hidden', 'disabled'],
+    })
     document.addEventListener('click', handleGenerateClick, true)
 
     return () => {
       observer.disconnect()
       document.removeEventListener('click', handleGenerateClick, true)
+      managedFields.forEach((field) => {
+        field.row.remove()
+        field.warning.remove()
+      })
+      resetLandedMobileGroups()
     }
   }, [])
 
