@@ -3,6 +3,27 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const whatsappAccessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+const whatsappPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const whatsappTemplateName = process.env.WHATSAPP_TEMPLATE_NAME || "homevalue_intro";
+const whatsappTemplateLanguageCode =
+  process.env.WHATSAPP_TEMPLATE_LANGUAGE_CODE || "en";
+
+const whatsappAgentDetails: Record<string, { name: string; phone: string }> = {
+  "bjornlim@nexdoor.sg": {
+    name: process.env.WHATSAPP_AGENT_BJORN_NAME || "Bjorn Lim",
+    phone: process.env.WHATSAPP_AGENT_BJORN_PHONE || "+65 9139 1363",
+  },
+  "abigailtang@nexdoor.sg": {
+    name: process.env.WHATSAPP_AGENT_ABIGAIL_NAME || "Abigail Tang",
+    phone: process.env.WHATSAPP_AGENT_ABIGAIL_PHONE || "",
+  },
+  "daveteo@nexdoor.sg": {
+    name: process.env.WHATSAPP_AGENT_DAVE_NAME || "Dave Teo",
+    phone: process.env.WHATSAPP_AGENT_DAVE_PHONE || "",
+  },
+};
+
 function displayValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
   return String(value);
@@ -22,6 +43,107 @@ function formatSqftFromSqm(value: unknown) {
 
 function getFirstAvailable(...values: unknown[]) {
   return values.find((value) => value !== null && value !== undefined && value !== "");
+}
+
+function normaliseWhatsappRecipient(phone: string) {
+  const digitsOnly = phone.replace(/\D/g, "");
+
+  if (!digitsOnly) return null;
+  if (digitsOnly.startsWith("65")) return digitsOnly;
+  if (digitsOnly.length === 8) return `65${digitsOnly}`;
+
+  return digitsOnly;
+}
+
+function getWhatsappAgentDetails(assignedTo: string | null) {
+  const normalisedAssignedTo = String(assignedTo || "").trim().toLowerCase();
+
+  return (
+    whatsappAgentDetails[normalisedAssignedTo] || {
+      name: process.env.WHATSAPP_CONSULTANT_NAME || "Bjorn Lim",
+      phone: process.env.WHATSAPP_CONSULTANT_PHONE || "+65 9139 1363",
+    }
+  );
+}
+
+async function sendHomeValueWhatsappIntro({
+  name,
+  phone,
+  assignedTo,
+}: {
+  name: string;
+  phone: string;
+  assignedTo: string | null;
+}) {
+  if (!whatsappAccessToken || !whatsappPhoneNumberId) {
+    console.warn(
+      "WhatsApp intro skipped: missing WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID"
+    );
+    return;
+  }
+
+  const recipient = normaliseWhatsappRecipient(phone);
+  if (!recipient) {
+    console.warn("WhatsApp intro skipped: invalid phone number");
+    return;
+  }
+
+  const agent = getWhatsappAgentDetails(assignedTo);
+  if (!agent.phone) {
+    console.warn(
+      `WhatsApp intro skipped: missing phone for assigned agent ${assignedTo}`
+    );
+    return;
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/v20.0/${whatsappPhoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${whatsappAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: recipient,
+        type: "template",
+        template: {
+          name: whatsappTemplateName,
+          language: {
+            code: whatsappTemplateLanguageCode,
+          },
+          components: [
+            {
+              type: "body",
+              parameters: [
+                {
+                  type: "text",
+                  text: name,
+                },
+                {
+                  type: "text",
+                  text: agent.name,
+                },
+                {
+                  type: "text",
+                  text: agent.phone,
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("WhatsApp intro send failed:", errorText);
+    return;
+  }
+
+  console.info(`WhatsApp intro sent for HomeValue lead assigned to ${assignedTo}`);
 }
 
 async function syncLeadToOffice(body: any) {
@@ -96,6 +218,20 @@ export async function POST(req: Request) {
       console.error("Office lead sync crash:", error);
       return { ok: false, skipped: false, assignedTo: null as string | null };
     });
+
+    if (officeSync.ok) {
+      try {
+        await sendHomeValueWhatsappIntro({
+          name: String(name || "").trim(),
+          phone: String(phone || "").trim(),
+          assignedTo: officeSync.assignedTo,
+        });
+      } catch (whatsappError) {
+        console.error("WhatsApp intro route error:", whatsappError);
+      }
+    } else {
+      console.warn("WhatsApp intro skipped because Office sync did not succeed");
+    }
 
     const isIntentUpdate = !!plan;
     const subject = isIntentUpdate
