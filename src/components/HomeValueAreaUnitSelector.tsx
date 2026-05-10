@@ -22,16 +22,30 @@ function normaliseText(value: string | null | undefined) {
   return (value || '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
-function getAreaFieldKind(input: HTMLInputElement): AreaFieldKind | null {
-  const text = normaliseText([
-    input.getAttribute('aria-label'),
-    input.getAttribute('placeholder'),
-    input.previousElementSibling?.textContent,
-    input.parentElement?.textContent,
-    input.closest('label')?.textContent,
-    input.closest('div')?.textContent,
-  ].filter(Boolean).join(' '))
+function getAssociatedFieldText(input: HTMLInputElement) {
+  const id = input.id
+  const labelByFor = id
+    ? document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent
+    : ''
 
+  const previousText = input.previousElementSibling?.textContent || ''
+  const labelText = input.closest('label')?.textContent || ''
+  const ariaLabel = input.getAttribute('aria-label') || ''
+  const name = input.getAttribute('name') || ''
+  const placeholder = input.getAttribute('placeholder') || ''
+  const parentText = input.parentElement?.textContent || ''
+
+  return normaliseText(
+    [labelByFor, previousText, labelText, ariaLabel, name, placeholder, parentText]
+      .filter(Boolean)
+      .join(' ')
+  )
+}
+
+function getAreaFieldKind(input: HTMLInputElement): AreaFieldKind | null {
+  const text = getAssociatedFieldText(input)
+
+  if (text.includes('floor level') || text.includes('stack number')) return null
   if (text.includes('built-up') || text.includes('built up')) return 'builtUp'
   if (text.includes('land size')) return 'land'
   if (text.includes('floor area')) return 'floor'
@@ -115,6 +129,25 @@ function injectResponsiveStyles() {
   const style = document.createElement('style')
   style.id = 'homevalue-area-unit-mobile-styles'
   style.textContent = `
+    [data-homevalue-area-unit-row='standard'],
+    [data-homevalue-area-unit-row='landed'] {
+      box-sizing: border-box !important;
+      width: 100% !important;
+      grid-column: 1 / -1 !important;
+    }
+
+    [data-homevalue-area-unit-row='standard'] [data-homevalue-area-helper='true'],
+    [data-homevalue-area-unit-row='landed'] [data-homevalue-area-helper='true'] {
+      max-width: 240px !important;
+    }
+
+    @media (min-width: 768px) {
+      [data-homevalue-area-unit-row='standard'],
+      [data-homevalue-area-unit-row='landed'] {
+        margin-top: 8px !important;
+      }
+    }
+
     @media (max-width: 767px) {
       [data-homevalue-landed-area-group='true'] {
         display: grid !important;
@@ -235,6 +268,7 @@ function attachUnitSelector(input: HTMLInputElement, kind: AreaFieldKind): Manag
   warning.style.fontSize = '12px'
   warning.style.lineHeight = '1.5'
   warning.style.padding = '10px 12px'
+  warning.style.gridColumn = '1 / -1'
 
   input.insertAdjacentElement('afterend', row)
   row.insertAdjacentElement('afterend', warning)
