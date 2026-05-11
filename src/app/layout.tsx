@@ -4,6 +4,7 @@ import "./globals.css";
 import Script from "next/script";
 import HomeValueLeadPopupExperiment from "@/components/HomeValueLeadPopupExperiment";
 import HomeValueAreaUnitSelector from "@/components/HomeValueAreaUnitSelector";
+import HomeValueAddressQualityGuard from "@/components/HomeValueAddressQualityGuard";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,6 +65,7 @@ export default function RootLayout({
         </Script>
         <HomeValueLeadPopupExperiment />
         <HomeValueAreaUnitSelector />
+        <HomeValueAddressQualityGuard />
         <noscript>
           <img
             height="1"
