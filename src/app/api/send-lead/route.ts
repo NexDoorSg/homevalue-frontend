@@ -12,7 +12,7 @@ const whatsappTemplateLanguageCode =
 const whatsappAgentDetails: Record<string, { name: string; phone: string }> = {
   "bjornlim@nexdoor.sg": {
     name: process.env.WHATSAPP_AGENT_BJORN_NAME || "Bjorn Lim",
-    phone: process.env.WHATSAPP_AGENT_BJORN_PHONE || "+65 9139 1363",
+    phone: process.env.WHATSAPP_AGENT_BJORN_PHONE || "",
   },
   "abigailtang@nexdoor.sg": {
     name: process.env.WHATSAPP_AGENT_ABIGAIL_NAME || "Abigail Tang",
@@ -55,13 +55,32 @@ function normaliseWhatsappRecipient(phone: string) {
   return digitsOnly;
 }
 
+function shouldSendWhatsappForIntent(plan: unknown) {
+  const normalisedPlan = String(plan || "").trim().toLowerCase();
+
+  if (!normalisedPlan) return false;
+
+  return [
+    "sell",
+    "selling",
+    "thinking of selling",
+    "looking to sell",
+    "buy",
+    "buying",
+    "thinking of buying",
+    "looking to buy",
+    "just exploring",
+    "exploring",
+  ].includes(normalisedPlan);
+}
+
 function getWhatsappAgentDetails(assignedTo: string | null) {
   const normalisedAssignedTo = String(assignedTo || "").trim().toLowerCase();
 
   return (
     whatsappAgentDetails[normalisedAssignedTo] || {
       name: process.env.WHATSAPP_CONSULTANT_NAME || "Bjorn Lim",
-      phone: process.env.WHATSAPP_CONSULTANT_PHONE || "+65 9139 1363",
+      phone: process.env.WHATSAPP_CONSULTANT_PHONE || "",
     }
   );
 }
@@ -206,6 +225,8 @@ export async function POST(req: Request) {
     } = body;
 
     const intent = displayValue(plan || "Pending");
+    const isIntentUpdate = !!plan;
+    const shouldSendWhatsappIntro = shouldSendWhatsappForIntent(plan);
     const estimatedValue = getFirstAvailable(estimated_price, estimatedPrice);
     const lowRange = getFirstAvailable(estimated_low, estimatedLow);
     const highRange = getFirstAvailable(estimated_high, estimatedHigh);
@@ -219,7 +240,7 @@ export async function POST(req: Request) {
       return { ok: false, skipped: false, assignedTo: null as string | null };
     });
 
-    if (officeSync.ok) {
+    if (officeSync.ok && shouldSendWhatsappIntro) {
       try {
         await sendHomeValueWhatsappIntro({
           name: String(name || "").trim(),
@@ -229,11 +250,12 @@ export async function POST(req: Request) {
       } catch (whatsappError) {
         console.error("WhatsApp intro route error:", whatsappError);
       }
-    } else {
+    } else if (!officeSync.ok) {
       console.warn("WhatsApp intro skipped because Office sync did not succeed");
+    } else {
+      console.info("WhatsApp intro skipped because no HomeValue intent was selected");
     }
 
-    const isIntentUpdate = !!plan;
     const subject = isIntentUpdate
       ? `HomeValue Intent - ${intent}`
       : `New HomeValue Lead - ${address || "Valuation Completed"}`;
