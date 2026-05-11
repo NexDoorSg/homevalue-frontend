@@ -24,6 +24,20 @@ const whatsappAgentDetails: Record<string, { name: string; phone: string }> = {
   },
 };
 
+const whatsappIntentAliases = new Set([
+  "sell",
+  "selling",
+  "looking to sell",
+  "thinking of selling",
+  "buy",
+  "buying",
+  "looking to buy",
+  "thinking of buying",
+  "just exploring",
+  "just exploring my options",
+  "exploring",
+]);
+
 function displayValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
   return String(value);
@@ -55,27 +69,22 @@ function normaliseWhatsappRecipient(phone: string) {
   return digitsOnly;
 }
 
-function shouldSendWhatsappForIntent(plan: unknown) {
-  const normalisedPlan = String(plan || "")
+function normaliseLeadIntent(value: unknown) {
+  return String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, " ");
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shouldSendWhatsappForIntent(plan: unknown) {
+  const normalisedPlan = normaliseLeadIntent(plan);
 
   if (!normalisedPlan) return false;
 
-  return [
-    "sell",
-    "selling",
-    "looking to sell",
-    "thinking of selling",
-    "buy",
-    "buying",
-    "looking to buy",
-    "thinking of buying",
-    "just exploring",
-    "just exploring my options",
-    "exploring",
-  ].some((intentPhrase) => normalisedPlan.includes(intentPhrase));
+  return whatsappIntentAliases.has(normalisedPlan);
 }
 
 function getWhatsappAgentDetails(assignedTo: string | null) {
