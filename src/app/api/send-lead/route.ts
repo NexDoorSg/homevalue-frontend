@@ -24,6 +24,20 @@ const whatsappAgentDetails: Record<string, { name: string; phone: string }> = {
   },
 };
 
+const whatsappIntentAliases = new Set([
+  "sell",
+  "selling",
+  "looking to sell",
+  "thinking of selling",
+  "buy",
+  "buying",
+  "looking to buy",
+  "thinking of buying",
+  "just exploring",
+  "just exploring my options",
+  "exploring",
+]);
+
 function displayValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
   return String(value);
@@ -55,23 +69,22 @@ function normaliseWhatsappRecipient(phone: string) {
   return digitsOnly;
 }
 
+function normaliseLeadIntent(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function shouldSendWhatsappForIntent(plan: unknown) {
-  const normalisedPlan = String(plan || "").trim().toLowerCase();
+  const normalisedPlan = normaliseLeadIntent(plan);
 
   if (!normalisedPlan) return false;
 
-  return [
-    "sell",
-    "selling",
-    "thinking of selling",
-    "looking to sell",
-    "buy",
-    "buying",
-    "thinking of buying",
-    "looking to buy",
-    "just exploring",
-    "exploring",
-  ].includes(normalisedPlan);
+  return whatsappIntentAliases.has(normalisedPlan);
 }
 
 function getWhatsappAgentDetails(assignedTo: string | null) {
@@ -252,8 +265,10 @@ export async function POST(req: Request) {
       }
     } else if (!officeSync.ok) {
       console.warn("WhatsApp intro skipped because Office sync did not succeed");
-    } else {
+    } else if (!plan) {
       console.info("WhatsApp intro skipped because no HomeValue intent was selected");
+    } else {
+      console.info(`WhatsApp intro skipped because HomeValue intent was not recognised: ${plan}`);
     }
 
     const subject = isIntentUpdate
