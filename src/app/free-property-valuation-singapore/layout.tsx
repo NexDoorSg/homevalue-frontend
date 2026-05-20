@@ -47,36 +47,36 @@ export default function FreePropertyValuationSingaporeLayout({
     <div className="free-property-valuation-page">
       <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       {children}
-      <section className="bg-[#f8f1e7] px-6 pb-16 md:px-10">
-        <div className="mx-auto max-w-[1440px] rounded-[28px] border border-[#ead7c6] bg-[#fffaf5] p-6 shadow-[0_20px_60px_rgba(23,36,58,0.06)] sm:p-8">
+      <section className="bg-[#fbf7ef] px-6 pb-16 md:px-10">
+        <div className="mx-auto max-w-[1440px] rounded-[28px] border border-[#d8c7ad] bg-[#f8f1e6] p-6 shadow-[0_20px_60px_rgba(23,36,58,0.06)] sm:p-8">
           <div className="max-w-4xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B88746]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#a9894f]">
               Free property valuation Singapore
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#17243a] sm:text-3xl">
               Know what your property could be worth before your next move
             </h2>
-            <p className="mt-4 text-sm leading-7 text-[#4b5563] sm:text-base">
+            <p className="mt-4 text-sm leading-7 text-[#71695d] sm:text-base">
               HomeValue by NexDoor helps Singapore homeowners get an indicative property value
               using recent HDB and URA transaction data. It is useful before selling, buying,
               upgrading, refinancing or simply checking where your home stands today.
             </p>
-            <p className="mt-4 text-sm leading-7 text-[#4b5563] sm:text-base">
+            <p className="mt-4 text-sm leading-7 text-[#71695d] sm:text-base">
               This online estimate is not a formal bank or HDB valuation. It is designed to give
               you a practical starting point based on comparable transaction data, property type,
               floor area, floor level, tenure and location.
             </p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm">
-              <a className="underline text-[#7a5a2d]" href="/hdb-valuation-singapore">
+              <a className="underline text-[#87692d]" href="/hdb-valuation-singapore">
                 HDB valuation Singapore
               </a>
-              <a className="underline text-[#7a5a2d]" href="/condo-valuation-singapore">
+              <a className="underline text-[#87692d]" href="/condo-valuation-singapore">
                 Condo valuation Singapore
               </a>
-              <a className="underline text-[#7a5a2d]" href="/landed-valuation-singapore">
+              <a className="underline text-[#87692d]" href="/landed-valuation-singapore">
                 Landed valuation Singapore
               </a>
-              <a className="underline text-[#7a5a2d]" href="/how-property-valuation-works-singapore">
+              <a className="underline text-[#87692d]" href="/how-property-valuation-works-singapore">
                 How property valuation works
               </a>
             </div>
