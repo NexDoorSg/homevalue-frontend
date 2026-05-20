@@ -1,13 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #17243a;
+  --background: #fffff8;
+  --foreground: #182333;
+  --nd-warm-white: #fffff8;
+  --nd-foreground: #182333;
+  --nd-cream: #fbf7ef;
   --nd-navy: #17243a;
-  --nd-cream: #F7F1E8;
-  --nd-beige: #EFE3D3;
-  --nd-gold: #B88746;
-  --nd-brown: #2F2A26;
+  --nd-charcoal: #252525;
+  --nd-gold: #a9894f;
+  --nd-deep-gold: #87692d;
+  --nd-beige: #eee5d6;
+  --nd-card: #f8f1e6;
+  --nd-border: #d8c7ad;
+  --nd-muted: #71695d;
 }
 
 @theme inline {
@@ -27,13 +33,13 @@ body {
 body:has(.homevalue-brand-sections) main,
 .free-property-valuation-page main {
   background: var(--nd-cream) !important;
-  color: var(--nd-navy) !important;
+  color: var(--nd-foreground) !important;
 }
 
 body:has(.homevalue-brand-sections) header,
 .free-property-valuation-page header {
-  border-color: rgba(184, 135, 70, 0.28) !important;
-  background: rgba(247, 241, 232, 0.94) !important;
+  border-color: var(--nd-border) !important;
+  background: rgba(255, 255, 248, 0.94) !important;
 }
 
 body:has(.homevalue-brand-sections) header a,
@@ -52,7 +58,7 @@ body:has(.homevalue-brand-sections) header button,
 
 body:has(.homevalue-brand-sections) header button:hover,
 .free-property-valuation-page header button:hover {
-  background: #0f1a2c !important;
+  background: #111b2d !important;
 }
 
 body:has(.homevalue-brand-sections) h1,
@@ -96,7 +102,7 @@ body:has(.homevalue-brand-sections) .bg-\[\#24292d\],
 
 body:has(.homevalue-brand-sections) .hover\:bg-\[\#24292d\]:hover,
 .free-property-valuation-page .hover\:bg-\[\#24292d\]:hover {
-  background-color: #0f1a2c !important;
+  background-color: #111b2d !important;
 }
 
 body:has(.homevalue-brand-sections) .border-\[\#ead7c6\],
@@ -107,7 +113,7 @@ body:has(.homevalue-brand-sections) .border-\[\#efddcc\],
 .free-property-valuation-page .border-\[\#f0dfcf\],
 .free-property-valuation-page .border-\[\#eddccc\],
 .free-property-valuation-page .border-\[\#efddcc\] {
-  border-color: rgba(184, 135, 70, 0.24) !important;
+  border-color: var(--nd-border) !important;
 }
 
 body:has(.homevalue-brand-sections) input:focus,
@@ -117,24 +123,24 @@ body:has(.homevalue-brand-sections) textarea:focus,
 .free-property-valuation-page select:focus,
 .free-property-valuation-page textarea:focus {
   border-color: var(--nd-gold) !important;
-  box-shadow: 0 0 0 3px rgba(184, 135, 70, 0.12) !important;
+  box-shadow: 0 0 0 3px rgba(169, 137, 79, 0.14) !important;
 }
 
 body:has(.homevalue-brand-sections) .sk,
 .free-property-valuation-page .sk {
-  background: linear-gradient(90deg, #efe7dc 25%, #e7dac9 50%, #efe7dc 75%) !important;
+  background: linear-gradient(90deg, #eee5d6 25%, #d8c7ad 50%, #eee5d6 75%) !important;
   background-size: 600px 100% !important;
 }
 
 body:has(.homevalue-brand-sections) .load-bar-fill,
 .free-property-valuation-page .load-bar-fill {
-  background: linear-gradient(90deg, #17243a, #B88746, #17243a) !important;
+  background: linear-gradient(90deg, #17243a, #a9894f, #17243a) !important;
   background-size: 400px 100% !important;
 }
 
 .homevalue-brand-sections {
   background: var(--nd-cream);
-  color: var(--nd-navy);
+  color: var(--nd-foreground);
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
 }
 
@@ -179,7 +185,7 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 .homevalue-nexdoor-panel p:not(.homevalue-eyebrow),
 .homevalue-offer-panel p:not(.homevalue-eyebrow) {
   margin: 14px 0 0;
-  color: rgba(23, 36, 58, 0.72);
+  color: var(--nd-muted);
   font-size: 15px;
   line-height: 1.8;
 }
@@ -192,9 +198,9 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 
 .homevalue-use-card {
   min-height: 150px;
-  border: 1px solid rgba(184, 135, 70, 0.22);
+  border: 1px solid var(--nd-border);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--nd-card);
   box-shadow: 0 18px 50px rgba(23, 36, 58, 0.06);
   padding: 22px;
 }
@@ -209,7 +215,7 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 .homevalue-use-card span {
   display: block;
   margin-top: 12px;
-  color: rgba(23, 36, 58, 0.68);
+  color: var(--nd-muted);
   font-size: 14px;
   line-height: 1.65;
 }
@@ -220,9 +226,9 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
   gap: 28px;
   align-items: center;
-  border: 1px solid rgba(184, 135, 70, 0.24);
+  border: 1px solid var(--nd-border);
   border-radius: 34px;
-  background: #fffaf5;
+  background: var(--nd-card);
   box-shadow: 0 22px 70px rgba(23, 36, 58, 0.07);
   padding: clamp(24px, 4vw, 44px);
 }
@@ -233,7 +239,7 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 
 .homevalue-offer-panel h2,
 .homevalue-offer-panel p:not(.homevalue-eyebrow) {
-  color: #fffaf5 !important;
+  color: var(--nd-warm-white) !important;
 }
 
 .homevalue-offer-panel p:not(.homevalue-eyebrow) {
@@ -247,7 +253,7 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
   justify-content: center;
   border-radius: 999px;
   background: var(--nd-gold);
-  color: #fffaf5;
+  color: var(--nd-warm-white);
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
