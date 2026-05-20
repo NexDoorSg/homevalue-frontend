@@ -39,26 +39,53 @@ body:has(.homevalue-brand-sections) main,
 body:has(.homevalue-brand-sections) header,
 .free-property-valuation-page header {
   border-color: var(--nd-border) !important;
-  background: rgba(255, 255, 248, 0.94) !important;
+  background: rgba(255, 255, 248, 0.96) !important;
+}
+
+body:has(.homevalue-brand-sections) header > div,
+.free-property-valuation-page header > div {
+  width: min(100% - 48px, 1280px) !important;
+  margin: 0 auto !important;
+  padding: 14px 0 !important;
 }
 
 body:has(.homevalue-brand-sections) header a,
 .free-property-valuation-page header a {
+  position: relative;
   color: var(--nd-navy) !important;
   font-family: var(--font-playfair), Georgia, "Times New Roman", serif !important;
+  font-size: 34px !important;
   font-weight: 700 !important;
-  letter-spacing: -0.035em !important;
+  letter-spacing: -0.055em !important;
+  line-height: 0.92 !important;
+  padding-bottom: 16px !important;
+}
+
+body:has(.homevalue-brand-sections) header a::after,
+.free-property-valuation-page header a::after {
+  content: "Property Decisions, Made With Precision.";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: max-content;
+  transform: translateX(-50%);
+  color: var(--nd-navy);
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
 body:has(.homevalue-brand-sections) header button,
 .free-property-valuation-page header button {
-  background: var(--nd-navy) !important;
-  box-shadow: 0 14px 32px rgba(23, 36, 58, 0.16) !important;
+  background: var(--nd-gold) !important;
+  box-shadow: 0 14px 32px rgba(169, 137, 79, 0.18) !important;
 }
 
 body:has(.homevalue-brand-sections) header button:hover,
 .free-property-valuation-page header button:hover {
-  background: #111b2d !important;
+  background: var(--nd-deep-gold) !important;
 }
 
 body:has(.homevalue-brand-sections) h1,
@@ -70,6 +97,11 @@ body:has(.homevalue-brand-sections) h3,
   color: var(--nd-navy) !important;
 }
 
+body:has(.homevalue-brand-sections) h1,
+.free-property-valuation-page h1 {
+  letter-spacing: -0.045em !important;
+}
+
 body:has(.homevalue-brand-sections) .text-\[\#b76633\],
 body:has(.homevalue-brand-sections) .text-\[\#bf6d34\],
 .free-property-valuation-page .text-\[\#b76633\],
@@ -79,9 +111,11 @@ body:has(.homevalue-brand-sections) .text-\[\#bf6d34\],
 
 body:has(.homevalue-brand-sections) .bg-\[\#b76633\],
 body:has(.homevalue-brand-sections) .bg-\[\#bf6d34\],
+body:has(.homevalue-brand-sections) .bg-\[\#de741f\],
 .free-property-valuation-page .bg-\[\#b76633\],
-.free-property-valuation-page .bg-\[\#bf6d34\] {
-  background-color: var(--nd-gold) !important;
+.free-property-valuation-page .bg-\[\#bf6d34\],
+.free-property-valuation-page .bg-\[\#de741f\] {
+  background-color: var(--nd-navy) !important;
 }
 
 body:has(.homevalue-brand-sections) .border-\[\#b76633\],
@@ -101,15 +135,21 @@ body:has(.homevalue-brand-sections) .bg-\[\#24292d\],
 }
 
 body:has(.homevalue-brand-sections) .hover\:bg-\[\#24292d\]:hover,
-.free-property-valuation-page .hover\:bg-\[\#24292d\]:hover {
+body:has(.homevalue-brand-sections) .hover\:bg-\[\#c96314\]:hover,
+.free-property-valuation-page .hover\:bg-\[\#24292d\]:hover,
+.free-property-valuation-page .hover\:bg-\[\#c96314\]:hover {
   background-color: #111b2d !important;
 }
 
 body:has(.homevalue-brand-sections) .border-\[\#ead7c6\],
+body:has(.homevalue-brand-sections) .border-\[\#ead8c6\],
+body:has(.homevalue-brand-sections) .border-\[\#ead5c1\],
 body:has(.homevalue-brand-sections) .border-\[\#f0dfcf\],
 body:has(.homevalue-brand-sections) .border-\[\#eddccc\],
 body:has(.homevalue-brand-sections) .border-\[\#efddcc\],
 .free-property-valuation-page .border-\[\#ead7c6\],
+.free-property-valuation-page .border-\[\#ead8c6\],
+.free-property-valuation-page .border-\[\#ead5c1\],
 .free-property-valuation-page .border-\[\#f0dfcf\],
 .free-property-valuation-page .border-\[\#eddccc\],
 .free-property-valuation-page .border-\[\#efddcc\] {
@@ -144,6 +184,10 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
 }
 
+#homevalue-brand-sections-slot {
+  background: var(--nd-cream);
+}
+
 .homevalue-section-inner {
   width: min(100% - 48px, 1280px);
   margin: 0 auto;
@@ -153,11 +197,15 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 .homevalue-nexdoor-section,
 .homevalue-offer-section {
   background: var(--nd-cream);
-  padding: 0 0 32px;
+  padding: 0 0 28px;
+}
+
+.homevalue-use-section {
+  padding-top: 24px;
 }
 
 .homevalue-section-heading {
-  max-width: 760px;
+  max-width: 720px;
   margin-bottom: 24px;
 }
 
@@ -193,15 +241,15 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 .homevalue-use-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .homevalue-use-card {
-  min-height: 150px;
+  min-height: 138px;
   border: 1px solid var(--nd-border);
-  border-radius: 28px;
+  border-radius: 24px;
   background: var(--nd-card);
-  box-shadow: 0 18px 50px rgba(23, 36, 58, 0.06);
+  box-shadow: 0 16px 44px rgba(23, 36, 58, 0.045);
   padding: 22px;
 }
 
@@ -223,17 +271,19 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 .homevalue-nexdoor-panel,
 .homevalue-offer-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
-  gap: 28px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+  gap: 32px;
   align-items: center;
   border: 1px solid var(--nd-border);
-  border-radius: 34px;
+  border-radius: 32px;
   background: var(--nd-card);
-  box-shadow: 0 22px 70px rgba(23, 36, 58, 0.07);
-  padding: clamp(24px, 4vw, 44px);
+  box-shadow: 0 20px 60px rgba(23, 36, 58, 0.06);
+  padding: clamp(26px, 4vw, 46px);
 }
 
 .homevalue-offer-panel {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: auto;
   background: var(--nd-navy);
 }
 
@@ -243,6 +293,7 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 }
 
 .homevalue-offer-panel p:not(.homevalue-eyebrow) {
+  max-width: 720px;
   opacity: 0.78;
 }
 
@@ -257,33 +308,53 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
   padding: 14px 22px;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
 }
 
 .homevalue-logo-lockup {
   justify-self: end;
-  text-align: right;
+  text-align: center;
   color: var(--nd-navy);
+  width: fit-content;
 }
 
 .homevalue-logo-wordmark {
   font-family: var(--font-playfair), Georgia, "Times New Roman", serif;
-  font-size: clamp(48px, 7vw, 82px);
+  font-size: clamp(58px, 7.5vw, 100px);
   font-weight: 700;
   letter-spacing: -0.055em;
-  line-height: 0.95;
+  line-height: 0.9;
 }
 
 .homevalue-logo-tagline {
   margin-top: 12px;
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
-  font-size: clamp(13px, 1.5vw, 19px);
+  font-size: clamp(12px, 1.3vw, 18px);
   font-weight: 500;
   letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
+  body:has(.homevalue-brand-sections) header > div,
+  .free-property-valuation-page header > div {
+    width: min(100% - 32px, 720px) !important;
+  }
+
+  body:has(.homevalue-brand-sections) header a,
+  .free-property-valuation-page header a {
+    font-size: 26px !important;
+    padding-bottom: 13px !important;
+  }
+
+  body:has(.homevalue-brand-sections) header a::after,
+  .free-property-valuation-page header a::after {
+    font-size: 7px;
+  }
+
   .homevalue-section-inner {
     width: min(100% - 32px, 720px);
   }
@@ -297,12 +368,15 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
   .homevalue-logo-lockup,
   .homevalue-offer-panel a {
     justify-self: start;
-    text-align: left;
   }
 
   .homevalue-use-section,
   .homevalue-nexdoor-section,
   .homevalue-offer-section {
-    padding-bottom: 24px;
+    padding-bottom: 22px;
+  }
+
+  .homevalue-offer-panel a {
+    width: 100%;
   }
 }
