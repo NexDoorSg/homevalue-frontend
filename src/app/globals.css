@@ -51,31 +51,49 @@ body:has(.homevalue-brand-sections) header > div,
 
 body:has(.homevalue-brand-sections) header a,
 .free-property-valuation-page header a {
-  position: relative;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  text-align: left !important;
   color: var(--nd-navy) !important;
   font-family: var(--font-playfair), Georgia, "Times New Roman", serif !important;
-  font-size: 34px !important;
+  font-size: 1.58rem !important;
   font-weight: 700 !important;
-  letter-spacing: -0.055em !important;
-  line-height: 0.9 !important;
-  padding-bottom: 10px !important;
+  letter-spacing: -0.045em !important;
+  line-height: 0.82 !important;
+  padding-bottom: 0 !important;
+  text-decoration: none !important;
+}
+
+.free-property-valuation-page header a {
+  align-items: center !important;
+  text-align: center !important;
 }
 
 body:has(.homevalue-brand-sections) header a::after,
 .free-property-valuation-page header a::after {
   content: "Property Decisions, Made With Precision.";
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: max-content;
-  transform: translateX(-50%);
+  display: block;
+  margin-top: 0.125rem;
   color: var(--nd-navy);
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
-  font-size: 6px;
+  font-size: 0.3rem;
   font-weight: 500;
   letter-spacing: -0.03em;
   line-height: 1;
   white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  body:has(.homevalue-brand-sections) header a,
+  .free-property-valuation-page header a {
+    font-size: 1.8rem !important;
+  }
+
+  body:has(.homevalue-brand-sections) header a::after,
+  .free-property-valuation-page header a::after {
+    font-size: 0.34rem;
+  }
 }
 
 body:has(.homevalue-brand-sections) header button,
@@ -316,25 +334,30 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 
 .homevalue-logo-lockup {
   justify-self: end;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   color: var(--nd-navy);
   width: fit-content;
 }
 
 .homevalue-logo-wordmark {
+  display: block;
   font-family: var(--font-playfair), Georgia, "Times New Roman", serif;
   font-size: clamp(58px, 7.5vw, 100px);
   font-weight: 700;
-  letter-spacing: -0.055em;
-  line-height: 0.9;
+  letter-spacing: -0.045em;
+  line-height: 0.82;
 }
 
 .homevalue-logo-tagline {
-  margin-top: 7px;
+  display: block;
+  margin-top: 0.25rem;
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
-  font-size: clamp(7px, 0.85vw, 12px);
+  font-size: clamp(11px, 1.35vw, 18px);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   line-height: 1;
   white-space: nowrap;
 }
@@ -347,13 +370,14 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 
   body:has(.homevalue-brand-sections) header a,
   .free-property-valuation-page header a {
-    font-size: 26px !important;
-    padding-bottom: 9px !important;
+    font-size: 1.52rem !important;
+    line-height: 0.82 !important;
   }
 
   body:has(.homevalue-brand-sections) header a::after,
   .free-property-valuation-page header a::after {
-    font-size: 4.6px;
+    margin-top: 0.125rem;
+    font-size: 0.28rem;
   }
 
   .homevalue-section-inner {
