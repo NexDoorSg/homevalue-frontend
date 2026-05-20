@@ -57,8 +57,8 @@ body:has(.homevalue-brand-sections) header a,
   font-size: 34px !important;
   font-weight: 700 !important;
   letter-spacing: -0.055em !important;
-  line-height: 0.92 !important;
-  padding-bottom: 16px !important;
+  line-height: 0.9 !important;
+  padding-bottom: 10px !important;
 }
 
 body:has(.homevalue-brand-sections) header a::after,
@@ -71,10 +71,11 @@ body:has(.homevalue-brand-sections) header a::after,
   transform: translateX(-50%);
   color: var(--nd-navy);
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
-  font-size: 9px;
+  font-size: 6px;
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   line-height: 1;
+  white-space: nowrap;
 }
 
 body:has(.homevalue-brand-sections) header button,
@@ -329,12 +330,12 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
 }
 
 .homevalue-logo-tagline {
-  margin-top: 12px;
+  margin-top: 7px;
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
-  font-size: clamp(12px, 1.3vw, 18px);
+  font-size: clamp(7px, 0.85vw, 12px);
   font-weight: 500;
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -347,12 +348,12 @@ body:has(.homevalue-brand-sections) .load-bar-fill,
   body:has(.homevalue-brand-sections) header a,
   .free-property-valuation-page header a {
     font-size: 26px !important;
-    padding-bottom: 13px !important;
+    padding-bottom: 9px !important;
   }
 
   body:has(.homevalue-brand-sections) header a::after,
   .free-property-valuation-page header a::after {
-    font-size: 7px;
+    font-size: 4.6px;
   }
 
   .homevalue-section-inner {
