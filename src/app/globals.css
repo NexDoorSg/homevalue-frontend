@@ -2,66 +2,301 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #17243a;
+  --nd-navy: #17243a;
+  --nd-cream: #F7F1E8;
+  --nd-beige: #EFE3D3;
+  --nd-gold: #B88746;
+  --nd-brown: #2F2A26;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-montserrat);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
 }
 
-.free-property-valuation-page .bg-\[\#fbf5ee\] {
-  background-color: #f8f1e7 !important;
+/* NexDoor brand refresh for HomeValue core pages */
+body:has(.homevalue-brand-sections) main,
+.free-property-valuation-page main {
+  background: var(--nd-cream) !important;
+  color: var(--nd-navy) !important;
 }
 
-.free-property-valuation-page .bg-white\/90 {
-  background-color: #fffaf5 !important;
+body:has(.homevalue-brand-sections) header,
+.free-property-valuation-page header {
+  border-color: rgba(184, 135, 70, 0.28) !important;
+  background: rgba(247, 241, 232, 0.94) !important;
 }
 
+body:has(.homevalue-brand-sections) header a,
+.free-property-valuation-page header a {
+  color: var(--nd-navy) !important;
+  font-family: var(--font-playfair), Georgia, "Times New Roman", serif !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.035em !important;
+}
+
+body:has(.homevalue-brand-sections) header button,
+.free-property-valuation-page header button {
+  background: var(--nd-navy) !important;
+  box-shadow: 0 14px 32px rgba(23, 36, 58, 0.16) !important;
+}
+
+body:has(.homevalue-brand-sections) header button:hover,
+.free-property-valuation-page header button:hover {
+  background: #0f1a2c !important;
+}
+
+body:has(.homevalue-brand-sections) h1,
+body:has(.homevalue-brand-sections) h2,
+body:has(.homevalue-brand-sections) h3,
+.free-property-valuation-page h1,
+.free-property-valuation-page h2,
+.free-property-valuation-page h3 {
+  color: var(--nd-navy) !important;
+}
+
+body:has(.homevalue-brand-sections) .text-\[\#b76633\],
+body:has(.homevalue-brand-sections) .text-\[\#bf6d34\],
+.free-property-valuation-page .text-\[\#b76633\],
+.free-property-valuation-page .text-\[\#bf6d34\] {
+  color: var(--nd-gold) !important;
+}
+
+body:has(.homevalue-brand-sections) .bg-\[\#b76633\],
+body:has(.homevalue-brand-sections) .bg-\[\#bf6d34\],
+.free-property-valuation-page .bg-\[\#b76633\],
+.free-property-valuation-page .bg-\[\#bf6d34\] {
+  background-color: var(--nd-gold) !important;
+}
+
+body:has(.homevalue-brand-sections) .border-\[\#b76633\],
+body:has(.homevalue-brand-sections) .border-\[\#bf6d34\],
+body:has(.homevalue-brand-sections) .border-\[\#c79267\],
+.free-property-valuation-page .border-\[\#b76633\],
+.free-property-valuation-page .border-\[\#bf6d34\],
+.free-property-valuation-page .border-\[\#c79267\] {
+  border-color: var(--nd-gold) !important;
+}
+
+body:has(.homevalue-brand-sections) .bg-\[\#2f3438\],
+body:has(.homevalue-brand-sections) .bg-\[\#24292d\],
+.free-property-valuation-page .bg-\[\#2f3438\],
+.free-property-valuation-page .bg-\[\#24292d\] {
+  background-color: var(--nd-navy) !important;
+}
+
+body:has(.homevalue-brand-sections) .hover\:bg-\[\#24292d\]:hover,
+.free-property-valuation-page .hover\:bg-\[\#24292d\]:hover {
+  background-color: #0f1a2c !important;
+}
+
+body:has(.homevalue-brand-sections) .border-\[\#ead7c6\],
+body:has(.homevalue-brand-sections) .border-\[\#f0dfcf\],
+body:has(.homevalue-brand-sections) .border-\[\#eddccc\],
+body:has(.homevalue-brand-sections) .border-\[\#efddcc\],
+.free-property-valuation-page .border-\[\#ead7c6\],
 .free-property-valuation-page .border-\[\#f0dfcf\],
 .free-property-valuation-page .border-\[\#eddccc\],
 .free-property-valuation-page .border-\[\#efddcc\] {
-  border-color: #ead7c6 !important;
+  border-color: rgba(184, 135, 70, 0.24) !important;
 }
 
-.free-property-valuation-page .bg-\[\#efddcc\] {
-  background-color: #ead7c6 !important;
+body:has(.homevalue-brand-sections) input:focus,
+body:has(.homevalue-brand-sections) select:focus,
+body:has(.homevalue-brand-sections) textarea:focus,
+.free-property-valuation-page input:focus,
+.free-property-valuation-page select:focus,
+.free-property-valuation-page textarea:focus {
+  border-color: var(--nd-gold) !important;
+  box-shadow: 0 0 0 3px rgba(184, 135, 70, 0.12) !important;
 }
 
-.free-property-valuation-page .text-\[\#bf6d34\] {
-  color: #b76633 !important;
-}
-
-.free-property-valuation-page .border-\[\#bf6d34\],
-.free-property-valuation-page .border-\[\#c79267\] {
-  border-color: #b76633 !important;
-}
-
-.free-property-valuation-page .bg-\[\#bf6d34\] {
-  background-color: #b76633 !important;
-}
-
+body:has(.homevalue-brand-sections) .sk,
 .free-property-valuation-page .sk {
-  background: linear-gradient(90deg, #f0ece6 25%, #e8e2da 50%, #f0ece6 75%) !important;
+  background: linear-gradient(90deg, #efe7dc 25%, #e7dac9 50%, #efe7dc 75%) !important;
   background-size: 600px 100% !important;
 }
 
+body:has(.homevalue-brand-sections) .load-bar-fill,
 .free-property-valuation-page .load-bar-fill {
-  background: linear-gradient(90deg, #b76633, #b08060, #b76633) !important;
+  background: linear-gradient(90deg, #17243a, #B88746, #17243a) !important;
   background-size: 400px 100% !important;
+}
+
+.homevalue-brand-sections {
+  background: var(--nd-cream);
+  color: var(--nd-navy);
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+}
+
+.homevalue-section-inner {
+  width: min(100% - 48px, 1280px);
+  margin: 0 auto;
+}
+
+.homevalue-use-section,
+.homevalue-nexdoor-section,
+.homevalue-offer-section {
+  background: var(--nd-cream);
+  padding: 0 0 32px;
+}
+
+.homevalue-section-heading {
+  max-width: 760px;
+  margin-bottom: 24px;
+}
+
+.homevalue-eyebrow {
+  margin: 0 0 10px;
+  color: var(--nd-gold);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.homevalue-section-heading h2,
+.homevalue-nexdoor-panel h2,
+.homevalue-offer-panel h2 {
+  margin: 0;
+  color: var(--nd-navy);
+  font-size: clamp(26px, 3vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+}
+
+.homevalue-section-heading p,
+.homevalue-nexdoor-panel p:not(.homevalue-eyebrow),
+.homevalue-offer-panel p:not(.homevalue-eyebrow) {
+  margin: 14px 0 0;
+  color: rgba(23, 36, 58, 0.72);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.homevalue-use-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.homevalue-use-card {
+  min-height: 150px;
+  border: 1px solid rgba(184, 135, 70, 0.22);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 50px rgba(23, 36, 58, 0.06);
+  padding: 22px;
+}
+
+.homevalue-use-card p {
+  margin: 0;
+  color: var(--nd-navy);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.homevalue-use-card span {
+  display: block;
+  margin-top: 12px;
+  color: rgba(23, 36, 58, 0.68);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.homevalue-nexdoor-panel,
+.homevalue-offer-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 28px;
+  align-items: center;
+  border: 1px solid rgba(184, 135, 70, 0.24);
+  border-radius: 34px;
+  background: #fffaf5;
+  box-shadow: 0 22px 70px rgba(23, 36, 58, 0.07);
+  padding: clamp(24px, 4vw, 44px);
+}
+
+.homevalue-offer-panel {
+  background: var(--nd-navy);
+}
+
+.homevalue-offer-panel h2,
+.homevalue-offer-panel p:not(.homevalue-eyebrow) {
+  color: #fffaf5 !important;
+}
+
+.homevalue-offer-panel p:not(.homevalue-eyebrow) {
+  opacity: 0.78;
+}
+
+.homevalue-offer-panel a {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--nd-gold);
+  color: #fffaf5;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 14px 22px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
+}
+
+.homevalue-logo-lockup {
+  justify-self: end;
+  text-align: right;
+  color: var(--nd-navy);
+}
+
+.homevalue-logo-wordmark {
+  font-family: var(--font-playfair), Georgia, "Times New Roman", serif;
+  font-size: clamp(48px, 7vw, 82px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.homevalue-logo-tagline {
+  margin-top: 12px;
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+  font-size: clamp(13px, 1.5vw, 19px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 900px) {
+  .homevalue-section-inner {
+    width: min(100% - 32px, 720px);
+  }
+
+  .homevalue-use-grid,
+  .homevalue-nexdoor-panel,
+  .homevalue-offer-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .homevalue-logo-lockup,
+  .homevalue-offer-panel a {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .homevalue-use-section,
+  .homevalue-nexdoor-section,
+  .homevalue-offer-section {
+    padding-bottom: 24px;
+  }
 }
