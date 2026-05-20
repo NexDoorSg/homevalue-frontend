@@ -1,0 +1,71 @@
+/* PR25 visual fixes for the two core HomeValue pages.
+   Keep this file narrow: no valuation, lead, popup or WhatsApp logic. */
+
+body:has(.homevalue-brand-sections) header a,
+.free-property-valuation-page header a {
+  align-items: center !important;
+  width: fit-content !important;
+  text-align: center !important;
+}
+
+body:has(.homevalue-brand-sections) header a::after,
+.free-property-valuation-page header a::after {
+  align-self: center !important;
+  width: max-content !important;
+  max-width: none !important;
+  text-align: center !important;
+  transform: translateX(0) !important;
+}
+
+.homevalue-offer-panel {
+  border-color: rgba(216, 199, 173, 0.32) !important;
+  background: linear-gradient(135deg, #17243a 0%, #111b2d 100%) !important;
+}
+
+.homevalue-offer-panel .homevalue-eyebrow {
+  color: #d9bd82 !important;
+}
+
+.homevalue-offer-panel h2 {
+  color: #fffff8 !important;
+}
+
+.homevalue-offer-panel p:not(.homevalue-eyebrow) {
+  color: rgba(255, 255, 248, 0.82) !important;
+  opacity: 1 !important;
+}
+
+.homevalue-offer-panel a {
+  background: #a9894f !important;
+  color: #fffff8 !important;
+}
+
+.homevalue-offer-panel a:hover {
+  background: #87692d !important;
+}
+
+/* Make the inserted brand sections read more naturally as part of the page flow. */
+.homevalue-use-section {
+  padding-top: 36px !important;
+}
+
+.homevalue-nexdoor-section,
+.homevalue-offer-section {
+  padding-bottom: 34px !important;
+}
+
+@media (max-width: 900px) {
+  body:has(.homevalue-brand-sections) header a,
+  .free-property-valuation-page header a {
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  .homevalue-use-section {
+    padding-top: 28px !important;
+  }
+
+  .homevalue-offer-panel {
+    gap: 22px !important;
+  }
+}
