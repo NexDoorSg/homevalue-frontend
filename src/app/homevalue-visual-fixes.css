@@ -1,46 +1,124 @@
-/* PR25 visual fixes for the two core HomeValue pages.
-   Keep this file narrow: no valuation, lead, popup or WhatsApp logic. */
+/* Core HomeValue visual fixes.
+   Scope is intentionally limited to visual presentation on the public HomeValue pages.
+   No valuation, lead, popup, Office sync or WhatsApp logic is touched. */
 
+/* Match the main NexDoor website logo proportions exactly. */
 body:has(.homevalue-brand-sections) header a,
 .free-property-valuation-page header a {
-  align-items: center !important;
+  display: inline-flex !important;
   width: fit-content !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #17243a !important;
+  font-family: var(--font-playfair), Georgia, "Times New Roman", serif !important;
+  font-size: 1.58rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.045em !important;
+  line-height: 0.82 !important;
+  text-align: center !important;
+  text-decoration: none !important;
+}
+
+/* The free valuation page has an inner div with older logo sizing and inline font styles.
+   Override it so both HomeValue core pages use the same NexDoor logo treatment. */
+body:has(.homevalue-brand-sections) header a > div,
+.free-property-valuation-page header a > div {
+  display: block !important;
+  color: #17243a !important;
+  font-family: var(--font-playfair), Georgia, "Times New Roman", serif !important;
+  font-size: 1.58rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.045em !important;
+  line-height: 0.82 !important;
   text-align: center !important;
 }
 
 body:has(.homevalue-brand-sections) header a::after,
 .free-property-valuation-page header a::after {
+  content: "Property Decisions, Made With Precision." !important;
+  display: block !important;
   align-self: center !important;
   width: max-content !important;
   max-width: none !important;
+  margin-top: 0.125rem !important;
+  color: #17243a !important;
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif !important;
+  font-size: 0.3rem !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1 !important;
   text-align: center !important;
-  transform: translateX(0) !important;
+  white-space: nowrap !important;
+  transform: none !important;
+}
+
+@media (min-width: 1024px) {
+  body:has(.homevalue-brand-sections) header a,
+  .free-property-valuation-page header a,
+  body:has(.homevalue-brand-sections) header a > div,
+  .free-property-valuation-page header a > div {
+    font-size: 1.8rem !important;
+  }
+
+  body:has(.homevalue-brand-sections) header a::after,
+  .free-property-valuation-page header a::after {
+    font-size: 0.34rem !important;
+  }
+}
+
+@media (max-width: 900px) {
+  body:has(.homevalue-brand-sections) header a,
+  .free-property-valuation-page header a,
+  body:has(.homevalue-brand-sections) header a > div,
+  .free-property-valuation-page header a > div {
+    font-size: 1.52rem !important;
+  }
+
+  body:has(.homevalue-brand-sections) header a::after,
+  .free-property-valuation-page header a::after {
+    font-size: 0.28rem !important;
+  }
 }
 
 .homevalue-offer-panel {
-  border-color: rgba(216, 199, 173, 0.32) !important;
+  border-color: rgba(216, 199, 173, 0.34) !important;
   background: linear-gradient(135deg, #17243a 0%, #111b2d 100%) !important;
 }
 
-.homevalue-offer-panel .homevalue-eyebrow {
-  color: #d9bd82 !important;
-}
-
-.homevalue-offer-panel h2 {
-  color: #fffff8 !important;
-}
-
-.homevalue-offer-panel p:not(.homevalue-eyebrow) {
-  color: rgba(255, 255, 248, 0.82) !important;
+/* Use higher specificity than the broad global h2 rule so the seller headline is truly visible. */
+body:has(.homevalue-brand-sections) .homevalue-offer-panel .homevalue-eyebrow,
+.free-property-valuation-page .homevalue-offer-panel .homevalue-eyebrow,
+.homevalue-brand-sections .homevalue-offer-panel .homevalue-eyebrow {
+  color: #e6c98a !important;
   opacity: 1 !important;
 }
 
-.homevalue-offer-panel a {
-  background: #a9894f !important;
-  color: #fffff8 !important;
+body:has(.homevalue-brand-sections) .homevalue-offer-panel h2,
+.free-property-valuation-page .homevalue-offer-panel h2,
+.homevalue-brand-sections .homevalue-offer-panel h2 {
+  color: #fffdf8 !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12) !important;
 }
 
-.homevalue-offer-panel a:hover {
+body:has(.homevalue-brand-sections) .homevalue-offer-panel p:not(.homevalue-eyebrow),
+.free-property-valuation-page .homevalue-offer-panel p:not(.homevalue-eyebrow),
+.homevalue-brand-sections .homevalue-offer-panel p:not(.homevalue-eyebrow) {
+  color: rgba(255, 253, 248, 0.86) !important;
+  opacity: 1 !important;
+}
+
+body:has(.homevalue-brand-sections) .homevalue-offer-panel a,
+.free-property-valuation-page .homevalue-offer-panel a,
+.homevalue-brand-sections .homevalue-offer-panel a {
+  background: #a9894f !important;
+  color: #fffdf8 !important;
+}
+
+body:has(.homevalue-brand-sections) .homevalue-offer-panel a:hover,
+.free-property-valuation-page .homevalue-offer-panel a:hover,
+.homevalue-brand-sections .homevalue-offer-panel a:hover {
   background: #87692d !important;
 }
 
@@ -55,12 +133,6 @@ body:has(.homevalue-brand-sections) header a::after,
 }
 
 @media (max-width: 900px) {
-  body:has(.homevalue-brand-sections) header a,
-  .free-property-valuation-page header a {
-    align-items: center !important;
-    text-align: center !important;
-  }
-
   .homevalue-use-section {
     padding-top: 28px !important;
   }
