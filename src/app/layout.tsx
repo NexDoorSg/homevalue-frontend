@@ -7,6 +7,7 @@ import HomeValueLeadPopupExperiment from "@/components/HomeValueLeadPopupExperim
 import HomeValueAreaUnitSelector from "@/components/HomeValueAreaUnitSelector";
 import HomeValueAddressQualityGuard from "@/components/HomeValueAddressQualityGuard";
 import HomeValueBrandSections from "@/components/HomeValueBrandSections";
+import HomeValueSeoSupportNav from "@/components/HomeValueSeoSupportNav";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -135,6 +136,7 @@ export default function RootLayout({
           />
         </noscript>
         {children}
+        <HomeValueSeoSupportNav />
         <HomeValueBrandSections />
       </body>
     </html>
