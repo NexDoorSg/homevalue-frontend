@@ -196,6 +196,23 @@ main.bg-\[\#f7f4ef\] .border-\[\#e5e0da\] {
   border-color: var(--nd-border) !important;
 }
 
+/* Highlight the first-100 seller offer inside the intent popup before visitors choose a plan. */
+body:has(.homevalue-brand-sections) div:has(> p + h3 + div.mt-6.flex.flex-col.gap-3) > div.mt-6.flex.flex-col.gap-3::before,
+.free-property-valuation-page div:has(> p + h3 + div.mt-6.flex.flex-col.gap-3) > div.mt-6.flex.flex-col.gap-3::before {
+  content: "Selling soon? Our first 100 seller clients enjoy 1% commission, 0% GST.";
+  display: block;
+  margin-bottom: 0.125rem;
+  border: 1px solid rgba(169, 137, 79, 0.38);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(247, 241, 232, 0.98), rgba(239, 227, 211, 0.92));
+  padding: 0.9rem 1rem;
+  color: #17243a;
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.45;
+  box-shadow: 0 12px 30px rgba(23, 36, 58, 0.08);
+}
+
 @media (max-width: 900px) {
   .homevalue-use-section {
     padding-top: 28px !important;
@@ -217,5 +234,11 @@ main.bg-\[\#f7f4ef\] .border-\[\#e5e0da\] {
 
   main.bg-\[\#f7f4ef\] > div > div.bg-white {
     padding: 1.5rem !important;
+  }
+
+  body:has(.homevalue-brand-sections) div:has(> p + h3 + div.mt-6.flex.flex-col.gap-3) > div.mt-6.flex.flex-col.gap-3::before,
+  .free-property-valuation-page div:has(> p + h3 + div.mt-6.flex.flex-col.gap-3) > div.mt-6.flex.flex-col.gap-3::before {
+    font-size: 0.8125rem;
+    padding: 0.8rem 0.9rem;
   }
 }
