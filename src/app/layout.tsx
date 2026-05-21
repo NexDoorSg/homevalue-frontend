@@ -25,15 +25,63 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const homeValueTitle =
+  "Free Property Valuation Singapore | Check HDB, Condo, EC & Landed Home Value | NexDoor";
+const homeValueDescription =
+  "Get a free property valuation estimate in Singapore using recent HDB and URA transaction data. Check your HDB, condo, EC or landed home value before selling, buying, upgrading or refinancing.";
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.nexdoor.sg/#organization",
+      name: "NexDoor",
+      url: "https://www.nexdoor.sg",
+      slogan: "Property Decisions, Made With Precision.",
+      areaServed: "Singapore",
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://homevalue.nexdoor.sg/#website",
+      name: "HomeValue by NexDoor",
+      url: "https://homevalue.nexdoor.sg",
+      publisher: {
+        "@id": "https://www.nexdoor.sg/#organization",
+      },
+      inLanguage: "en-SG",
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://homevalue.nexdoor.sg/#webapplication",
+      name: "HomeValue by NexDoor",
+      url: "https://homevalue.nexdoor.sg",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "All",
+      description: homeValueDescription,
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "SGD",
+      },
+      publisher: {
+        "@id": "https://www.nexdoor.sg/#organization",
+      },
+      areaServed: "Singapore",
+    },
+  ],
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://homevalue.nexdoor.sg"),
-  title: "Free Property Valuation Singapore | HDB, Condo, EC & Landed | NexDoor",
-  description:
-    "Get a free property value estimate in Singapore using recent HDB and URA transaction data. Check your HDB, condo, EC or landed home value before your next move.",
+  title: homeValueTitle,
+  description: homeValueDescription,
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "Free Property Valuation Singapore | HDB, Condo, EC & Landed | NexDoor",
-    description:
-      "Get a free property value estimate in Singapore using recent HDB and URA transaction data. Check your HDB, condo, EC or landed home value before your next move.",
+    title: homeValueTitle,
+    description: homeValueDescription,
     url: "https://homevalue.nexdoor.sg",
     siteName: "HomeValue by NexDoor",
     locale: "en_SG",
@@ -41,9 +89,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Free Property Valuation Singapore | HDB, Condo, EC & Landed | NexDoor",
-    description:
-      "Get a free property value estimate in Singapore using recent HDB and URA transaction data. Check your HDB, condo, EC or landed home value before your next move.",
+    title: homeValueTitle,
+    description: homeValueDescription,
   },
 };
 
@@ -58,6 +105,9 @@ export default function RootLayout({
       className={`${montserrat.variable} ${playfair.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <Script id="homevalue-structured-data" type="application/ld+json">
+          {JSON.stringify(jsonLd)}
+        </Script>
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
