@@ -2,7 +2,7 @@
    Scope is intentionally limited to visual presentation on the public HomeValue pages.
    No valuation, lead, popup, Office sync or WhatsApp logic is touched. */
 
-/* Match the main NexDoor website logo proportions exactly. */
+/* Match the NexDoor logo lockup with an exact 5.4x wordmark-to-tagline font-size ratio. */
 body:has(.homevalue-brand-sections) header a,
 .free-property-valuation-page header a {
   display: inline-flex !important;
@@ -21,7 +21,7 @@ body:has(.homevalue-brand-sections) header a,
 }
 
 /* The free valuation page has an inner div with older logo sizing and inline font styles.
-   Override it so both HomeValue core pages use the same NexDoor logo treatment. */
+   Override it so both HomeValue core pages use the same centered NexDoor logo treatment. */
 body:has(.homevalue-brand-sections) header a > div,
 .free-property-valuation-page header a > div {
   display: block !important;
@@ -44,7 +44,7 @@ body:has(.homevalue-brand-sections) header a::after,
   margin-top: 0.125rem !important;
   color: #17243a !important;
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif !important;
-  font-size: 0.3rem !important;
+  font-size: 0.292592593rem !important;
   font-weight: 500 !important;
   letter-spacing: -0.03em !important;
   line-height: 1 !important;
@@ -63,7 +63,7 @@ body:has(.homevalue-brand-sections) header a::after,
 
   body:has(.homevalue-brand-sections) header a::after,
   .free-property-valuation-page header a::after {
-    font-size: 0.34rem !important;
+    font-size: 0.333333333rem !important;
   }
 }
 
@@ -77,7 +77,7 @@ body:has(.homevalue-brand-sections) header a::after,
 
   body:has(.homevalue-brand-sections) header a::after,
   .free-property-valuation-page header a::after {
-    font-size: 0.28rem !important;
+    font-size: 0.281481481rem !important;
   }
 }
 
