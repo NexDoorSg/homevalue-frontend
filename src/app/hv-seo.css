@@ -1,0 +1,78 @@
+main.bg-\[\#f7f4ef\] {
+  background: radial-gradient(circle at top left, rgba(169, 137, 79, 0.12), transparent 34rem), radial-gradient(circle at top right, rgba(23, 36, 58, 0.08), transparent 30rem), var(--nd-cream) !important;
+  color: var(--nd-foreground) !important;
+}
+
+main.bg-\[\#f7f4ef\] > div {
+  width: min(100%, 1040px) !important;
+}
+
+main.bg-\[\#f7f4ef\] > div > div.bg-white,
+main.bg-\[\#f7f4ef\] > section {
+  border: 1px solid var(--nd-border) !important;
+  border-radius: 28px !important;
+  background: rgba(255, 255, 248, 0.94) !important;
+  box-shadow: 0 24px 70px rgba(23, 36, 58, 0.08) !important;
+}
+
+main.bg-\[\#f7f4ef\] > section {
+  width: min(100% - 48px, 896px) !important;
+  margin: 3rem auto 0 !important;
+  padding: 2rem !important;
+}
+
+main.bg-\[\#f7f4ef\] h1,
+main.bg-\[\#f7f4ef\] h2,
+main.bg-\[\#f7f4ef\] h3 {
+  color: var(--nd-navy) !important;
+}
+
+main.bg-\[\#f7f4ef\] h1 {
+  letter-spacing: -0.045em !important;
+  line-height: 1.12 !important;
+}
+
+main.bg-\[\#f7f4ef\] h2 {
+  letter-spacing: -0.025em !important;
+}
+
+main.bg-\[\#f7f4ef\] p,
+main.bg-\[\#f7f4ef\] li {
+  color: var(--nd-muted) !important;
+}
+
+main.bg-\[\#f7f4ef\] a {
+  color: var(--nd-deep-gold) !important;
+  text-underline-offset: 4px !important;
+}
+
+main.bg-\[\#f7f4ef\] a.inline-block.rounded-full {
+  background: var(--nd-navy) !important;
+  color: var(--nd-warm-white) !important;
+  box-shadow: 0 16px 34px rgba(23, 36, 58, 0.16) !important;
+  text-decoration: none !important;
+}
+
+main.bg-\[\#f7f4ef\] a.inline-block.rounded-full:hover {
+  background: #111b2d !important;
+}
+
+main.bg-\[\#f7f4ef\] .border-\[\#e5e0da\] {
+  border-color: var(--nd-border) !important;
+}
+
+@media (max-width: 900px) {
+  main.bg-\[\#f7f4ef\] {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  main.bg-\[\#f7f4ef\] > section {
+    width: 100% !important;
+    padding: 1.5rem !important;
+  }
+
+  main.bg-\[\#f7f4ef\] > div > div.bg-white {
+    padding: 1.5rem !important;
+  }
+}
