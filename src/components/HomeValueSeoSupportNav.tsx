@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -57,8 +58,21 @@ function LinkPill({ href, label, active }: { href: string; label: string; active
 
 export default function HomeValueSeoSupportNav() {
   const pathname = usePathname();
+  const isSeoPage = seoPageRoutes.has(pathname);
 
-  if (!seoPageRoutes.has(pathname)) {
+  useEffect(() => {
+    if (!isSeoPage) return;
+
+    const oldAdLandingLinks = document.querySelectorAll<HTMLAnchorElement>(
+      'a[href="/free-property-valuation-singapore"]'
+    );
+
+    oldAdLandingLinks.forEach((link) => {
+      link.href = "/";
+    });
+  }, [isSeoPage]);
+
+  if (!isSeoPage) {
     return null;
   }
 
