@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const seoPageRoutes = new Set([
+  "/free-property-valuation-singapore",
   "/hdb-valuation-singapore",
   "/condo-valuation-singapore",
   "/landed-valuation-singapore",
@@ -23,6 +23,7 @@ const seoPageRoutes = new Set([
 
 const mainLinks = [
   { href: "/", label: "Check your property value" },
+  { href: "/free-property-valuation-singapore", label: "Free property valuation" },
   { href: "/hdb-valuation-singapore", label: "HDB valuation" },
   { href: "/condo-valuation-singapore", label: "Condo valuation" },
   { href: "/landed-valuation-singapore", label: "Landed valuation" },
@@ -60,18 +61,6 @@ export default function HomeValueSeoSupportNav() {
   const pathname = usePathname();
   const isSeoPage = seoPageRoutes.has(pathname);
 
-  useEffect(() => {
-    if (!isSeoPage) return;
-
-    const oldAdLandingLinks = document.querySelectorAll<HTMLAnchorElement>(
-      'a[href="/free-property-valuation-singapore"]'
-    );
-
-    oldAdLandingLinks.forEach((link) => {
-      link.href = "/";
-    });
-  }, [isSeoPage]);
-
   if (!isSeoPage) {
     return null;
   }
@@ -90,7 +79,7 @@ export default function HomeValueSeoSupportNav() {
         <p className="mt-4 max-w-3xl text-sm leading-7 text-[#71695d] sm:text-base">
           These guide pages help explain different parts of property valuation in Singapore.
           To get an indicative estimate for your own home, start from the main HomeValue
-          homepage and enter your property details there.
+          valuation pages and enter your property details there.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
