@@ -26,6 +26,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = "https://homevalue.nexdoor.sg";
+const nexDoorUrl = "https://www.nexdoor.sg";
 const homeValueTitle =
   "Free Property Valuation Singapore | Check HDB, Condo, EC & Landed Home Value | NexDoor";
 const homeValueDescription =
@@ -35,46 +37,107 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "Organization",
-      "@id": "https://www.nexdoor.sg/#organization",
+      "@type": ["Organization", "LocalBusiness", "RealEstateAgent"],
+      "@id": `${nexDoorUrl}/#organization`,
       name: "NexDoor",
-      url: "https://www.nexdoor.sg",
+      alternateName: "NexDoor | Singapore Property Agency",
+      legalName: "NEXDOOR PTE. LTD.",
+      url: nexDoorUrl,
+      logo: `${nexDoorUrl}/logo.png`,
+      image: `${nexDoorUrl}/logo.png`,
+      description:
+        "NexDoor is a Singapore property agency offering data-backed advice for HDB, condo, EC and landed property decisions.",
+      telephone: "+65 8988 2212",
+      email: "admin@nexdoor.sg",
       slogan: "Property Decisions, Made With Precision.",
-      areaServed: "Singapore",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "152 Beach Road, #23-02, Gateway East",
+        postalCode: "189721",
+        addressLocality: "Singapore",
+        addressCountry: "SG",
+      },
+      areaServed: {
+        "@type": "Country",
+        name: "Singapore",
+      },
+      identifier: [
+        {
+          "@type": "PropertyValue",
+          propertyID: "Singapore UEN",
+          value: "202606966C",
+        },
+        {
+          "@type": "PropertyValue",
+          propertyID: "CEA Estate Agent Licence",
+          value: "L3011052H",
+        },
+      ],
+      knowsAbout: [
+        "Singapore property valuation",
+        "HDB valuation",
+        "Condo valuation",
+        "Executive condominium valuation",
+        "Landed property valuation",
+        "HDB resale transactions",
+        "URA private property transactions",
+        "Singapore residential property",
+      ],
+      sameAs: [
+        siteUrl,
+        "https://www.google.com/maps/place/NexDoor/@1.2988735,103.8568258,17z/data=!3m1!4b1!4m6!3m5!1s0xf62bf4168a9c009:0xa0a9d337a6b0a905!8m2!3d1.2988735!4d103.8594007!16s%2Fg%2F11n9srb1lm",
+        "https://www.instagram.com/nexdoorsingapore/",
+        "https://www.tiktok.com/@nexdoorsingapore",
+        "https://www.facebook.com/nexdoorsingapore",
+        "https://www.youtube.com/@NexDoorSG",
+      ],
     },
     {
       "@type": "WebSite",
-      "@id": "https://homevalue.nexdoor.sg/#website",
+      "@id": `${siteUrl}/#website`,
       name: "HomeValue by NexDoor",
-      url: "https://homevalue.nexdoor.sg",
+      url: siteUrl,
+      description: homeValueDescription,
       publisher: {
-        "@id": "https://www.nexdoor.sg/#organization",
+        "@id": `${nexDoorUrl}/#organization`,
       },
       inLanguage: "en-SG",
     },
     {
       "@type": "WebApplication",
-      "@id": "https://homevalue.nexdoor.sg/#webapplication",
+      "@id": `${siteUrl}/#webapplication`,
       name: "HomeValue by NexDoor",
-      url: "https://homevalue.nexdoor.sg",
+      alternateName: "NexDoor HomeValue",
+      url: siteUrl,
       applicationCategory: "BusinessApplication",
       operatingSystem: "All",
       description: homeValueDescription,
+      isAccessibleForFree: true,
       offers: {
         "@type": "Offer",
         price: "0",
         priceCurrency: "SGD",
       },
       publisher: {
-        "@id": "https://www.nexdoor.sg/#organization",
+        "@id": `${nexDoorUrl}/#organization`,
       },
-      areaServed: "Singapore",
+      areaServed: {
+        "@type": "Country",
+        name: "Singapore",
+      },
+      about: [
+        "Free property valuation Singapore",
+        "HDB home value estimate",
+        "Condo valuation Singapore",
+        "EC valuation Singapore",
+        "Landed property valuation Singapore",
+      ],
     },
   ],
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://homevalue.nexdoor.sg"),
+  metadataBase: new URL(siteUrl),
   title: homeValueTitle,
   description: homeValueDescription,
   alternates: {
@@ -83,7 +146,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: homeValueTitle,
     description: homeValueDescription,
-    url: "https://homevalue.nexdoor.sg",
+    url: siteUrl,
     siteName: "HomeValue by NexDoor",
     locale: "en_SG",
     type: "website",
@@ -102,7 +165,7 @@ export default function RootLayout({
 }) {
   return (
     <html
-      lang="en"
+      lang="en-SG"
       className={`${montserrat.variable} ${playfair.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
