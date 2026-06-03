@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
-const pageTitle = 'Check Your Property Value in Singapore | Free HomeValue Estimate by NexDoor'
+const pageTitle = 'Free Property Valuation Singapore | HDB, Condo, EC & Landed | NexDoor'
 const pageDescription =
-  'Use HomeValue by NexDoor to get an indicative property value estimate for your HDB, condo, EC or landed home before deciding your next move.'
+  'Get a free property valuation estimate in Singapore for HDB, condo, EC and landed homes using recent HDB and URA transaction data. Use HomeValue by NexDoor before selling, buying, upgrading or refinancing.'
 
 export const metadata: Metadata = {
   title: pageTitle,
@@ -28,18 +28,32 @@ export const metadata: Metadata = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
-  name: 'Check Your Property Value in Singapore',
+  '@id': 'https://homevalue.nexdoor.sg/free-property-valuation-singapore#webpage',
+  name: pageTitle,
   url: 'https://homevalue.nexdoor.sg/free-property-valuation-singapore',
   description: pageDescription,
+  inLanguage: 'en-SG',
   isPartOf: {
-    '@type': 'WebSite',
-    name: 'HomeValue by NexDoor',
-    url: 'https://homevalue.nexdoor.sg',
+    '@id': 'https://homevalue.nexdoor.sg/#website',
   },
   publisher: {
-    '@type': 'Organization',
-    name: 'NexDoor',
-    url: 'https://www.nexdoor.sg',
+    '@id': 'https://www.nexdoor.sg/#organization',
+  },
+  about: [
+    'Free property valuation Singapore',
+    'HDB valuation Singapore',
+    'Condo valuation Singapore',
+    'Executive condominium valuation Singapore',
+    'Landed property valuation Singapore',
+    'Singapore residential property value estimate',
+  ],
+  mainEntity: {
+    '@type': 'WebApplication',
+    '@id': 'https://homevalue.nexdoor.sg/#webapplication',
+    name: 'HomeValue by NexDoor',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'All',
+    isAccessibleForFree: true,
   },
 }
 
@@ -72,8 +86,8 @@ export default function FreePropertyValuationSingaporeLayout({
               floor area, floor level, tenure and location.
             </p>
             <p className="mt-4 text-sm leading-7 text-[#71695d] sm:text-base">
-              For the main HomeValue experience, visit the homepage to check your property value
-              and understand the recent transactions around your home.
+              HomeValue is created by NexDoor, a Singapore property agency operated by NEXDOOR
+              PTE. LTD. and licensed under CEA Estate Agent Licence L3011052H.
             </p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm">
               <a className="underline text-[#87692d]" href="/">
