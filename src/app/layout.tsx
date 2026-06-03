@@ -135,6 +135,15 @@ const jsonLd = {
   ],
 };
 
+const homeValueKeyPages = [
+  { href: "/", label: "HomeValue tool" },
+  { href: "/free-property-valuation-singapore", label: "Free property valuation Singapore" },
+  { href: "/hdb-valuation-singapore", label: "HDB valuation Singapore" },
+  { href: "/condo-valuation-singapore", label: "Condo valuation Singapore" },
+  { href: "/landed-valuation-singapore", label: "Landed valuation Singapore" },
+  { href: "/how-property-valuation-works-singapore", label: "How property valuation works" },
+];
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: homeValueTitle,
@@ -198,6 +207,24 @@ export default function RootLayout({
           />
         </noscript>
         {children}
+        <nav aria-label="HomeValue key pages" className="bg-[#fbf7ef] px-6 py-8 md:px-10">
+          <div className="mx-auto max-w-[1040px] rounded-[24px] border border-[#d8c7ad] bg-[#fffdf8] p-5 shadow-[0_16px_44px_rgba(23,36,58,0.05)] sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#a9894f]">
+              HomeValue key pages
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {homeValueKeyPages.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="rounded-full border border-[#d8c7ad] bg-white px-4 py-2 text-sm font-semibold text-[#17243a] transition hover:border-[#a9894f] hover:text-[#87692d]"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        </nav>
         <HomeValueSeoSupportNav />
         <HomeValueBrandSections />
       </body>
