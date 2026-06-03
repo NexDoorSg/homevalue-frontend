@@ -2,6 +2,9 @@ import type { MetadataRoute } from 'next'
 
 const baseUrl = 'https://homevalue.nexdoor.sg'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const pages = [
   { route: '', changeFrequency: 'weekly', priority: 1 },
   { route: '/free-property-valuation-singapore', changeFrequency: 'weekly', priority: 0.95 },
