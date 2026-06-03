@@ -84,7 +84,6 @@ const jsonLd = {
         "Singapore residential property",
       ],
       sameAs: [
-        siteUrl,
         "https://www.google.com/maps/place/NexDoor/@1.2988735,103.8568258,17z/data=!3m1!4b1!4m6!3m5!1s0xf62bf4168a9c009:0xa0a9d337a6b0a905!8m2!3d1.2988735!4d103.8594007!16s%2Fg%2F11n9srb1lm",
         "https://www.instagram.com/nexdoorsingapore/",
         "https://www.tiktok.com/@nexdoorsingapore",
