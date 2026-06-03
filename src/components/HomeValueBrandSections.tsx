@@ -98,7 +98,8 @@ export default function HomeValueBrandSections() {
             <p className="homevalue-eyebrow">Powered by NexDoor</p>
             <h2>Property decisions, made with more clarity</h2>
             <p>
-              HomeValue is created by NexDoor, a boutique property agency in Singapore.
+              HomeValue is created by NexDoor, a Singapore property agency operated by
+              NEXDOOR PTE. LTD. and licensed under CEA Estate Agent Licence L3011052H.
               We help homeowners and buyers read the numbers, understand the market and
               plan the next move with confidence.
             </p>
