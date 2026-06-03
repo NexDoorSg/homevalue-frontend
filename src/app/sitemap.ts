@@ -4,7 +4,7 @@ const baseUrl = 'https://homevalue.nexdoor.sg'
 
 const pages = [
   { route: '', changeFrequency: 'weekly', priority: 1 },
-  { route: '/free-property-valuation-singapore', changeFrequency: 'monthly', priority: 0.7 },
+  { route: '/free-property-valuation-singapore', changeFrequency: 'weekly', priority: 0.95 },
   { route: '/hdb-valuation-singapore', changeFrequency: 'monthly', priority: 0.75 },
   { route: '/condo-valuation-singapore', changeFrequency: 'monthly', priority: 0.75 },
   { route: '/landed-valuation-singapore', changeFrequency: 'monthly', priority: 0.75 },
