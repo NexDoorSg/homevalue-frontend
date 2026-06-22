@@ -23,6 +23,7 @@ type Payload = {
   subjectCompletionYearHdb?: number | null
 }
 
+// CHANGE 1: Added floor_level to ComparableRow type
 type ComparableRow = {
   transaction_date: string | null
   address: string | null
@@ -38,6 +39,7 @@ type ComparableRow = {
   completion_year: number | string | null
   property_subtype: string | null
   property_group: string | null
+  floor_level: string | null
 }
 
 function readKey(request: NextRequest) {
@@ -101,6 +103,8 @@ function cleanComparableRows(rows: ComparableRow[], lat: number, lon: number) {
         completionYear: row.completion_year ? Number(row.completion_year) : null,
         propertySubtype: row.property_subtype,
         propertyGroup: row.property_group,
+        // CHANGE 2: Added floorLevel to cleaned row output
+        floorLevel: row.floor_level || null,
       }
     })
     .filter((row) => Number.isFinite(row.price) && row.price > 0 && Number.isFinite(row.sizeSqft) && row.sizeSqft > 0 && Number.isFinite(row.distanceM))
@@ -114,7 +118,8 @@ async function getComparableTransactions(body: Payload) {
 
   let query = supabase
     .from('property_transactions_v2')
-    .select('transaction_date, address, street_name, project_name, unit_type, tenure, transaction_price, floor_area_sqm, price_psf, latitude, longitude, completion_year, property_subtype, property_group')
+    // CHANGE 3: Added floor_level to select
+    .select('transaction_date, address, street_name, project_name, unit_type, tenure, transaction_price, floor_area_sqm, price_psf, latitude, longitude, completion_year, property_subtype, property_group, floor_level')
     .gte('latitude', box.minLat)
     .lte('latitude', box.maxLat)
     .gte('longitude', box.minLon)
