@@ -488,11 +488,20 @@ async function fetchRowsForRadius(
       .eq('unit_type', normalizeText(propertyType))
       .limit(1000)
   } else if (propertyCategory === 'condo') {
-    query = query.eq('property_subtype', 'condo').limit(2000)
+    query = query
+      .in('unit_type', ['Condominium', 'Apartment'])
+      .in('property_subtype', ['condo', 'Resale', 'New Sale', 'Sub Sale'])
+      .limit(2000)
   } else if (propertyCategory === 'ec') {
-    query = query.eq('property_subtype', 'ec').limit(2000)
+    query = query
+      .in('unit_type', ['Executive Condominium'])
+      .in('property_subtype', ['ec', 'Resale', 'New Sale', 'Sub Sale'])
+      .limit(2000)
   } else {
-    query = query.in('property_subtype', ['landed_strata', 'landed_non_strata']).limit(3000)
+    query = query
+      .in('unit_type', ['Detached House', 'Semi-Detached House', 'Terrace House'])
+      .in('property_subtype', ['landed_strata', 'landed_non_strata', 'Resale', 'New Sale', 'Sub Sale'])
+      .limit(3000)
   }
   const { data, error } = await query
   return { data, error }
