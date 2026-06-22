@@ -129,11 +129,17 @@ async function getComparableTransactions(body: Payload) {
   if (category === 'hdb') {
     query = query.eq('property_group', 'hdb').eq('unit_type', normalizeText(body.propertyType))
   } else if (category === 'condo') {
-    query = query.eq('property_subtype', 'condo')
+    query = query
+      .in('unit_type', ['Condominium', 'Apartment'])
+      .in('property_subtype', ['condo', 'Resale', 'New Sale', 'Sub Sale'])
   } else if (category === 'ec') {
-    query = query.eq('property_subtype', 'ec')
+    query = query
+      .in('unit_type', ['Executive Condominium'])
+      .in('property_subtype', ['ec', 'Resale', 'New Sale', 'Sub Sale'])
   } else {
-    query = query.eq('property_subtype', body.subjectIsStrata ? 'landed_strata' : 'landed_non_strata')
+    query = query
+      .in('unit_type', ['Detached House', 'Semi-Detached House', 'Terrace House'])
+      .in('property_subtype', ['landed_strata', 'landed_non_strata', 'Resale', 'New Sale', 'Sub Sale'])
   }
 
   const { data, error } = await query
