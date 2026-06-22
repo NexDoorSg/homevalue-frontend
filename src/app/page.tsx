@@ -2912,8 +2912,9 @@ export default function Home() {
                           <thead>
                             <tr className="text-left text-[#6a727a]">
                               <th className="px-4 py-3">Date</th>
-                              <th className="px-4 py-3">Address</th>
-                              <th className="px-4 py-3">Size</th>
+                            <th className="px-4 py-3">Address</th>
+                            {showFloorRangeColumn && <th className="px-4 py-3">Floor</th>}
+                            <th className="px-4 py-3">Size</th>
                               <th className="px-4 py-3">Price</th>
                               <th className="px-4 py-3">PSF</th>
                               {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
@@ -2929,10 +2930,13 @@ export default function Home() {
                             {tableRows.map((row, i) => (
                               <tr key={i} className="border-t hover:bg-[#faf8f4] transition">
                                 <td className="px-5 py-4">{formatDate(row.transaction_date)}</td>
-                                <td className="px-5 py-4">
-                                  {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
-                                </td>
-                                <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
+                               <td className="px-5 py-4">
+  {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
+</td>
+{showFloorRangeColumn && (
+  <td className="px-5 py-4">{row.floor_level || '-'}</td>
+)}
+<td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
                                 <td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
                                 <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
                                 {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
