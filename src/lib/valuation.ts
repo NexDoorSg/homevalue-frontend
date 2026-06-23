@@ -353,8 +353,12 @@ function buildHdbCandidate(
   let valuationPool: CleanedRow[]
   let method: string
 
-  if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 180) {
-    valuationPool = sameBlockRows
+if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 180) {
+    const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000
+    const recentSameBlock = sameBlockRows.filter(
+      (r) => r.transaction_date && new Date(r.transaction_date).getTime() >= oneYearAgo
+    )
+    valuationPool = recentSameBlock.length >= 2 ? recentSameBlock : sameBlockRows
     method = 'hdb_same_block_fresh'
 
   } else if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
