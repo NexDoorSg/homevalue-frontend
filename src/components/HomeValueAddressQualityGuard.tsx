@@ -206,11 +206,10 @@ function validateAddress(category: PropertyCategory, address: string, check: Add
   const cleanedAddress = normalise(address)
   if (!cleanedAddress) return null
 
-  if (category === 'hdb') {
+ if (category === 'hdb') {
     if (!hasLeadingBlockOrHouseNumber(cleanedAddress)) return getMessage(category)
-    if (check && !hasValidHdbBlockResult(check, cleanedAddress)) return getMessage(category)
     return null
-  }
+}
 
   if (category === 'landed') {
     if (!hasLeadingBlockOrHouseNumber(cleanedAddress)) return getMessage(category)
