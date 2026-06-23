@@ -753,10 +753,7 @@ export default function Home() {
     return Math.round(estimatedPrice / sqftVal)
   })()
   const showFloorRangeColumn =
-    propertyCategory === 'hdb' &&
-    recentComparables.some(
-      (row) => row.floor_level && row.floor_level.trim() !== ''
-    )
+  propertyCategory === 'hdb'
 
   const selectedProjectKey = (selectedProjectName || '').toUpperCase().trim()
 
