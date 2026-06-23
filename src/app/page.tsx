@@ -2913,8 +2913,11 @@ export default function Home() {
                             <tr className="text-left text-[#6a727a]">
                               <th className="px-4 py-3">Date</th>
                               <th className="px-4 py-3">Address</th>
-                              <th className="px-4 py-3">Size</th>
-                              <th className="px-4 py-3">Price</th>
+                             <th className="px-4 py-3">Size</th>
+{propertyCategory === 'hdb' && showFloorRangeColumn && (
+  <th className="px-4 py-3">Floor Range</th>
+)}
+<th className="px-4 py-3">Price</th>
                               <th className="px-4 py-3">PSF</th>
                               {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
                                 <th className="px-4 py-3">Tenure</th>
@@ -2932,8 +2935,11 @@ export default function Home() {
                                 <td className="px-5 py-4">
                                   {propertyCategory === 'landed' ? row.address : row.project_name || row.address}
                                 </td>
-                                <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
-                                <td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
+                             <td className="px-5 py-4">{sqmToSqft(row.floor_area_sqm)} sqft</td>
+{propertyCategory === 'hdb' && showFloorRangeColumn && (
+  <td className="px-5 py-4">{row.floor_level || '—'}</td>
+)}
+<td className="px-5 py-4">{formatMoney(row.transaction_price)}</td>
                                 <td className="px-5 py-4">${Math.round(row.psf).toLocaleString()}</td>
                                 {(propertyCategory === 'condo' || propertyCategory === 'ec' || propertyCategory === 'landed') && (
                                   <td className="px-5 py-4">{formatTenure(row.tenure)}</td>
