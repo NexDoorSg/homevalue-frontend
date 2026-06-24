@@ -441,7 +441,11 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     const recentSameBlock = sameBlockRows.filter(
       (r) => r.transaction_date && new Date(r.transaction_date).getTime() >= oneYearAgo
     )
-    valuationPool = recentSameBlock.length >= 2 ? recentSameBlock : sameBlockRows
+    // Use only the last 365 days of same-block transactions for the fresh path.
+    // The branch condition guarantees the most recent same-block transaction is
+    // within a year, so recentSameBlock always has at least one row — never fall
+    // back to the unfiltered sameBlockRows, which would reintroduce stale data.
+    valuationPool = recentSameBlock
     method = 'hdb_same_block_fresh'
 
   } else if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 730) {
