@@ -366,6 +366,28 @@ function buildHdbCandidate(
 
   console.log('[buildHdbCandidate] subjectBlockNo:', JSON.stringify(subjectBlockNo), 'effectiveBlockNo:', JSON.stringify(effectiveBlockNo), 'sameBlockRows:', sameBlockRows.length, 'allRows:', allRows.length)
 
+  // Block-level PSF anchor: when same-type transactions in the block are sparse
+  // (< 3), fall back to all transactions in the same block regardless of unit
+  // type to derive a stable block-level price-per-sqm reference. This gives a
+  // sensible anchor even when same-type comparables are too few to trust.
+  let blockAnchorPsm: number | null = null
+  if (sameBlockRows.length < 3 && effectiveBlockNo) {
+    const sameBlockAnyTypeRows = allRows.filter(
+      (row) => extractBlockNumber(row.address) === effectiveBlockNo
+    )
+    if (sameBlockAnyTypeRows.length > 0) {
+      const sorted = sameBlockAnyTypeRows
+        .map((r) => r.pricePerSqm)
+        .filter((v) => Number.isFinite(v) && v > 0)
+        .sort((a, b) => a - b)
+      if (sorted.length > 0) {
+        const mid = Math.floor(sorted.length / 2)
+        blockAnchorPsm =
+          sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+      }
+    }
+  }
+
   const mostRecentSameBlock = getMostRecentDate(sameBlockRows)
   const now = Date.now()
   const daysSinceSameBlock = mostRecentSameBlock
@@ -471,7 +493,24 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 180) {
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
   const estimated = avgPsm * floorAreaSqm
-  const biasedEstimate = estimated * 1.01
+
+  // Blend in the block-level PSF anchor when same-type comparables are sparse.
+  // If we still have some same-type data, the anchor is a 30% supplement; if
+  // there is no same-type data, the anchor becomes the primary signal at 70%.
+  let blendedEstimate = estimated
+  let blendedMethod = method
+  if (blockAnchorPsm) {
+    const blockAnchorEstimate = blockAnchorPsm * floorAreaSqm
+    if (sameBlockRows.length > 0) {
+      blendedEstimate = estimated * 0.7 + blockAnchorEstimate * 0.3
+      blendedMethod = `${method}+block_anchor_30`
+    } else {
+      blendedEstimate = blockAnchorEstimate * 0.7 + estimated * 0.3
+      blendedMethod = `${method}+block_anchor_70`
+    }
+  }
+
+  const biasedEstimate = blendedEstimate * 1.01
 
   const psfValues = trimmed.map((row) => row.pricePerSqm)
   const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
@@ -488,7 +527,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 180) {
     high: floorAdjusted * (1 + halfSpread),
     comparables: trimmed.length,
     radius,
-    method,
+    method: blendedMethod,
   }
 }
 
