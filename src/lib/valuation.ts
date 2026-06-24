@@ -322,14 +322,16 @@ function getMostRecentDate(rows: CleanedRow[]): Date | null {
   return latest
 }
 
-function buildHdbCandidate(
+async function buildHdbCandidate(
   allRows: CleanedRow[],
   radius: number,
   floorAreaSqm: number,
   subjectFloorLevel: number | undefined,
   subjectBlockNo: string,
-  subjectCompletionYear: number | null
-): CandidateResult | null {
+  subjectCompletionYear: number | null,
+  subjectLat: number,
+  subjectLon: number
+): Promise<CandidateResult | null> {
   if (allRows.length === 0) return null
 
   // The subject block number can arrive null/empty (e.g. from the internal
@@ -367,15 +369,38 @@ function buildHdbCandidate(
   console.log('[buildHdbCandidate] subjectBlockNo:', JSON.stringify(subjectBlockNo), 'effectiveBlockNo:', JSON.stringify(effectiveBlockNo), 'sameBlockRows:', sameBlockRows.length, 'allRows:', allRows.length)
 
   // Block-level PSF anchor: when same-type transactions in the block are sparse
-  // (< 3), fall back to all transactions in the same block regardless of unit
-  // type to derive a stable block-level price-per-sqm reference. This gives a
-  // sensible anchor even when same-type comparables are too few to trust.
+  // (< 3), run a SEPARATE query for all HDB transactions in the same block
+  // regardless of unit type (the main pool is restricted to the subject's unit
+  // type upstream) to derive a stable block-level price-per-sqm reference. This
+  // gives a sensible anchor even when same-type comparables are too few.
   let blockAnchorPsm: number | null = null
   if (sameBlockRows.length < 3 && effectiveBlockNo) {
-    const sameBlockAnyTypeRows = allRows.filter(
-      (row) => extractBlockNumber(row.address) === effectiveBlockNo
-    )
-    if (sameBlockAnyTypeRows.length > 0) {
+    const box = getBoundingBox(subjectLat, subjectLon, 250)
+    const { data: blockData, error: blockError } = await supabase
+      .from('property_transactions_v2')
+      .select(
+        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address, completion_year, is_strata'
+      )
+      .eq('property_group', 'hdb')
+      .gte('latitude', box.minLat)
+      .lte('latitude', box.maxLat)
+      .gte('longitude', box.minLon)
+      .lte('longitude', box.maxLon)
+      .not('transaction_price', 'is', null)
+      .not('floor_area_sqm', 'is', null)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .limit(500)
+
+    if (blockError) {
+      console.error('[buildHdbCandidate] block anchor query error:', blockError)
+    } else if (blockData && blockData.length > 0) {
+      const sameBlockAnyTypeRows = cleanRows(
+        blockData as TransactionRow[],
+        subjectLat,
+        subjectLon
+      ).filter((row) => extractBlockNumber(row.address) === effectiveBlockNo)
+
       const sorted = sameBlockAnyTypeRows
         .map((r) => r.pricePerSqm)
         .filter((v) => Number.isFinite(v) && v > 0)
@@ -385,6 +410,12 @@ function buildHdbCandidate(
         blockAnchorPsm =
           sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
       }
+      console.log(
+        '[buildHdbCandidate] block anchor — sameBlockAnyTypeRows:',
+        sameBlockAnyTypeRows.length,
+        'blockAnchorPsm:',
+        blockAnchorPsm
+      )
     }
   }
 
@@ -2035,13 +2066,15 @@ export async function getValuation({
       const cleanedRows = cleanRows(data as TransactionRow[], lat, lon)
       if (cleanedRows.length === 0) continue
 
-      const candidate = buildHdbCandidate(
+      const candidate = await buildHdbCandidate(
         cleanedRows,
         radius,
         floorAreaSqm,
         floorLevel,
         blockNo,
-        completionYear
+        completionYear,
+        lat,
+        lon
       )
 
       if (!candidate) continue
@@ -2096,7 +2129,7 @@ export async function getValuation({
     const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
     if (fallbackRows.length === 0) return null
 
-    const fallbackResult = buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear)
+    const fallbackResult = await buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear, lat, lon)
     if (fallbackResult && cacheKey) await writeCache(cacheKey, fallbackResult)
     return fallbackResult
   }
