@@ -892,8 +892,14 @@ function getSameProjectSizeCurveRows(
   sameProjectRows: CleanedRow[],
   floorAreaSqm: number
 ) {
-  const usefulRows = filterByAreaRatio(sameProjectRows, floorAreaSqm, 0.45, 1.90)
-  const baseRows = usefulRows.length >= 2 ? usefulRows : sameProjectRows
+  const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000
+  const recentRows = sameProjectRows.filter(
+    (r) => r.transaction_date && new Date(r.transaction_date).getTime() >= oneYearAgo
+  )
+  const basePool = recentRows.length >= 3 ? recentRows : sameProjectRows
+
+  const usefulRows = filterByAreaRatio(basePool, floorAreaSqm, 0.45, 1.90)
+  const baseRows = usefulRows.length >= 2 ? usefulRows : basePool
 
   const trimmed = trimCondoEcOutliers(baseRows)
   return trimmed.length > 0 ? trimmed : baseRows
