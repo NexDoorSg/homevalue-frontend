@@ -248,11 +248,35 @@ function getRecencyWeight(
     return 0.88
   }
 
+  if (propertyCategory === 'hdb') {
+    if (daysOld <= 90) return 3.0
+    if (daysOld <= 180) return 2.5
+    if (daysOld <= 365) return 2.0
+    if (daysOld <= 730) return 1.2
+    if (daysOld <= 1095) return 0.8
+    return 0.5
+  }
+
   if (daysOld <= 90) return 1.2
   if (daysOld <= 180) return 1.1
   if (daysOld <= 365) return 1
   if (daysOld <= 730) return 0.94
   return 0.88
+}
+
+function getHdbAgeWeight(
+  rowCompletionYear: number | null,
+  subjectCompletionYear: number | null
+) {
+  if (rowCompletionYear === null || subjectCompletionYear === null) return 1.0
+
+  const diff = Math.abs(rowCompletionYear - subjectCompletionYear)
+
+  if (diff <= 3) return 1.5
+  if (diff <= 8) return 1.2
+  if (diff <= 15) return 0.9
+  if (diff <= 25) return 0.7
+  return 0.5
 }
 
 function parseFloorLevelFromAddress(address: string | null | undefined) {
@@ -521,7 +545,8 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     const recencyWeight = getRecencyWeight(row.transaction_date, 'hdb')
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
     const blockWeight = effectiveBlockNo && extractBlockNumber(row.address) === effectiveBlockNo ? 3.0 : 1.0
-    return distanceWeight * sizeWeight * recencyWeight * floorWeight * blockWeight
+    const ageWeight = getHdbAgeWeight(row.completion_year, subjectCompletionYear)
+    return distanceWeight * sizeWeight * recencyWeight * floorWeight * blockWeight * ageWeight
   })
 
   const avgPsm = weightedAverage(values, weights)
