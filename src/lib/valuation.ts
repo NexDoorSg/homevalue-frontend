@@ -538,11 +538,15 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
   if (trimmed.length === 0) return null
 
   const values = trimmed.map((row) => row.pricePerSqm)
+  // On thin pools, cap the recency weight so a single very fresh sale can't
+  // dominate the estimate. Full recency weights apply once the pool has >= 3 rows.
+  const capRecency = valuationPool.length < 3
   const weights = trimmed.map((row) => {
     const distanceWeight = 1 / Math.max(row.distanceM, 50)
     const sizeDiff = Math.abs(row.floor_area_sqm - floorAreaSqm)
     const sizeWeight = 1 / Math.max(sizeDiff, 5)
-    const recencyWeight = getRecencyWeight(row.transaction_date, 'hdb')
+    const rawRecencyWeight = getRecencyWeight(row.transaction_date, 'hdb')
+    const recencyWeight = capRecency ? Math.min(rawRecencyWeight, 2.0) : rawRecencyWeight
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
     const blockWeight = effectiveBlockNo && extractBlockNumber(row.address) === effectiveBlockNo ? 3.0 : 1.0
     const ageWeight = getHdbAgeWeight(row.completion_year, subjectCompletionYear)
