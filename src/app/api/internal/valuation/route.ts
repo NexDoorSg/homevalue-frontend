@@ -114,6 +114,8 @@ async function getComparableTransactions(body: Payload) {
   const lat = Number(body.lat)
   const lon = Number(body.lon)
   const category = body.propertyCategory
+
+  console.log('[getComparableTransactions] subjectBlockNo:', JSON.stringify(body.subjectBlockNo), 'subjectAddress:', JSON.stringify(body.subjectAddress))
   const box = getBoundingBox(lat, lon, category === 'landed' ? 5000 : 1500)
 
   let query = supabase

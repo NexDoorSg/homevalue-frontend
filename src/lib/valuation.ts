@@ -364,6 +364,8 @@ function buildHdbCandidate(
     sameBlockRows = allRows.filter((row) => row.distanceM <= 50)
   }
 
+  console.log('[buildHdbCandidate] subjectBlockNo:', JSON.stringify(subjectBlockNo), 'effectiveBlockNo:', JSON.stringify(effectiveBlockNo), 'sameBlockRows:', sameBlockRows.length, 'allRows:', allRows.length)
+
   const mostRecentSameBlock = getMostRecentDate(sameBlockRows)
   const now = Date.now()
   const daysSinceSameBlock = mostRecentSameBlock
