@@ -390,8 +390,6 @@ async function buildHdbCandidate(
     sameBlockRows = allRows.filter((row) => row.distanceM <= 50)
   }
 
-  console.log('[buildHdbCandidate] subjectBlockNo:', JSON.stringify(subjectBlockNo), 'effectiveBlockNo:', JSON.stringify(effectiveBlockNo), 'sameBlockRows:', sameBlockRows.length, 'allRows:', allRows.length)
-
   // Block-level PSF anchor: when same-type transactions in the block are sparse
   // (< 3), run a SEPARATE query for all HDB transactions in the same block
   // regardless of unit type (the main pool is restricted to the subject's unit
@@ -434,12 +432,6 @@ async function buildHdbCandidate(
         blockAnchorPsm =
           sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
       }
-      console.log(
-        '[buildHdbCandidate] block anchor — sameBlockAnyTypeRows:',
-        sameBlockAnyTypeRows.length,
-        'blockAnchorPsm:',
-        blockAnchorPsm
-      )
     }
   }
 
