@@ -332,9 +332,37 @@ function buildHdbCandidate(
 ): CandidateResult | null {
   if (allRows.length === 0) return null
 
-  const sameBlockRows = subjectBlockNo
-    ? allRows.filter((row) => extractBlockNumber(row.address) === subjectBlockNo)
+  // The subject block number can arrive null/empty (e.g. from the internal
+  // checker). Fall back to the most common block number among rows that are
+  // essentially at the subject location (within 50m) so same-block filtering
+  // still works instead of always falling through to hdb_nearby_all.
+  let effectiveBlockNo = subjectBlockNo
+  if (!effectiveBlockNo) {
+    const blockCounts = new Map<string, number>()
+    for (const row of allRows) {
+      if (row.distanceM > 50) continue
+      const block = extractBlockNumber(row.address)
+      if (!block) continue
+      blockCounts.set(block, (blockCounts.get(block) ?? 0) + 1)
+    }
+    let bestCount = 0
+    for (const [block, count] of blockCounts) {
+      if (count > bestCount) {
+        bestCount = count
+        effectiveBlockNo = block
+      }
+    }
+  }
+
+  let sameBlockRows = effectiveBlockNo
+    ? allRows.filter((row) => extractBlockNumber(row.address) === effectiveBlockNo)
     : []
+
+  // Second fallback: if we still couldn't identify same-block rows, treat rows
+  // within 50m (essentially the same location) as a same-block proxy.
+  if (sameBlockRows.length === 0) {
+    sameBlockRows = allRows.filter((row) => row.distanceM <= 50)
+  }
 
   const mostRecentSameBlock = getMostRecentDate(sameBlockRows)
   const now = Date.now()
@@ -344,7 +372,7 @@ function buildHdbCandidate(
 
   const nearbyWithSimilarAge = subjectCompletionYear
     ? allRows.filter((row) => {
-        if (extractBlockNumber(row.address) === subjectBlockNo) return false
+        if (extractBlockNumber(row.address) === effectiveBlockNo) return false
         if (!row.completion_year) return false
         return Math.abs(row.completion_year - subjectCompletionYear) <= 5
       })
@@ -433,7 +461,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 180) {
     const sizeWeight = 1 / Math.max(sizeDiff, 5)
     const recencyWeight = getRecencyWeight(row.transaction_date, 'hdb')
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
-    const blockWeight = extractBlockNumber(row.address) === subjectBlockNo ? 3.0 : 1.0
+    const blockWeight = effectiveBlockNo && extractBlockNumber(row.address) === effectiveBlockNo ? 3.0 : 1.0
     return distanceWeight * sizeWeight * recencyWeight * floorWeight * blockWeight
   })
 
