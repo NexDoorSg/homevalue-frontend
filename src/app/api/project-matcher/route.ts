@@ -26,6 +26,8 @@ type TxRow = {
   transaction_date: string | null
   postal_code: string | null
   floor_area_sqm: number | string | null
+  latitude: number | string | null
+  longitude: number | string | null
 }
 
 type MatchResult = {
@@ -37,6 +39,8 @@ type MatchResult = {
   district: string
   typicalSizeMin: number | null
   typicalSizeMax: number | null
+  lat: number | null
+  lon: number | null
 }
 
 const SQFT_PER_SQM = 10.7639
@@ -119,7 +123,7 @@ async function fetchTransactions(
   for (let from = 0; from < MAX_ROWS; from += PAGE) {
     let query = supabase
       .from('property_transactions_v2')
-      .select('street_name, project_name, transaction_price, price_psf, transaction_date, postal_code, floor_area_sqm')
+      .select('street_name, project_name, transaction_price, price_psf, transaction_date, postal_code, floor_area_sqm, latitude, longitude')
       .gte('transaction_date', sinceDate)
       .gte('transaction_price', priceFloor)
       .lte('transaction_price', priceCeil)
@@ -212,6 +216,8 @@ export async function GET(request: NextRequest) {
       prices: number[]
       psfs: number[]
       areasSqft: number[]
+      lats: number[]
+      lons: number[]
       lastTxDate: string | null
       districtCounts: Record<string, number>
     }
@@ -225,7 +231,7 @@ export async function GET(request: NextRequest) {
 
       let group = groups.get(name)
       if (!group) {
-        group = { name, prices: [], psfs: [], areasSqft: [], lastTxDate: null, districtCounts: {} }
+        group = { name, prices: [], psfs: [], areasSqft: [], lats: [], lons: [], lastTxDate: null, districtCounts: {} }
         groups.set(name, group)
       }
       group.prices.push(price)
@@ -233,6 +239,10 @@ export async function GET(request: NextRequest) {
       if (Number.isFinite(psf) && psf > 0) group.psfs.push(psf)
       const areaSqm = Number(row.floor_area_sqm)
       if (Number.isFinite(areaSqm) && areaSqm > 0) group.areasSqft.push(areaSqm * SQFT_PER_SQM)
+      const lat = Number(row.latitude)
+      if (Number.isFinite(lat) && lat !== 0) group.lats.push(lat)
+      const lon = Number(row.longitude)
+      if (Number.isFinite(lon) && lon !== 0) group.lons.push(lon)
       if (row.transaction_date && (!group.lastTxDate || row.transaction_date > group.lastTxDate)) {
         group.lastTxDate = row.transaction_date
       }
@@ -272,6 +282,8 @@ export async function GET(request: NextRequest) {
         district,
         typicalSizeMin,
         typicalSizeMax,
+        lat: group.lats.length > 0 ? median(group.lats) : null,
+        lon: group.lons.length > 0 ? median(group.lons) : null,
       })
     }
 
