@@ -288,7 +288,25 @@ export async function GET(request: NextRequest) {
     }
 
     results.sort((a, b) => b.txCount - a.txCount)
-    const topResults = results.slice(0, 8)
+
+    // Take the 30 highest-volume candidates, then enforce district diversity by
+    // capping each district to 2 entries so results spread across Singapore
+    // rather than clustering in one high-volume district. Finally return the
+    // top 8 by transaction count from that diverse set. The '—' placeholder
+    // (no postal code, e.g. all HDB rows) is exempt — otherwise every HDB
+    // result would collapse into a single bucket and cap at 2.
+    const MAX_PER_DISTRICT = 2
+    const districtSeen: Record<string, number> = {}
+    const diverse: MatchResult[] = []
+    for (const result of results.slice(0, 30)) {
+      if (result.district !== '—') {
+        const seen = districtSeen[result.district] || 0
+        if (seen >= MAX_PER_DISTRICT) continue
+        districtSeen[result.district] = seen + 1
+      }
+      diverse.push(result)
+    }
+    const topResults = diverse.slice(0, 8)
 
     return json({ results: topResults, category, budget, budgetMin })
   } catch (error) {
