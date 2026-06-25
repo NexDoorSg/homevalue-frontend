@@ -215,10 +215,11 @@ export async function GET(request: NextRequest) {
     since.setMonth(since.getMonth() - 24)
     const sinceDate = since.toISOString().slice(0, 10)
 
-    // Bound the fetch to a generous price band around the budget so medians stay
-    // representative while keeping row volume manageable.
-    const priceFloor = Math.max(0, Math.round(budgetMin * 0.6))
-    const priceCeil = Math.round(budget * 1.4)
+    // Filter transactions to the budget range directly in the query so we fetch
+    // only relevant rows — this keeps volume well under the page cap rather than
+    // pulling everything and filtering in memory.
+    const priceFloor = Math.max(0, budgetMin)
+    const priceCeil = budget
 
     const rows = await fetchTransactions(category, sinceDate, priceFloor, priceCeil, sizeMinSqm, sizeMaxSqm)
 

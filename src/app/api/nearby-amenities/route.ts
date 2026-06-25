@@ -44,22 +44,37 @@ function distanceM(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return 2 * R * Math.asin(Math.sqrt(a))
 }
 
-async function getOneMapToken(): Promise<string | null> {
+async function getOneMapToken(): Promise<string> {
   const email = process.env.ONEMAP_EMAIL
   const password = process.env.ONEMAP_PASSWORD
-  if (!email || !password) return null
-
-  const res = await fetch('https://www.onemap.gov.sg/api/auth/post/getToken', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  if (!res.ok) {
-    console.error('OneMap getToken failed:', res.status)
-    return null
+  if (!email || !password) {
+    throw new Error('OneMap credentials are not configured (set ONEMAP_EMAIL and ONEMAP_PASSWORD).')
   }
+
+  let res: Response
+  try {
+    res = await fetch('https://www.onemap.gov.sg/api/auth/post/getToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+  } catch (err) {
+    console.error('OneMap getToken network error:', err)
+    throw new Error(`OneMap getToken request failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '<unreadable body>')
+    console.error(`OneMap getToken failed: HTTP ${res.status} ${res.statusText} — ${body}`)
+    throw new Error(`OneMap getToken failed (HTTP ${res.status}): ${body}`)
+  }
+
   const data = (await res.json()) as { access_token?: string }
-  return data.access_token || null
+  if (!data.access_token) {
+    console.error('OneMap getToken returned no access_token:', JSON.stringify(data))
+    throw new Error(`OneMap getToken returned no access_token: ${JSON.stringify(data)}`)
+  }
+  return data.access_token
 }
 
 export async function GET(request: NextRequest) {
@@ -77,17 +92,15 @@ export async function GET(request: NextRequest) {
     }
 
     const token = await getOneMapToken()
-    if (!token) {
-      return json({ error: 'OneMap authentication is not configured.' }, { status: 503 })
-    }
 
     const themeUrl = `https://www.onemap.gov.sg/api/public/themesvc/retrieveTheme?queryName=${THEME_QUERY[type]}`
     const themeRes = await fetch(themeUrl, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!themeRes.ok) {
-      console.error('OneMap retrieveTheme failed:', themeRes.status)
-      return json({ error: 'Unable to fetch amenities.' }, { status: 502 })
+      const body = await themeRes.text().catch(() => '<unreadable body>')
+      console.error(`OneMap retrieveTheme failed: HTTP ${themeRes.status} ${themeRes.statusText} — ${body}`)
+      throw new Error(`OneMap retrieveTheme failed (HTTP ${themeRes.status}): ${body}`)
     }
     const themeData = (await themeRes.json()) as { SrchResults?: ThemeRow[] }
 
@@ -113,7 +126,9 @@ export async function GET(request: NextRequest) {
 
     return json({ results, type, lat, lon })
   } catch (error) {
+    // Surface the actual failure so it's visible from the calling frontend.
+    const message = error instanceof Error ? error.message : String(error)
     console.error('nearby-amenities error:', error)
-    return json({ error: 'Unable to fetch amenities.' }, { status: 500 })
+    return json({ error: message }, { status: 500 })
   }
 }
