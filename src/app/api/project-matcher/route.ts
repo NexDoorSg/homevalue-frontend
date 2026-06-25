@@ -137,16 +137,22 @@ async function fetchTransactions(
     if (sizeMinSqm !== null) query = query.gte('floor_area_sqm', sizeMinSqm)
     if (sizeMaxSqm !== null) query = query.lte('floor_area_sqm', sizeMaxSqm)
 
+    // Category filters mirror the valuation engine: combine unit_type with the
+    // set of property_subtype tags (raw + transaction-type) seen in the dataset.
     if (category === 'hdb') {
       query = query.eq('property_group', 'hdb')
     } else if (category === 'condo') {
-      query = query.eq('property_subtype', 'condo')
+      query = query
+        .in('unit_type', ['Condominium', 'Apartment'])
+        .in('property_subtype', ['condo', 'Resale', 'New Sale', 'Sub Sale'])
     } else if (category === 'ec') {
-      // EC rows aren't tagged property_subtype = 'ec' in this dataset; they're
-      // identified by unit_type, matching how the valuation pipeline treats them.
-      query = query.eq('unit_type', 'Executive Condominium')
+      query = query
+        .eq('unit_type', 'Executive Condominium')
+        .in('property_subtype', ['ec', 'Resale', 'New Sale', 'Sub Sale'])
     } else {
-      query = query.in('property_subtype', ['landed_strata', 'landed_non_strata'])
+      query = query
+        .in('unit_type', ['Detached House', 'Semi-Detached House', 'Terrace House'])
+        .in('property_subtype', ['landed_strata', 'landed_non_strata', 'Resale', 'New Sale', 'Sub Sale'])
     }
 
     const { data, error } = await query
