@@ -178,6 +178,17 @@ export async function GET(request: NextRequest) {
         ? Number(budgetMinParam)
         : Math.round(budget * 0.7)
 
+    // Optional comma-separated district allow-list, e.g. "D09,D10,D11".
+    const districtsParam = params.get('districts')
+    const districts = districtsParam
+      ? new Set(
+          districtsParam
+            .split(',')
+            .map((d) => d.trim().toUpperCase())
+            .filter(Boolean),
+        )
+      : null
+
     // Optional size band, supplied in sqft, filtered internally in sqm.
     const sizeMinParam = params.get('sizeMin')
     const sizeMaxParam = params.get('sizeMax')
@@ -287,26 +298,12 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    results.sort((a, b) => b.txCount - a.txCount)
+    // Optional district filter: keep only projects in one of the requested
+    // districts (e.g. ?districts=D09,D10,D11). Absent → island-wide.
+    const filtered = districts ? results.filter((r) => districts.has(r.district)) : results
 
-    // Take the 30 highest-volume candidates, then enforce district diversity by
-    // capping each district to 2 entries so results spread across Singapore
-    // rather than clustering in one high-volume district. Finally return the
-    // top 8 by transaction count from that diverse set. The '—' placeholder
-    // (no postal code, e.g. all HDB rows) is exempt — otherwise every HDB
-    // result would collapse into a single bucket and cap at 2.
-    const MAX_PER_DISTRICT = 2
-    const districtSeen: Record<string, number> = {}
-    const diverse: MatchResult[] = []
-    for (const result of results.slice(0, 30)) {
-      if (result.district !== '—') {
-        const seen = districtSeen[result.district] || 0
-        if (seen >= MAX_PER_DISTRICT) continue
-        districtSeen[result.district] = seen + 1
-      }
-      diverse.push(result)
-    }
-    const topResults = diverse.slice(0, 8)
+    filtered.sort((a, b) => b.txCount - a.txCount)
+    const topResults = filtered.slice(0, 8)
 
     return json({ results: topResults, category, budget, budgetMin })
   } catch (error) {
