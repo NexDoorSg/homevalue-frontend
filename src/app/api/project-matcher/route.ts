@@ -25,6 +25,7 @@ type TxRow = {
   price_psf: number | string | null
   transaction_date: string | null
   postal_code: string | null
+  floor_area_sqm: number | string | null
 }
 
 type MatchResult = {
@@ -34,7 +35,11 @@ type MatchResult = {
   txCount: number
   lastTxDate: string | null
   district: string
+  typicalSizeMin: number | null
+  typicalSizeMax: number | null
 }
+
+const SQFT_PER_SQM = 10.7639
 
 // Singapore postal sector (first 2 digits of postal code) -> postal district.
 // Source: standard URA/SingPost postal district map.
@@ -87,12 +92,25 @@ function median(values: number[]): number {
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
+// Linear-interpolated percentile (p in [0, 1]) over an already-sorted array.
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0
+  if (sorted.length === 1) return sorted[0]
+  const idx = (sorted.length - 1) * p
+  const lo = Math.floor(idx)
+  const hi = Math.ceil(idx)
+  if (lo === hi) return sorted[lo]
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo)
+}
+
 // Fetch all matching rows in pages (Supabase caps a single response at ~1000 rows).
 async function fetchTransactions(
   category: PropertyCategory,
   sinceDate: string,
   priceFloor: number,
   priceCeil: number,
+  sizeMinSqm: number | null,
+  sizeMaxSqm: number | null,
 ): Promise<TxRow[]> {
   const PAGE = 1000
   const MAX_ROWS = 10000
@@ -101,13 +119,16 @@ async function fetchTransactions(
   for (let from = 0; from < MAX_ROWS; from += PAGE) {
     let query = supabase
       .from('property_transactions_v2')
-      .select('street_name, project_name, transaction_price, price_psf, transaction_date, postal_code')
+      .select('street_name, project_name, transaction_price, price_psf, transaction_date, postal_code, floor_area_sqm')
       .gte('transaction_date', sinceDate)
       .gte('transaction_price', priceFloor)
       .lte('transaction_price', priceCeil)
       .not('transaction_price', 'is', null)
       .order('transaction_date', { ascending: false })
       .range(from, from + PAGE - 1)
+
+    if (sizeMinSqm !== null) query = query.gte('floor_area_sqm', sizeMinSqm)
+    if (sizeMaxSqm !== null) query = query.lte('floor_area_sqm', sizeMaxSqm)
 
     if (category === 'hdb') {
       query = query.eq('property_group', 'hdb')
@@ -153,6 +174,18 @@ export async function GET(request: NextRequest) {
         ? Number(budgetMinParam)
         : Math.round(budget * 0.7)
 
+    // Optional size band, supplied in sqft, filtered internally in sqm.
+    const sizeMinParam = params.get('sizeMin')
+    const sizeMaxParam = params.get('sizeMax')
+    const sizeMinSqm =
+      sizeMinParam !== null && Number.isFinite(Number(sizeMinParam)) && Number(sizeMinParam) > 0
+        ? Number(sizeMinParam) / SQFT_PER_SQM
+        : null
+    const sizeMaxSqm =
+      sizeMaxParam !== null && Number.isFinite(Number(sizeMaxParam)) && Number(sizeMaxParam) > 0
+        ? Number(sizeMaxParam) / SQFT_PER_SQM
+        : null
+
     // Last 24 months.
     const since = new Date()
     since.setMonth(since.getMonth() - 24)
@@ -163,7 +196,7 @@ export async function GET(request: NextRequest) {
     const priceFloor = Math.max(0, Math.round(budgetMin * 0.6))
     const priceCeil = Math.round(budget * 1.4)
 
-    const rows = await fetchTransactions(category, sinceDate, priceFloor, priceCeil)
+    const rows = await fetchTransactions(category, sinceDate, priceFloor, priceCeil, sizeMinSqm, sizeMaxSqm)
 
     // Grouping field per category: condo/EC by project, HDB by street/estate.
     // Landed transactions carry the estate name in project_name (street_name is
@@ -178,6 +211,7 @@ export async function GET(request: NextRequest) {
       name: string
       prices: number[]
       psfs: number[]
+      areasSqft: number[]
       lastTxDate: string | null
       districtCounts: Record<string, number>
     }
@@ -191,12 +225,14 @@ export async function GET(request: NextRequest) {
 
       let group = groups.get(name)
       if (!group) {
-        group = { name, prices: [], psfs: [], lastTxDate: null, districtCounts: {} }
+        group = { name, prices: [], psfs: [], areasSqft: [], lastTxDate: null, districtCounts: {} }
         groups.set(name, group)
       }
       group.prices.push(price)
       const psf = Number(row.price_psf)
       if (Number.isFinite(psf) && psf > 0) group.psfs.push(psf)
+      const areaSqm = Number(row.floor_area_sqm)
+      if (Number.isFinite(areaSqm) && areaSqm > 0) group.areasSqft.push(areaSqm * SQFT_PER_SQM)
       if (row.transaction_date && (!group.lastTxDate || row.transaction_date > group.lastTxDate)) {
         group.lastTxDate = row.transaction_date
       }
@@ -218,6 +254,15 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Typical size range = 25th–75th percentile floor area (sqft), to nearest 10.
+      let typicalSizeMin: number | null = null
+      let typicalSizeMax: number | null = null
+      if (group.areasSqft.length > 0) {
+        const sortedAreas = [...group.areasSqft].sort((a, b) => a - b)
+        typicalSizeMin = Math.round(percentile(sortedAreas, 0.25) / 10) * 10
+        typicalSizeMax = Math.round(percentile(sortedAreas, 0.75) / 10) * 10
+      }
+
       results.push({
         name: group.name,
         medianPrice: Math.round(medianPrice),
@@ -225,6 +270,8 @@ export async function GET(request: NextRequest) {
         txCount: group.prices.length,
         lastTxDate: group.lastTxDate,
         district,
+        typicalSizeMin,
+        typicalSizeMax,
       })
     }
 
