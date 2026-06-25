@@ -48,38 +48,41 @@ const SQFT_PER_SQM = 10.7639
 // Singapore postal sector (first 2 digits of postal code) -> postal district.
 // Source: standard URA/SingPost postal district map.
 const SECTOR_TO_DISTRICT: Record<string, string> = {}
-const DISTRICT_SECTORS: Record<string, string[]> = {
-  D01: ['01', '02', '03', '04', '05', '06'],
-  D02: ['07', '08'],
-  D03: ['14', '15', '16'],
-  D04: ['09', '10'],
-  D05: ['11', '12', '13'],
-  D06: ['17'],
-  D07: ['18', '19'],
-  D08: ['20', '21'],
-  D09: ['22', '23'],
-  D10: ['24', '25', '26', '27'],
-  D11: ['28', '29', '30'],
-  D12: ['31', '32', '33'],
-  D13: ['34', '35', '36', '37'],
-  D14: ['38', '39', '40', '41'],
-  D15: ['42', '43', '44', '45'],
-  D16: ['46', '47', '48'],
-  D17: ['49', '50', '81'],
-  D18: ['51', '52'],
-  D19: ['53', '54', '55', '82'],
-  D20: ['56', '57'],
-  D21: ['58', '59'],
-  D22: ['60', '61', '62', '63', '64'],
-  D23: ['65', '66', '67', '68'],
-  D24: ['69', '70', '71'],
-  D25: ['72', '73'],
-  D26: ['77', '78'],
-  D27: ['75', '76'],
-  D28: ['79', '80'],
-}
-for (const [district, sectors] of Object.entries(DISTRICT_SECTORS)) {
-  for (const sector of sectors) SECTOR_TO_DISTRICT[sector] = district
+// Each entry maps an inclusive 2-digit sector range to its postal district.
+const DISTRICT_SECTOR_RANGES: Array<[string, number, number]> = [
+  ['D01', 1, 6],
+  ['D02', 7, 8],
+  ['D03', 9, 10],
+  ['D04', 11, 11],
+  ['D05', 12, 13],
+  ['D06', 14, 14],
+  ['D07', 15, 15],
+  ['D08', 16, 16],
+  ['D09', 17, 18],
+  ['D10', 19, 21],
+  ['D11', 22, 23],
+  ['D12', 24, 27],
+  ['D13', 28, 30],
+  ['D14', 31, 32],
+  ['D15', 33, 36],
+  ['D16', 37, 40],
+  ['D17', 41, 42],
+  ['D18', 43, 44],
+  ['D19', 45, 48],
+  ['D20', 49, 52],
+  ['D21', 53, 58],
+  ['D22', 59, 62],
+  ['D23', 63, 66],
+  ['D24', 67, 68],
+  ['D25', 69, 71],
+  ['D26', 72, 73],
+  ['D27', 75, 77],
+  ['D28', 78, 82],
+]
+for (const [district, start, end] of DISTRICT_SECTOR_RANGES) {
+  for (let sector = start; sector <= end; sector++) {
+    SECTOR_TO_DISTRICT[String(sector).padStart(2, '0')] = district
+  }
 }
 
 function districtFromPostal(postal: string | null | undefined): string | null {
