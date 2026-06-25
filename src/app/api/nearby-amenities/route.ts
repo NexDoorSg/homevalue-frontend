@@ -17,20 +17,38 @@ export function OPTIONS() {
 
 type AmenityType = 'mrt' | 'school' | 'hawker'
 
-const THEME_QUERY: Record<AmenityType, string> = {
-  mrt: 'mrt_lrt_station',
-  school: 'primaryschool',
-  hawker: 'hawkercentre',
+// OneMap elastic-search terms per amenity type. The search API is public and
+// needs no Bearer token, so there's no auth/token step here.
+const SEARCH_VAL: Record<AmenityType, string> = {
+  mrt: 'MRT Station',
+  school: 'Primary School',
+  hawker: 'Hawker Centre',
 }
 
 const RADIUS_M = 1000
 const MAX_RESULTS = 10
+// Safety cap on pagination (MRT is ~78 pages; this leaves headroom).
+const MAX_PAGES = 120
+// OneMap rate-limits bursts, so cap concurrent page fetches and retry on 429.
+const PAGE_CONCURRENCY = 4
+const MAX_RETRIES = 4
 
-type ThemeRow = {
-  NAME?: string
-  DESCRIPTION?: string
-  LatLng?: string
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+type SearchRow = {
+  SEARCHVAL?: string
+  BUILDING?: string
+  ADDRESS?: string
+  LATITUDE?: string
+  LONGITUDE?: string
   [key: string]: unknown
+}
+
+type SearchResponse = {
+  found?: number
+  totalNumPages?: number
+  pageNum?: number
+  results?: SearchRow[]
 }
 
 // Haversine distance in metres between two lat/lon points.
@@ -44,37 +62,62 @@ function distanceM(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return 2 * R * Math.asin(Math.sqrt(a))
 }
 
-async function getOneMapToken(): Promise<string> {
-  const email = process.env.ONEMAP_EMAIL
-  const password = process.env.ONEMAP_PASSWORD
-  if (!email || !password) {
-    throw new Error('OneMap credentials are not configured (set ONEMAP_EMAIL and ONEMAP_PASSWORD).')
-  }
+function searchUrl(searchVal: string, pageNum: number): string {
+  const q = encodeURIComponent(searchVal)
+  return `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${q}&returnGeom=Y&getAddrDetails=Y&pageNum=${pageNum}`
+}
 
-  let res: Response
-  try {
-    res = await fetch('https://www.onemap.gov.sg/api/auth/post/getToken', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-  } catch (err) {
-    console.error('OneMap getToken network error:', err)
-    throw new Error(`OneMap getToken request failed: ${err instanceof Error ? err.message : String(err)}`)
-  }
+async function fetchSearchPage(searchVal: string, pageNum: number): Promise<SearchResponse> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let res: Response
+    try {
+      res = await fetch(searchUrl(searchVal, pageNum))
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        await sleep(250 * 2 ** attempt)
+        continue
+      }
+      console.error(`OneMap search network error (page ${pageNum}):`, err)
+      throw new Error(`OneMap search request failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '<unreadable body>')
-    console.error(`OneMap getToken failed: HTTP ${res.status} ${res.statusText} — ${body}`)
-    throw new Error(`OneMap getToken failed (HTTP ${res.status}): ${body}`)
+    // Back off and retry on rate-limit / transient server errors.
+    if ((res.status === 429 || res.status >= 500) && attempt < MAX_RETRIES) {
+      await sleep(250 * 2 ** attempt)
+      continue
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => '<unreadable body>')
+      console.error(`OneMap search failed (page ${pageNum}): HTTP ${res.status} ${res.statusText} — ${body}`)
+      throw new Error(`OneMap search failed (HTTP ${res.status}): ${body}`)
+    }
+    return (await res.json()) as SearchResponse
   }
+  // Unreachable: the loop either returns or throws.
+  throw new Error('OneMap search exhausted retries.')
+}
 
-  const data = (await res.json()) as { access_token?: string }
-  if (!data.access_token) {
-    console.error('OneMap getToken returned no access_token:', JSON.stringify(data))
-    throw new Error(`OneMap getToken returned no access_token: ${JSON.stringify(data)}`)
+// Fetch every page of search results for the term (results are relevance-ranked,
+// not proximity-ranked, so we need them all before filtering by distance).
+// Pages are fetched with bounded concurrency to respect OneMap's rate limits.
+async function fetchAllSearchResults(searchVal: string): Promise<SearchRow[]> {
+  const first = await fetchSearchPage(searchVal, 1)
+  const rows: SearchRow[] = [...(first.results || [])]
+
+  const totalPages = Math.min(first.totalNumPages || 1, MAX_PAGES)
+  if (totalPages <= 1) return rows
+
+  const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+  let cursor = 0
+  async function worker() {
+    while (cursor < pages.length) {
+      const pageNum = pages[cursor++]
+      const page = await fetchSearchPage(searchVal, pageNum)
+      rows.push(...(page.results || []))
+    }
   }
-  return data.access_token
+  await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, pages.length) }, worker))
+  return rows
 }
 
 export async function GET(request: NextRequest) {
@@ -91,36 +134,25 @@ export async function GET(request: NextRequest) {
       return json({ error: 'type must be one of mrt, school, hawker.' }, { status: 400 })
     }
 
-    const token = await getOneMapToken()
+    const rows = await fetchAllSearchResults(SEARCH_VAL[type])
 
-    const themeUrl = `https://www.onemap.gov.sg/api/public/themesvc/retrieveTheme?queryName=${THEME_QUERY[type]}`
-    const themeRes = await fetch(themeUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!themeRes.ok) {
-      const body = await themeRes.text().catch(() => '<unreadable body>')
-      console.error(`OneMap retrieveTheme failed: HTTP ${themeRes.status} ${themeRes.statusText} — ${body}`)
-      throw new Error(`OneMap retrieveTheme failed (HTTP ${themeRes.status}): ${body}`)
+    // Parse coords, keep within radius, and dedupe by name (a station/centre can
+    // appear multiple times for different exits/addresses — keep the nearest).
+    const nearest = new Map<string, { name: string; lat: number; lon: number; distance_m: number }>()
+    for (const row of rows) {
+      const rlat = Number(row.LATITUDE)
+      const rlon = Number(row.LONGITUDE)
+      if (!Number.isFinite(rlat) || !Number.isFinite(rlon)) continue
+      const distance_m = Math.round(distanceM(lat, lon, rlat, rlon))
+      if (distance_m > RADIUS_M) continue
+      const name = row.SEARCHVAL || row.BUILDING || row.ADDRESS || 'Unknown'
+      const existing = nearest.get(name)
+      if (!existing || distance_m < existing.distance_m) {
+        nearest.set(name, { name, lat: rlat, lon: rlon, distance_m })
+      }
     }
-    const themeData = (await themeRes.json()) as { SrchResults?: ThemeRow[] }
 
-    // SrchResults[0] is a summary record; the rest are amenity rows.
-    const rows = Array.isArray(themeData.SrchResults) ? themeData.SrchResults.slice(1) : []
-
-    const results = rows
-      .map((row) => {
-        if (!row.LatLng) return null
-        const [rlat, rlon] = String(row.LatLng).split(',').map(Number)
-        if (!Number.isFinite(rlat) || !Number.isFinite(rlon)) return null
-        return {
-          name: row.NAME || row.DESCRIPTION || 'Unknown',
-          lat: rlat,
-          lon: rlon,
-          distance_m: Math.round(distanceM(lat, lon, rlat, rlon)),
-        }
-      })
-      .filter((r): r is { name: string; lat: number; lon: number; distance_m: number } => r !== null)
-      .filter((r) => r.distance_m <= RADIUS_M)
+    const results = [...nearest.values()]
       .sort((a, b) => a.distance_m - b.distance_m)
       .slice(0, MAX_RESULTS)
 
