@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// CORS so the public endpoint can be called from calculator.nexdoor.sg.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+function json(body: unknown, init?: { status?: number }) {
+  return NextResponse.json(body, { status: init?.status ?? 200, headers: CORS_HEADERS })
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: CORS_HEADERS })
+}
+
 type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
 
 type TxRow = {
@@ -126,10 +141,10 @@ export async function GET(request: NextRequest) {
     const category = (params.get('category') || '').toLowerCase() as PropertyCategory
 
     if (!Number.isFinite(budget) || budget <= 0) {
-      return NextResponse.json({ error: 'A valid budget is required.' }, { status: 400 })
+      return json({ error: 'A valid budget is required.' }, { status: 400 })
     }
     if (!['hdb', 'condo', 'ec', 'landed'].includes(category)) {
-      return NextResponse.json({ error: 'category must be one of hdb, condo, ec, landed.' }, { status: 400 })
+      return json({ error: 'category must be one of hdb, condo, ec, landed.' }, { status: 400 })
     }
 
     const budgetMinParam = params.get('budgetMin')
@@ -216,9 +231,9 @@ export async function GET(request: NextRequest) {
     results.sort((a, b) => b.txCount - a.txCount)
     const topResults = results.slice(0, 8)
 
-    return NextResponse.json({ results: topResults, category, budget, budgetMin })
+    return json({ results: topResults, category, budget, budgetMin })
   } catch (error) {
     console.error('project-matcher error:', error)
-    return NextResponse.json({ error: 'Unable to match projects.' }, { status: 500 })
+    return json({ error: 'Unable to match projects.' }, { status: 500 })
   }
 }
