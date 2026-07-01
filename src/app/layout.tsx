@@ -137,6 +137,7 @@ const jsonLd = {
 
 const homeValueKeyPages = [
   { href: "/", label: "HomeValue tool" },
+  { href: "/projects", label: "Projects" },
   { href: "/free-property-valuation-singapore", label: "Free property valuation Singapore" },
   { href: "/hdb-valuation-singapore", label: "HDB valuation Singapore" },
   { href: "/condo-valuation-singapore", label: "Condo valuation Singapore" },
