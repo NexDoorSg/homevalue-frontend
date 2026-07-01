@@ -15,6 +15,10 @@ export type Project = {
   avg_rental_psf_pm: number | string | null;
   latitude: number | string | null;
   longitude: number | string | null;
+  completion_year: number | null;
+  land_area_sqft: number | null;
+  facilities: string[] | null;
+  num_facilities: number | null;
   last_enriched_at: string | null;
 };
 
@@ -81,6 +85,14 @@ export function formatRentalPsf(value: number | string | null | undefined): stri
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) return null;
   return `$${num.toFixed(2)} psf pm`;
+}
+
+// Land area stored in sqft; show both units, e.g. "34,998 sqft / 3,252 sqm".
+export function formatLandArea(value: number | null | undefined): string | null {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  const sqm = Math.round(num / 10.764);
+  return `${num.toLocaleString("en-SG")} sqft / ${sqm.toLocaleString("en-SG")} sqm`;
 }
 
 // "2026-07-01T03:35:58.786741+00:00" -> "1 Jul 2026"

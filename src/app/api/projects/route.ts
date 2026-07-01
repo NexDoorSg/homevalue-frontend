@@ -18,7 +18,7 @@ export function OPTIONS() {
 
 // Columns exposed for each project row (mirrors projects_master).
 const PROJECT_COLUMNS =
-  'id, project_name, street_name, district, market_segment, region, developer, tenure, property_type, total_units, units_sold_to_date, avg_rental_psf_pm, latitude, longitude, last_enriched_at'
+  'id, project_name, street_name, district, market_segment, region, developer, tenure, property_type, total_units, units_sold_to_date, avg_rental_psf_pm, latitude, longitude, completion_year, land_area_sqft, facilities, num_facilities, last_enriched_at'
 
 const DEFAULT_LIMIT = 24
 const MAX_SEARCH_ROWS = 1000

@@ -5,6 +5,7 @@ import ProjectPriceChart from "./ProjectPriceChart";
 import {
   formatDate,
   formatDistrict,
+  formatLandArea,
   formatRentalPsf,
   formatTenure,
   segmentBadgeClasses,
@@ -78,6 +79,24 @@ export default function ProjectCard({ project, onClose }: ProjectCardProps) {
   const hasProfitability = stats && stats.profitability.total_with_2_transactions > 0;
   const enrichedDate = formatDate(project.last_enriched_at);
 
+  // Detail rows — only rendered when the underlying value is present.
+  const details: { label: string; value: string }[] = [];
+  const addDetail = (label: string, value: string | null | undefined) => {
+    if (value != null && value !== "") details.push({ label, value });
+  };
+  addDetail("Developer", project.developer);
+  addDetail("Completion Year", project.completion_year != null ? String(project.completion_year) : null);
+  addDetail("Total Units", project.total_units != null ? project.total_units.toLocaleString("en-SG") : null);
+  addDetail("Land Area", formatLandArea(project.land_area_sqft));
+  addDetail("Tenure", project.tenure);
+  addDetail("Property Type", project.property_type);
+  addDetail("District", project.district ? formatDistrict(project.district) : null);
+  addDetail("Market Segment", project.market_segment);
+  addDetail("Avg Rental PSF", rental);
+
+  const facilities = project.facilities ?? [];
+  const facilityCount = project.num_facilities ?? facilities.length;
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-[#0f1626]/60 px-4 py-8 backdrop-blur-sm"
@@ -147,6 +166,48 @@ export default function ProjectCard({ project, onClose }: ProjectCardProps) {
             <StatBox label="Profitable" value={hasProfitability ? profitablePct : "—"} />
             <StatBox label="District" value={formatDistrict(project.district)} />
           </div>
+
+          {/* Details */}
+          {(details.length > 0 || facilities.length > 0) && (
+            <section className="mt-8">
+              <h3 className="text-lg font-semibold text-[#1A2942]">Details</h3>
+
+              {details.length > 0 && (
+                <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
+                  {details.map((d) => (
+                    <div
+                      key={d.label}
+                      className="flex items-baseline justify-between gap-4 border-b border-[#f0e8da] py-2"
+                    >
+                      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#a9894f]">
+                        {d.label}
+                      </dt>
+                      <dd className="text-right text-sm font-semibold text-[#1A2942]">{d.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {facilities.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold text-[#1A2942]">Facilities</h4>
+                  <p className="mt-1 text-xs text-[#a9894f]">
+                    {facilityCount} {facilityCount === 1 ? "facility" : "facilities"}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {facilities.map((facility) => (
+                      <span
+                        key={facility}
+                        className="rounded-full border border-[#e7dcc8] bg-[#EDE4D8] px-3 py-1 text-xs font-medium text-[#1A2942]"
+                      >
+                        {facility}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Price history chart */}
           <section className="mt-8">
