@@ -63,6 +63,14 @@ const fmtDate = (d: string | null | undefined) => {
 const fmtSigned = (n: number) => `${n >= 0 ? "+" : "−"}$${Math.abs(Math.round(n)).toLocaleString("en-SG")}`;
 const fmtPct = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(1)}%`;
 
+// Compact price for the tower cells: $2.98M / $850K / $12,345.
+function formatPrice(price: number | null | undefined): string {
+  if (!price) return "—";
+  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(2)}M`;
+  if (price >= 100_000) return `$${(price / 1000).toFixed(0)}K`;
+  return `$${Math.round(price).toLocaleString("en-SG")}`;
+}
+
 function yearsHeldFrom(date: string): number {
   return (Date.now() - new Date(date).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
 }
@@ -196,29 +204,66 @@ export default function TowerView({ slug }: { slug: string }) {
                     const floorUnits = data.floors[String(floor)] || {};
                     return (
                       <div key={floor} className="flex items-center gap-1.5">
-                        <span className="w-9 shrink-0 pr-1 text-right text-[11px] font-medium text-[#a9894f]">
+                        <span className="w-11 shrink-0 pr-1 text-right text-[11px] font-medium text-[#a9894f]">
                           F{String(floor).padStart(2, "0")}
                         </span>
                         {data.stacks.map((stack) => {
                           const unit = floorUnits[String(stack)];
                           if (!unit) {
-                            return <div key={stack} style={{ width: 52, height: 44 }} className="m-[2px] shrink-0" />;
+                            return (
+                              <div
+                                key={stack}
+                                className="m-[2px] h-[68px] w-[72px] shrink-0 sm:h-[82px] sm:w-[90px]"
+                              />
+                            );
                           }
                           const colour = STATUS_COLOURS[unit.status] || STATUS_COLOURS.no_data;
                           const textDark = unit.status === "no_data";
                           const active = selectedUnit?.unit === unit.unit;
+                          const latest = unit.latestTx;
+                          const isLoss = unit.profitPct != null && unit.profitPct < 0;
+                          const baseText = textDark ? "text-[#71695d]" : "text-white";
+                          const mutedText = textDark ? "text-[#71695d]/70" : "text-white/70";
                           return (
                             <button
                               key={stack}
                               type="button"
                               title={`Unit #${unit.unit}`}
                               onClick={() => setSelectedUnit(unit)}
-                              style={{ width: 52, height: 44, backgroundColor: colour }}
-                              className={`m-[2px] flex shrink-0 items-center justify-center rounded-md text-xs font-semibold transition ${
-                                textDark ? "text-[#71695d]" : "text-white"
-                              } ${active ? "ring-2 ring-[#1A2942] ring-offset-1" : "hover:opacity-85"}`}
+                              style={{ backgroundColor: colour }}
+                              className={`m-[2px] flex h-[68px] w-[72px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-center leading-tight transition sm:h-[82px] sm:w-[90px] ${baseText} ${
+                                active ? "ring-2 ring-[#1A2942] ring-offset-1" : "hover:opacity-85"
+                              }`}
                             >
-                              {String(stack).padStart(2, "0")}
+                              {/* Unit number */}
+                              <span className={`text-[9px] sm:text-[10px] ${mutedText}`}>#{unit.unit}</span>
+                              {/* Latest price */}
+                              <span className="text-[9px] font-bold sm:text-[11px]">
+                                {latest ? formatPrice(latest.price) : "—"}
+                              </span>
+                              {/* Latest PSF */}
+                              {latest && latest.psf > 0 && (
+                                <span className="text-[9px] sm:text-[10px]">
+                                  ${Math.round(latest.psf).toLocaleString("en-SG")} psf
+                                </span>
+                              )}
+                              {/* Profit / loss */}
+                              {unit.transactionCount >= 2 && unit.profitPct != null ? (
+                                <span
+                                  className={`text-[9px] sm:text-[10px] ${isLoss ? "text-[#ffd9d2]" : "text-white"}`}
+                                >
+                                  {unit.profitPct >= 0 ? "+" : ""}
+                                  {unit.profitPct.toFixed(1)}%
+                                </span>
+                              ) : (
+                                <span className={`text-[9px] sm:text-[10px] ${mutedText}`}>
+                                  {unit.transactionCount === 1 ? "1 tx" : "No data"}
+                                </span>
+                              )}
+                              {/* SSD indicator */}
+                              {unit.ssdStatus === "in_period" && (
+                                <span className="text-[9px]">SSD {(unit.ssdRate * 100).toFixed(0)}%</span>
+                              )}
                             </button>
                           );
                         })}
