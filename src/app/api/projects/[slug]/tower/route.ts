@@ -165,9 +165,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const canonicalName = (master?.project_name as string) || decoded
     const rows = await fetchUnitTransactions(canonicalName)
 
+    // Deduplicate transactions — URA data can carry duplicate rows (e.g. an
+    // option + exercise pair) with identical address, date and price. Keep one.
+    const seen = new Set<string>()
+    const deduped = rows.filter((tx) => {
+      const key = `${tx.address}|${tx.transaction_date}|${tx.transaction_price}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    console.log(
+      `tower dedup [${canonicalName}]: ${rows.length} rows → ${deduped.length} after dedup (${rows.length - deduped.length} duplicates removed)`,
+    )
+
     // Group by block -> floor -> stack -> transactions.
     const blocks = new Map<string, Map<number, Map<number, Tx[]>>>()
-    for (const row of rows) {
+    for (const row of deduped) {
       const address = (row.address || '').trim()
       if (!address) continue
       const parsed = parseAddress(address)
