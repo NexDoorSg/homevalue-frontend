@@ -44,14 +44,14 @@ type TowerData = {
 
 type StatusStyle = { bg: string; text: string; border: string };
 const STATUS_STYLES: Record<string, StatusStyle> = {
-  profitable_clear: { bg: "#dcfce7", text: "#166534", border: "#86efac" },
-  profitable_ssd: { bg: "#fef9c3", text: "#854d0e", border: "#fde047" },
-  unprofitable: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
-  single_tx: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
-  no_data: { bg: "#f3f4f6", text: "#6b7280", border: "#e5e7eb" },
+  profitable_clear: { bg: "#1A2942", text: "#FFFFFF", border: "#2d4a6b" }, // NexDoor navy
+  profitable_ssd: { bg: "#C9A96E", text: "#FFFFFF", border: "#b8935a" }, // NexDoor gold
+  unprofitable: { bg: "#B84C30", text: "#FFFFFF", border: "#a03d24" }, // NexDoor terracotta
+  single_tx: { bg: "#64748b", text: "#FFFFFF", border: "#4f6070" }, // slate grey
+  no_data: { bg: "#EDE4D8", text: "#1A2942", border: "#d4c9b8" }, // NexDoor cream
 };
-const PROFIT_GREEN = "#166534";
-const LOSS_RED = "#991b1b";
+const PROFIT_TEXT = "#FFFFFF"; // white — visible on navy/gold/terracotta
+const LOSS_TEXT = "#ffe0d9"; // light tint — visible on terracotta
 
 const fmtMoney = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `$${Math.round(n).toLocaleString("en-SG")}`;
@@ -266,7 +266,7 @@ export default function TowerView({ slug }: { slug: string }) {
                               {unit.transactionCount >= 2 && unit.profitPct != null ? (
                                 <span
                                   className="text-[9px] font-semibold sm:text-[10px]"
-                                  style={{ color: unit.profitPct >= 0 ? PROFIT_GREEN : LOSS_RED }}
+                                  style={{ color: unit.profitPct >= 0 ? PROFIT_TEXT : LOSS_TEXT }}
                                 >
                                   {unit.profitPct >= 0 ? "+" : ""}
                                   {unit.profitPct.toFixed(1)}%
