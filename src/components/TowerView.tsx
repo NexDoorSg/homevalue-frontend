@@ -42,13 +42,16 @@ type TowerData = {
   stacks: number[];
 };
 
-const STATUS_COLOURS: Record<string, string> = {
-  profitable_clear: "#22c55e",
-  profitable_ssd: "#eab308",
-  unprofitable: "#ef4444",
-  single_tx: "#3b82f6",
-  no_data: "#e5e7eb",
+type StatusStyle = { bg: string; text: string; border: string };
+const STATUS_STYLES: Record<string, StatusStyle> = {
+  profitable_clear: { bg: "#dcfce7", text: "#166534", border: "#86efac" },
+  profitable_ssd: { bg: "#fef9c3", text: "#854d0e", border: "#fde047" },
+  unprofitable: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
+  single_tx: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
+  no_data: { bg: "#f3f4f6", text: "#6b7280", border: "#e5e7eb" },
 };
+const PROFIT_GREEN = "#166534";
+const LOSS_RED = "#991b1b";
 
 const fmtMoney = (n: number | null | undefined) =>
   n == null || !Number.isFinite(n) ? "—" : `$${Math.round(n).toLocaleString("en-SG")}`;
@@ -187,12 +190,15 @@ export default function TowerView({ slug }: { slug: string }) {
             </section>
 
             {/* Legend */}
-            <section className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[#71695d]">
-              <LegendDot colour={STATUS_COLOURS.profitable_clear} label="Profitable, SSD cleared" />
-              <LegendDot colour={STATUS_COLOURS.profitable_ssd} label="Profitable, in SSD period" />
-              <LegendDot colour={STATUS_COLOURS.unprofitable} label="Unprofitable" />
-              <LegendDot colour={STATUS_COLOURS.single_tx} label="1 transaction" />
-              <LegendDot colour={STATUS_COLOURS.no_data} label="No data" />
+            <section className="mt-6">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[#71695d]">
+                <LegendDot style={STATUS_STYLES.profitable_clear} label="Profitable, SSD cleared" />
+                <LegendDot style={STATUS_STYLES.profitable_ssd} label="Profitable, in SSD period" />
+                <LegendDot style={STATUS_STYLES.unprofitable} label="Unprofitable" />
+                <LegendDot style={STATUS_STYLES.single_tx} label="1 transaction" />
+                <LegendDot style={STATUS_STYLES.no_data} label="No data" />
+              </div>
+              <p className="mt-2 text-[10px] text-[#a9894f]">HV↗ = Get estimated value on HomeValue</p>
             </section>
 
             {/* Tower + detail panel */}
@@ -200,6 +206,18 @@ export default function TowerView({ slug }: { slug: string }) {
               {/* Tower grid */}
               <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-[#e7dcc8] bg-white p-4">
                 <div className="inline-block">
+                  {/* Stack number header (sticky at top) */}
+                  <div className="sticky top-0 z-10 flex items-center gap-1.5 bg-white pb-1">
+                    <span className="w-11 shrink-0" />
+                    {data.stacks.map((stack) => (
+                      <span
+                        key={stack}
+                        className="m-[2px] w-[72px] shrink-0 text-center text-[11px] font-medium text-[#1A2942]/60 sm:w-[90px]"
+                      >
+                        {String(stack).padStart(2, "0")}
+                      </span>
+                    ))}
+                  </div>
                   {floorNumbers.map((floor) => {
                     const floorUnits = data.floors[String(floor)] || {};
                     return (
@@ -217,26 +235,23 @@ export default function TowerView({ slug }: { slug: string }) {
                               />
                             );
                           }
-                          const colour = STATUS_COLOURS[unit.status] || STATUS_COLOURS.no_data;
-                          const textDark = unit.status === "no_data";
+                          const s = STATUS_STYLES[unit.status] || STATUS_STYLES.no_data;
                           const active = selectedUnit?.unit === unit.unit;
                           const latest = unit.latestTx;
-                          const isLoss = unit.profitPct != null && unit.profitPct < 0;
-                          const baseText = textDark ? "text-[#71695d]" : "text-white";
-                          const mutedText = textDark ? "text-[#71695d]/70" : "text-white/70";
+                          const fullAddress = `${data.selectedBlock} ${data.projectName} #${unit.unit}`;
                           return (
                             <button
                               key={stack}
                               type="button"
                               title={`Unit #${unit.unit}`}
                               onClick={() => setSelectedUnit(unit)}
-                              style={{ backgroundColor: colour }}
-                              className={`m-[2px] flex h-[68px] w-[72px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-center leading-tight transition sm:h-[82px] sm:w-[90px] ${baseText} ${
-                                active ? "ring-2 ring-[#1A2942] ring-offset-1" : "hover:opacity-85"
+                              style={{ backgroundColor: s.bg, color: s.text, borderColor: s.border, borderWidth: 1 }}
+                              className={`relative m-[2px] flex h-[68px] w-[72px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-center leading-tight transition sm:h-[82px] sm:w-[90px] ${
+                                active ? "ring-2 ring-[#1A2942] ring-offset-1" : "hover:brightness-95"
                               }`}
                             >
                               {/* Unit number */}
-                              <span className={`text-[9px] sm:text-[10px] ${mutedText}`}>#{unit.unit}</span>
+                              <span className="text-[9px] opacity-70 sm:text-[10px]">#{unit.unit}</span>
                               {/* Latest price */}
                               <span className="text-[9px] font-bold sm:text-[11px]">
                                 {latest ? formatPrice(latest.price) : "—"}
@@ -250,20 +265,32 @@ export default function TowerView({ slug }: { slug: string }) {
                               {/* Profit / loss */}
                               {unit.transactionCount >= 2 && unit.profitPct != null ? (
                                 <span
-                                  className={`text-[9px] sm:text-[10px] ${isLoss ? "text-[#ffd9d2]" : "text-white"}`}
+                                  className="text-[9px] font-semibold sm:text-[10px]"
+                                  style={{ color: unit.profitPct >= 0 ? PROFIT_GREEN : LOSS_RED }}
                                 >
                                   {unit.profitPct >= 0 ? "+" : ""}
                                   {unit.profitPct.toFixed(1)}%
                                 </span>
                               ) : (
-                                <span className={`text-[9px] sm:text-[10px] ${mutedText}`}>
+                                <span className="text-[9px] opacity-75 sm:text-[10px]">
                                   {unit.transactionCount === 1 ? "1 tx" : "No data"}
                                 </span>
                               )}
-                              {/* SSD indicator */}
+                              {/* SSD indicator (inherits cell colour: amber on ssd, red on unprofitable) */}
                               {unit.ssdStatus === "in_period" && (
-                                <span className="text-[9px]">SSD {(unit.ssdRate * 100).toFixed(0)}%</span>
+                                <span className="text-[9px] font-semibold">SSD {(unit.ssdRate * 100).toFixed(0)}%</span>
                               )}
+                              {/* HomeValue link */}
+                              <a
+                                href={`https://homevalue.nexdoor.sg/?address=${encodeURIComponent(fullAddress)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Get estimated value on HomeValue"
+                                style={{ position: "absolute", bottom: "2px", right: "3px", fontSize: "8px", opacity: 0.6, textDecoration: "none", color: "inherit" }}
+                              >
+                                HV↗
+                              </a>
                             </button>
                           );
                         })}
@@ -285,12 +312,12 @@ export default function TowerView({ slug }: { slug: string }) {
   );
 }
 
-function LegendDot({ colour, label }: { colour: string; label: string }) {
+function LegendDot({ style, label }: { style: StatusStyle; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
         className="inline-block h-3 w-3 rounded-full"
-        style={{ backgroundColor: colour, border: colour === "#e5e7eb" ? "1px solid #cbd5e1" : "none" }}
+        style={{ backgroundColor: style.bg, border: `1px solid ${style.border}` }}
       />
       {label}
     </span>
@@ -307,7 +334,12 @@ function UnitPanel({ unit, onClose }: { unit: Unit; onClose: () => void }) {
   return (
     <aside className="w-full shrink-0 rounded-2xl border border-[#e7dcc8] bg-white p-5 lg:w-[380px] lg:max-w-[380px]">
       <div className="flex items-start justify-between">
-        <h2 className="text-lg font-bold text-[#1A2942]">Unit #{unit.unit}</h2>
+        <div>
+          <h2 className="text-lg font-bold text-[#1A2942]">Unit #{unit.unit}</h2>
+          {latest && (
+            <p className="mt-0.5 text-xs text-[#a9894f]">Last transacted: {fmtDate(latest.date)}</p>
+          )}
+        </div>
         <button
           type="button"
           onClick={onClose}
