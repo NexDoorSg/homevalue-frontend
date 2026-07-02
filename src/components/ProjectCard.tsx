@@ -265,9 +265,17 @@ export default function ProjectCard({ project, onClose }: ProjectCardProps) {
           </section>
 
           {/* Footer */}
-          <p className="mt-8 border-t border-[#f0e8da] pt-4 text-xs text-[#a9894f]">
-            Data sourced from URA REALIS.{enrichedDate ? ` Updated ${enrichedDate}.` : ""}
-          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#f0e8da] pt-4">
+            <p className="text-xs text-[#a9894f]">
+              Data sourced from URA REALIS.{enrichedDate ? ` Updated ${enrichedDate}.` : ""}
+            </p>
+            <a
+              href={`/projects/${encodeURIComponent(project.project_name)}/tower`}
+              className="text-sm font-semibold text-[#B84C30] transition hover:underline"
+            >
+              Tower View →
+            </a>
+          </div>
         </div>
       </div>
     </div>
