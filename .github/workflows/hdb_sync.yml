@@ -1,0 +1,39 @@
+name: HDB Sync
+
+# Weekly sync of data.gov.sg HDB resale prices into Supabase
+# (property_transactions_v2). Also runnable on demand.
+on:
+  schedule:
+    # 02:00 UTC every Friday (~10:00 Singapore time). GitHub Actions cron is UTC.
+    - cron: '0 2 * * 5'
+  workflow_dispatch: {}
+
+# Avoid overlapping runs (manual + scheduled) writing at the same time.
+concurrency:
+  group: hdb-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # No pip dependencies — the script uses only the Python standard library.
+
+      - name: Run HDB sync
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::SUPABASE_KEY secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          python -u scripts/hdb_sync/sync_hdb_datagov.py
