@@ -68,7 +68,21 @@ OUT_COLS = [
     "address", "street_name", "project_name", "transaction_date", "transaction_price",
     "floor_area_sqm", "price_psf", "unit_type", "property_group", "property_subtype",
     "floor_level", "tenure", "completion_year", "source", "latitude", "longitude",
+    "postal_code",
 ]
+
+# OneMap returns the literal string "NIL" when it has no postal code for a
+# result. Storing that would look like a real value and parse as a bogus
+# postal sector, so it is normalised to None.
+ONEMAP_NIL = "NIL"
+
+
+def clean_postal(value):
+    """OneMap POSTAL -> a 6-digit string, or None."""
+    postal = (value or "").strip()
+    if not postal or postal.upper() == ONEMAP_NIL:
+        return None
+    return postal if postal.isdigit() else None
 
 
 def get_json(url, headers=None):
@@ -125,6 +139,10 @@ def transform(row):
         "source": "data_gov_hdb",
         "latitude": None,
         "longitude": None,
+        # Filled from the same OneMap lookup that resolves lat/lon, or reused
+        # from an existing table row. data.gov.sg's resale dataset has no
+        # postal field of its own (only block + street_name).
+        "postal_code": None,
     }
 
 
@@ -158,29 +176,53 @@ def fetch_existing_keys(dates):
 
 
 def table_coords_for(addresses):
-    """Batch-lookup lat/lon by exact address (any property_group), first non-null match."""
+    """Batch-lookup lat/lon AND postal_code by exact address (any property_group).
+
+    Returns {address: (lat, lon, postal_code)}, taking the first non-null value
+    of each independently — a row may carry coordinates but no postal, or the
+    reverse.
+
+    Postal is read here so the coord-reuse path can satisfy postal_code without
+    an OneMap call. Note this only pays off once existing rows actually have
+    postal codes: before the backfill every HDB row has postal_code NULL, so
+    these addresses still fall through to OneMap (which now returns postal
+    anyway). After the backfill it resolves from the table for free.
+    """
     base = f"{SUPABASE_URL}/rest/v1/{TABLE}"
-    out = {}
+    coords, postals = {}, {}
     addrs = list(addresses)
     CH = 50
     for i in range(0, len(addrs), CH):
         chunk = addrs[i:i + CH]
         inlist = ",".join('"' + a.replace('"', "") + '"' for a in chunk)
         qs = urllib.parse.urlencode(
-            {"select": "address,latitude,longitude", "address": f"in.({inlist})", "latitude": "not.is.null", "limit": "10000"}
+            {"select": "address,latitude,longitude,postal_code", "address": f"in.({inlist})", "limit": "10000"}
         )
         data, _ = get_json(f"{base}?{qs}", {"apikey": ANON_KEY})
         for r in data:
             a = (r.get("address") or "").strip()
-            if a and a not in out and r.get("latitude") is not None:
-                out[a] = (r["latitude"], r["longitude"])
-    return out
+            if not a:
+                continue
+            if a not in coords and r.get("latitude") is not None:
+                coords[a] = (r["latitude"], r["longitude"])
+            if a not in postals and clean_postal(r.get("postal_code")):
+                postals[a] = clean_postal(r.get("postal_code"))
+    return {
+        a: (coords.get(a, (None, None))[0], coords.get(a, (None, None))[1], postals.get(a))
+        for a in set(coords) | set(postals)
+    }
 
 
 _geo_cache = {}
 
 
 def geocode(address):
+    """-> (lat, lon, postal_code) or None.
+
+    The request already asks for getAddrDetails=Y, so the response carries
+    POSTAL alongside LATITUDE/LONGITUDE — it just used to be discarded.
+    Capturing it costs no extra call.
+    """
     if address in _geo_cache:
         return _geo_cache[address]
     url = f"{ONEMAP}?searchVal={urllib.parse.quote(address)}&returnGeom=Y&getAddrDetails=Y&pageNum=1"
@@ -190,7 +232,11 @@ def geocode(address):
             with urllib.request.urlopen(req, timeout=30) as r:
                 data = json.load(r)
             results = data.get("results", [])
-            _geo_cache[address] = (float(results[0]["LATITUDE"]), float(results[0]["LONGITUDE"])) if results else None
+            _geo_cache[address] = (
+                float(results[0]["LATITUDE"]),
+                float(results[0]["LONGITUDE"]),
+                clean_postal(results[0].get("POSTAL")),
+            ) if results else None
             return _geo_cache[address]
         except urllib.error.HTTPError as e:
             if (e.code == 429 or e.code >= 500) and attempt < GEO_MAX_RETRIES:
@@ -267,8 +313,13 @@ def main():
     uniq_addr = sorted({t["address"] for t in to_write})
     print(f"Unique addresses in insert set: {len(uniq_addr)}")
     tcoords = table_coords_for(uniq_addr)
-    from_table = [a for a in uniq_addr if a in tcoords]
-    need_onemap = [a for a in uniq_addr if a not in tcoords]
+    # An address only skips OneMap if the table can supply BOTH coordinates and
+    # a postal code; a partial hit still needs the lookup.
+    def complete(a):
+        v = tcoords.get(a)
+        return bool(v and v[0] is not None and v[2])
+    from_table = [a for a in uniq_addr if complete(a)]
+    need_onemap = [a for a in uniq_addr if not complete(a)]
     print(f"  Resolved from existing table rows: {len(from_table)}")
     print(f"  Need a fresh OneMap call         : {len(need_onemap)}")
     for i, a in enumerate(need_onemap, 1):
@@ -277,17 +328,23 @@ def main():
         if i % 50 == 0:
             print(f"    OneMap … {i}/{len(need_onemap)}")
 
-    coord_map = dict(tcoords)
+    resolved = {a: tcoords[a] for a in from_table}
     for a in need_onemap:
         g = _geo_cache.get(a)
+        partial = tcoords.get(a) or (None, None, None)
         if g:
-            coord_map[a] = g
+            # Prefer OneMap for anything the table couldn't supply.
+            resolved[a] = (g[0], g[1], g[2] or partial[2])
+        elif partial[0] is not None or partial[2]:
+            resolved[a] = partial
     for t in to_write:
-        c = coord_map.get(t["address"])
-        if c:
-            t["latitude"], t["longitude"] = c
+        v = resolved.get(t["address"])
+        if v:
+            t["latitude"], t["longitude"], t["postal_code"] = v
     with_geo = sum(1 for t in to_write if t["latitude"] is not None)
-    print(f"  Rows to write with lat/lon: {with_geo}/{len(to_write)}\n")
+    with_postal = sum(1 for t in to_write if t["postal_code"])
+    print(f"  Rows to write with lat/lon: {with_geo}/{len(to_write)}")
+    print(f"  Rows to write with postal : {with_postal}/{len(to_write)}\n")
 
     print(f"Upsert conflict target: ({CONFLICT_KEY}) — ON CONFLICT DO NOTHING (never overwrites)\n")
 
