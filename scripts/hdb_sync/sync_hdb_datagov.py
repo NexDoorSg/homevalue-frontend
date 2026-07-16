@@ -22,6 +22,7 @@ Usage:
 
 import os
 import csv
+import re
 import json
 import time
 import argparse
@@ -83,6 +84,19 @@ def clean_postal(value):
     if not postal or postal.upper() == ONEMAP_NIL:
         return None
     return postal if postal.isdigit() else None
+
+
+# data.gov.sg abbreviates the LANE street suffix to "LN"; OneMap does not
+# recognise it and returns no result at all. ~168 of the 9,762 distinct HDB
+# addresses (~4,315 rows) end this way — Teck Whye, Marsiling, Compassvale,
+# St. George's and others. Anchored to the end and preceded by whitespace so it
+# only ever rewrites a whole-word suffix, never a substring inside a name.
+LN_SUFFIX_RE = re.compile(r"\sLN$", re.IGNORECASE)
+
+
+def expand_ln(address):
+    """'12B MARSILING LN' -> '12B MARSILING LANE'. None if not LN-suffixed."""
+    return LN_SUFFIX_RE.sub(" LANE", address) if LN_SUFFIX_RE.search(address or "") else None
 
 
 def get_json(url, headers=None):
@@ -216,37 +230,55 @@ def table_coords_for(addresses):
 _geo_cache = {}
 
 
-def geocode(address):
-    """-> (lat, lon, postal_code) or None.
-
-    The request already asks for getAddrDetails=Y, so the response carries
-    POSTAL alongside LATITUDE/LONGITUDE — it just used to be discarded.
-    Capturing it costs no extra call.
-    """
-    if address in _geo_cache:
-        return _geo_cache[address]
-    url = f"{ONEMAP}?searchVal={urllib.parse.quote(address)}&returnGeom=Y&getAddrDetails=Y&pageNum=1"
+def _geocode_once(query):
+    """One OneMap lookup, with retry/backoff. -> (lat, lon, postal_code) or None."""
+    url = f"{ONEMAP}?searchVal={urllib.parse.quote(query)}&returnGeom=Y&getAddrDetails=Y&pageNum=1"
     for attempt in range(GEO_MAX_RETRIES + 1):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=30) as r:
                 data = json.load(r)
             results = data.get("results", [])
-            _geo_cache[address] = (
+            if not results:
+                return None
+            return (
                 float(results[0]["LATITUDE"]),
                 float(results[0]["LONGITUDE"]),
                 clean_postal(results[0].get("POSTAL")),
-            ) if results else None
-            return _geo_cache[address]
+            )
         except urllib.error.HTTPError as e:
             if (e.code == 429 or e.code >= 500) and attempt < GEO_MAX_RETRIES:
                 time.sleep(0.4 * (2 ** attempt)); continue
-            _geo_cache[address] = None; return None
+            return None
         except Exception:
             if attempt < GEO_MAX_RETRIES:
                 time.sleep(0.4 * (2 ** attempt)); continue
-            _geo_cache[address] = None; return None
-    _geo_cache[address] = None; return None
+            return None
+    return None
+
+
+def geocode(address):
+    """-> (lat, lon, postal_code) or None.
+
+    The request already asks for getAddrDetails=Y, so the response carries
+    POSTAL alongside LATITUDE/LONGITUDE — it just used to be discarded.
+    Capturing it costs no extra call.
+
+    Falls back once to the LANE-expanded form for LN-suffixed addresses, which
+    OneMap otherwise fails outright. If both attempts come back empty the
+    address is left unresolved — never guessed.
+    """
+    if address in _geo_cache:
+        return _geo_cache[address]
+    found = _geocode_once(address)
+    if found is None:
+        alt = expand_ln(address)
+        if alt:
+            found = _geocode_once(alt)
+    # Cached under the original address either way, so a hit via the fallback
+    # is not re-attempted.
+    _geo_cache[address] = found
+    return found
 
 
 def upsert(rows):
