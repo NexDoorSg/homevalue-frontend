@@ -46,6 +46,11 @@ this_month = today.replace(day=1)
 prev_month = (this_month - timedelta(days=1)).replace(day=1)
 MONTHS = [month_str(prev_month), month_str(this_month)]
 PAGE = 1000
+DATAGOV_PACING_S = 0.3
+
+# ---- HTTP (shared by get_json) ----
+HTTP_MAX_RETRIES = 4
+HTTP_BACKOFF_S = 0.4
 
 # ---- OneMap ----
 ONEMAP = "https://www.onemap.gov.sg/api/common/elastic/search"
@@ -100,9 +105,25 @@ def expand_ln(address):
 
 
 def get_json(url, headers=None):
-    req = urllib.request.Request(url, headers=headers or {})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.load(r), dict(r.headers)
+    """GET + parse JSON, retrying on 429/5xx with exponential backoff.
+
+    Same backoff shape as _geocode_once, but this re-raises once the retries are
+    spent instead of returning None: callers unpack the (data, headers) tuple and
+    a soft failure here would silently sync nothing rather than fail the run.
+    """
+    for attempt in range(HTTP_MAX_RETRIES + 1):
+        try:
+            req = urllib.request.Request(url, headers=headers or {})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.load(r), dict(r.headers)
+        except urllib.error.HTTPError as e:
+            if (e.code == 429 or e.code >= 500) and attempt < HTTP_MAX_RETRIES:
+                time.sleep(HTTP_BACKOFF_S * (2 ** attempt)); continue
+            raise
+        except Exception:
+            if attempt < HTTP_MAX_RETRIES:
+                time.sleep(HTTP_BACKOFF_S * (2 ** attempt)); continue
+            raise
 
 
 def fetch_datagov_month(month):
@@ -117,6 +138,10 @@ def fetch_datagov_month(month):
         rows.extend(recs)
         total = result.get("total", 0)
         offset += PAGE
+        # Pace every request, including the last one of a month: the rate limit is
+        # account-wide, so the next month's first page needs the gap just as much
+        # as the next page does.
+        time.sleep(DATAGOV_PACING_S)
         if not recs or offset >= total:
             break
     return rows
