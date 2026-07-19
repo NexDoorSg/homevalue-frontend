@@ -92,16 +92,29 @@ def clean_postal(value):
 
 
 # data.gov.sg abbreviates the LANE street suffix to "LN"; OneMap does not
-# recognise it and returns no result at all. ~168 of the 9,762 distinct HDB
-# addresses (~4,315 rows) end this way — Teck Whye, Marsiling, Compassvale,
-# St. George's and others. Anchored to the end and preceded by whitespace so it
-# only ever rewrites a whole-word suffix, never a substring inside a name.
-LN_SUFFIX_RE = re.compile(r"\sLN$", re.IGNORECASE)
+# recognise it and returns no result at all. Two shapes occur: LN ending the
+# address ("12B MARSILING LN", the common case — Teck Whye, Marsiling, etc.) and
+# LN followed by a lane number ("122 BT MERAH LN 1"). The leading \s stops it
+# matching LN inside a word such as JLN (Jalan) or KELN (Keelung), and the
+# (?=$|\s\d) tail only rewrites a standalone LN token that ends the string or is
+# followed by a number — never e.g. a hypothetical "LN ROAD".
+LN_TOKEN_RE = re.compile(r"\sLN(?=$|\s+\d)", re.IGNORECASE)
+
+# Likewise CTRL -> CENTRAL. OneMap resolves "CTRL" directly for almost all such
+# addresses; the lone exception is a pair of blocks (215/216 CHOA CHU KANG CTRL)
+# that OneMap merges into one POSTAL=NIL entry under the abbreviation but splits
+# into individual, postal-bearing blocks under the spelled-out "CENTRAL".
+CTRL_TOKEN_RE = re.compile(r"\sCTRL(?=$|\s)", re.IGNORECASE)
 
 
 def expand_ln(address):
-    """'12B MARSILING LN' -> '12B MARSILING LANE'. None if not LN-suffixed."""
-    return LN_SUFFIX_RE.sub(" LANE", address) if LN_SUFFIX_RE.search(address or "") else None
+    """'12B MARSILING LN' / '122 BT MERAH LN 1' -> LANE form. None if no LN token."""
+    return LN_TOKEN_RE.sub(" LANE", address) if LN_TOKEN_RE.search(address or "") else None
+
+
+def expand_ctrl(address):
+    """'216 CHOA CHU KANG CTRL' -> '... CENTRAL'. None if no CTRL token."""
+    return CTRL_TOKEN_RE.sub(" CENTRAL", address) if CTRL_TOKEN_RE.search(address or "") else None
 
 
 def get_json(url, headers=None):
@@ -289,17 +302,29 @@ def geocode(address):
     POSTAL alongside LATITUDE/LONGITUDE — it just used to be discarded.
     Capturing it costs no extra call.
 
-    Falls back once to the LANE-expanded form for LN-suffixed addresses, which
-    OneMap otherwise fails outright. If both attempts come back empty the
-    address is left unresolved — never guessed.
+    Falls back to a de-abbreviated form (LN -> LANE, CTRL -> CENTRAL) when the
+    first attempt either finds nothing OR resolves coordinates but no postal:
+    OneMap returns some abbreviated addresses as a merged multi-block entry with
+    POSTAL=NIL, while the spelled-out form resolves the individual, postal-bearing
+    block. If no attempt yields a postal the address is left as-is — never guessed.
     """
     if address in _geo_cache:
         return _geo_cache[address]
     found = _geocode_once(address)
-    if found is None:
-        alt = expand_ln(address)
-        if alt:
-            found = _geocode_once(alt)
+    if found is None or found[2] is None:
+        for alt in (expand_ln(address), expand_ctrl(address)):
+            if not alt:
+                continue
+            cand = _geocode_once(alt)
+            if cand is None:
+                continue
+            # Take the candidate when it fills in coords we lacked, or the postal
+            # we lacked; the expanded form is the same place, so its coords are
+            # no worse. Stop as soon as a postal is in hand.
+            if found is None or (found[2] is None and cand[2] is not None):
+                found = cand
+            if found[2] is not None:
+                break
     # Cached under the original address either way, so a hit via the fallback
     # is not re-attempted.
     _geo_cache[address] = found
