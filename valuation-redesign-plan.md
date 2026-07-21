@@ -111,6 +111,19 @@ interpolate psm against floor in log-log space from same-project comps).
 - **Segment-level fallback:** for thin projects, fall back to a global/segment
   (district × property-age × tenure) floor-premium curve rather than a
   same-project fit.
+- **⚠ Known flaw in the existing size curve — fix before mirroring it for floor.**
+  The current size curve introduces a **momentum-sensitive downward lean**
+  (median **−3.4%**, correlated with recent price momentum at **r = −0.61** in a
+  small n=10 sample). Cause: the curve's **wide area window (0.45–1.90×)** plus
+  its **fallback to all-time same-project rows** when recent similar-size comps
+  are thin — this dilutes fast-rising prices with older/cheaper comps far more
+  than a plain recent-weighted average does. Clearest example: **TREVISTA**
+  (momentum +5%, curve lean **−13.4%**). This was confirmed **NOT** caused by
+  trailing-anchor market lag — that hypothesis was tested and refuted
+  (correlation of momentum with the plain-average path's error was ~0). **Fix
+  direction:** tighten the curve's area window and/or require recency-bounded
+  comps for the side-anchors, so the curve stops under-shooting live momentum.
+  The floor curve (3a) must not inherit this behaviour.
 
 **3b. Momentum thresholds.** Formalize when momentum is computed same-project vs
 nearby-project. Same-project momentum (≥3 sales in both the last-6mo and prior
