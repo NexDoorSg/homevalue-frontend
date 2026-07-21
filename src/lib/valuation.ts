@@ -1328,8 +1328,8 @@ function buildSameProjectCondoEcCandidate(
     radius,
     method:
       latestDaysOld !== null && latestDaysOld > 365
-        ? 'condo_ec_same_project_size_curve_calibrated_market_adjusted'
-        : 'condo_ec_same_project_size_curve_calibrated',
+        ? 'condo_ec_same_project_size_curve_market_adjusted'
+        : 'condo_ec_same_project_size_curve',
   }
 }
 
