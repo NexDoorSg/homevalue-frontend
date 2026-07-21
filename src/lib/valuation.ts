@@ -491,8 +491,10 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
       const sameBlockAvgPsm =
         sameBlockRows.reduce((s, r) => s + r.pricePerSqm, 0) / sameBlockRows.length
       const adjustedPsm = sameBlockAvgPsm * clampedDrift
+      // Stage 1: no flat ×1.01 bias, no floor premium (HDB floor matching is
+      // currently dead — getFloorWeight ≡ 1 for HDB — so the premium had no
+      // evidence behind it; real floor handling comes in Stage 5).
       const estimated = adjustedPsm * floorAreaSqm
-      const biasedEstimate = estimated * 1.01
 
       const psfValues = sameBlockRows.map((r) => r.pricePerSqm).sort((a, b) => a - b)
       const stdDev = Math.sqrt(
@@ -500,12 +502,11 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
       )
       const stdDevPct = stdDev / sameBlockAvgPsm
       const halfSpread = Math.min(stdDevPct, 0.05)
-      
-      const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, 'hdb')
+
       return {
-        estimated: floorAdjusted,
-        low: floorAdjusted * (1 - halfSpread),
-        high: floorAdjusted * (1 + halfSpread),
+        estimated,
+        low: estimated * (1 - halfSpread),
+        high: estimated * (1 + halfSpread),
         comparables: sameBlockRows.length,
         radius,
         method: 'hdb_same_block_drift_adjusted',
@@ -566,7 +567,10 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     }
   }
 
-  const biasedEstimate = blendedEstimate * 1.01
+  // Stage 1: no flat ×1.01 bias, no floor premium (HDB floor matching is
+  // currently dead — getFloorWeight ≡ 1 for HDB). Point estimate is the
+  // (block-anchor-blended) weighted psm × subject area.
+  const estimated2 = blendedEstimate
 
   const psfValues = trimmed.map((row) => row.pricePerSqm)
   const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
@@ -576,11 +580,10 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
   const stdDevPct = stdDev / mean
   const halfSpread = Math.min(stdDevPct, 0.05)
 
-  const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, 'hdb')
   return {
-    estimated: floorAdjusted,
-    low: floorAdjusted * (1 - halfSpread),
-    high: floorAdjusted * (1 + halfSpread),
+    estimated: estimated2,
+    low: estimated2 * (1 - halfSpread),
+    high: estimated2 * (1 + halfSpread),
     comparables: trimmed.length,
     radius,
     method: blendedMethod,
@@ -692,30 +695,48 @@ function cleanRows(
     )
 }
 
+// MAD (median absolute deviation) outlier trim. Robust at small n: works down
+// to n=3, unlike the previous p10/p90 (trimRowsByMetric) and p15/p85
+// (trimCondoEcOutliers) percentile trims, which silently no-op'd below n=5 —
+// exactly the thin pools most exposed to a single bad comp. A row is dropped
+// when its metric lies more than MAD_TRIM_K median-absolute-deviations from the
+// median. If MAD is 0 (majority of values identical) there is nothing to trim.
+// Reverts to the input set if fewer than 3 rows survive (small-sample safety).
+const MAD_TRIM_K = 3
+
+function madTrim(
+  rows: CleanedRow[],
+  metricGetter: (row: CleanedRow) => number
+) {
+  if (rows.length < 3) return rows
+
+  const values = rows
+    .map(metricGetter)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+  if (values.length < 3) return rows
+
+  const med = percentile(values, 0.5)
+  if (med === null) return rows
+
+  const absDevs = values.map((v) => Math.abs(v - med)).sort((a, b) => a - b)
+  const mad = percentile(absDevs, 0.5)
+  if (mad === null || mad === 0) return rows
+
+  const threshold = MAD_TRIM_K * mad
+  const trimmed = rows.filter((row) => {
+    const value = metricGetter(row)
+    return Number.isFinite(value) && value > 0 && Math.abs(value - med) <= threshold
+  })
+
+  return trimmed.length >= 3 ? trimmed : rows
+}
+
 function trimRowsByMetric(
   rows: CleanedRow[],
   metricGetter: (row: CleanedRow) => number
 ) {
-  if (rows.length < 5) return rows
-
-  const metricValues = rows
-    .map(metricGetter)
-    .filter((value) => Number.isFinite(value) && value > 0)
-    .sort((a, b) => a - b)
-
-  if (metricValues.length < 5) return rows
-
-  const p10 = percentile(metricValues, 0.1)
-  const p90 = percentile(metricValues, 0.9)
-
-  if (p10 === null || p90 === null) return rows
-
-  const trimmed = rows.filter((row) => {
-    const value = metricGetter(row)
-    return value >= p10 && value <= p90
-  })
-
-  return trimmed.length >= 3 ? trimmed : rows
+  return madTrim(rows, metricGetter)
 }
 
 function filterByAreaRatio(
@@ -755,25 +776,7 @@ function getCondoEcAreaBands(subjectAreaSqm: number) {
 }
 
 function trimCondoEcOutliers(rows: CleanedRow[]) {
-  if (rows.length < 5) return rows
-
-  const psmValues = rows
-    .map((row) => row.pricePerSqm)
-    .filter((value) => Number.isFinite(value) && value > 0)
-    .sort((a, b) => a - b)
-
-  if (psmValues.length < 5) return rows
-
-  const p15 = percentile(psmValues, 0.15)
-  const p85 = percentile(psmValues, 0.85)
-
-  if (p15 === null || p85 === null) return rows
-
-  const trimmed = rows.filter((row) => {
-    return row.pricePerSqm >= p15 && row.pricePerSqm <= p85
-  })
-
-  return trimmed.length >= 3 ? trimmed : rows
+  return madTrim(rows, (row) => row.pricePerSqm)
 }
 
 function getCondoEcProjectWeight(
@@ -894,56 +897,9 @@ function getCondoEcAnchorSpread(rows: CleanedRow[], daysOld: number | null) {
 }
 
 
-function applyCondoEcSameProjectMarketCalibration(
-  anchorPsm: number,
-  sameProjectRows: CleanedRow[],
-  anchorRows: CleanedRow[],
-  latestDaysOld: number | null
-) {
-  if (!anchorPsm || !Number.isFinite(anchorPsm)) return anchorPsm
-
-  // HomeValue is client-facing. For condo/EC same-project valuations,
-  // keep the estimate realistic but avoid presenting an overly conservative
-  // headline that makes sellers feel we are pricing their unit too low.
-  // This is intentionally small and only applies after a same-project anchor
-  // has already been established.
-  let uplift = 0.025
-
-  if (sameProjectRows.length <= 8 || anchorRows.length <= 3) {
-    uplift = 0.04
-  } else if (sameProjectRows.length <= 15 || anchorRows.length <= 5) {
-    uplift = 0.035
-  }
-
-  // If the project data is older, do not stack too much optimism on top of
-  // the separate market-movement adjustment.
-  if (latestDaysOld !== null && latestDaysOld > 365) {
-    uplift = Math.min(uplift, 0.03)
-  }
-
-  let calibratedPsm = anchorPsm * (1 + uplift)
-
-  const sameProjectPsmValues = sameProjectRows
-    .map((row) => row.pricePerSqm)
-    .filter((value) => Number.isFinite(value) && value > 0)
-    .sort((a, b) => a - b)
-
-  const p75 = percentile(sameProjectPsmValues, 0.75)
-  const p90 = percentile(sameProjectPsmValues, 0.90)
-
-  // Keep the seller-friendly calibration within the project's own PSF reality.
-  // It can lift a conservative size-curve anchor, but it should not recreate
-  // the old issue where nearby higher-PSF condos overpower the subject project.
-  if (p75 && Number.isFinite(p75) && anchorPsm < p75) {
-    calibratedPsm = Math.min(calibratedPsm, p75 * 1.02)
-  }
-
-  if (p90 && Number.isFinite(p90)) {
-    calibratedPsm = Math.min(calibratedPsm, p90)
-  }
-
-  return Math.max(anchorPsm, calibratedPsm)
-}
+// Stage 1 removal: the seller-friendly same-project calibration (+2.5–4% uplift,
+// ceilinged at p90) was a one-directional upward bias with no evidence basis and
+// has been removed. The same-project anchor psm is now used directly.
 
 function pickSameProjectAnchorRows(
   sameProjectRows: CleanedRow[],
@@ -1355,33 +1311,25 @@ function buildSameProjectCondoEcCandidate(
     Math.min(1 + movementCap, rawMovement)
   )
 
-  const calibratedAnchorPsm = applyCondoEcSameProjectMarketCalibration(
-    anchorPsm,
-    sameProjectRows,
-    anchorRows,
-    latestDaysOld
-  )
-  const adjustedPsm = calibratedAnchorPsm * marketMovement
+  // Stage 1: no calibration uplift, no flat ×1.01 bias, no additive floor
+  // premium. The point estimate is the (market-movement-adjusted) same-project
+  // anchor psm × subject area. Floor is already reflected in the anchor via the
+  // floor-closeness term in getWeightedPsmForRows.
+  const adjustedPsm = anchorPsm * marketMovement
   const estimated = adjustedPsm * floorAreaSqm
-  const biasedEstimate = estimated * 1.01
-  const floorAdjusted = applyFloorAdjustment(
-    biasedEstimate,
-    subjectFloorLevel,
-    propertyCategory
-  )
 
   const halfSpread = getCondoEcAnchorSpread(anchorRows, latestDaysOld)
 
   return {
-    estimated: floorAdjusted,
-    low: floorAdjusted * (1 - halfSpread),
-    high: floorAdjusted * (1 + halfSpread),
+    estimated,
+    low: estimated * (1 - halfSpread),
+    high: estimated * (1 + halfSpread),
     comparables: anchorRows.length,
     radius,
     method:
       latestDaysOld !== null && latestDaysOld > 365
-        ? 'condo_ec_same_project_size_curve_calibrated_market_adjusted'
-        : 'condo_ec_same_project_size_curve_calibrated',
+        ? 'condo_ec_same_project_size_curve_market_adjusted'
+        : 'condo_ec_same_project_size_curve',
   }
 }
 
@@ -1479,8 +1427,9 @@ function buildCondoEcCandidate(
   const avgPsm = weightedAverage(values, weights)
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
+  // Stage 1: no flat ×1.01 bias, no additive floor premium. Point estimate is
+  // the weighted-average psm × subject area; band is the p25/p75 psm straddle.
   const estimated = avgPsm * floorAreaSqm
-  const biasedEstimate = estimated * 1.01
 
   const sortedPsm = usable
     .map((row) => row.pricePerSqm)
@@ -1495,17 +1444,16 @@ function buildCondoEcCandidate(
   const low =
     lowPsm && Number.isFinite(lowPsm)
       ? lowPsm * floorAreaSqm
-      : biasedEstimate * (1 - fallbackSpread)
+      : estimated * (1 - fallbackSpread)
   const high =
     highPsm && Number.isFinite(highPsm)
       ? highPsm * floorAreaSqm
-      : biasedEstimate * (1 + fallbackSpread)
+      : estimated * (1 + fallbackSpread)
 
-  const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, propertyCategory)
   return {
-    estimated: floorAdjusted,
-    low: floorAdjusted * (low / biasedEstimate),
-    high: floorAdjusted * (high / biasedEstimate),
+    estimated,
+    low,
+    high,
     comparables: usable.length,
     radius,
     method: 'condo_ec_strict_nearby',
@@ -1582,14 +1530,13 @@ function buildCondoEcFallback(
   const avgPsm = weightedAverage(values, weights)
   if (!avgPsm || !Number.isFinite(avgPsm)) return null
 
+  // Stage 1: no flat ×1.01 bias, no additive floor premium.
   const estimated = avgPsm * floorAreaSqm
-  const biasedEstimate = estimated * 1.01
 
-  const floorAdjusted = applyFloorAdjustment(biasedEstimate, subjectFloorLevel, propertyCategory)
   return {
-    estimated: floorAdjusted,
-    low: floorAdjusted * 0.93,
-    high: floorAdjusted * 1.07,
+    estimated,
+    low: estimated * 0.93,
+    high: estimated * 1.07,
     comparables: usable.length,
     radius: Math.round(usable[usable.length - 1].distanceM),
     method: 'condo_ec_strict_nearby_fallback',
