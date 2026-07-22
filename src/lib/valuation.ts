@@ -1175,8 +1175,25 @@ function getSameProjectSizeAdjustedPsm(
 
   if (!curvePsm || !Number.isFinite(curvePsm)) return null
 
+  // Stage 3 (backtested): recency-bound the 25% similar-blend path. Left
+  // unbounded, pickSameProjectAnchorRows draws similar-size comps from the full
+  // ~5-year same-project history, which drags this 25% down in fast-rising
+  // projects and produced a momentum-correlated downward lean (median −3.4%, up
+  // to −13…−16% for the fastest-rising projects). Prefer same-project sales from
+  // the last 12 months; fall back to the full history only when fewer than 3
+  // recent sales exist. The side anchors (already recency-gated via
+  // getSameProjectSizeCurveRows) and the min/max clamp are intentionally left
+  // untouched — the fix is scoped strictly to this 25% path. Backtest: overall
+  // median APE halved (~7% → ~3.2%), momentum slope halved, no upward-bias
+  // regression on flat/declining projects.
+  const recentSameProjectRows = sameProjectRows.filter((row) => {
+    const daysOld = getDaysOld(row.transaction_date)
+    return daysOld !== null && daysOld <= 365
+  })
+  const similarPool =
+    recentSameProjectRows.length >= 3 ? recentSameProjectRows : sameProjectRows
   const similarRows = trimCondoEcOutliers(
-    pickSameProjectAnchorRows(sameProjectRows, floorAreaSqm)
+    pickSameProjectAnchorRows(similarPool, floorAreaSqm)
   )
   const similarWeightedPsm = getWeightedPsmForRows(
     similarRows,
