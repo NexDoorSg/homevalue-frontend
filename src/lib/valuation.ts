@@ -351,6 +351,27 @@ function getMostRecentDate(rows: CleanedRow[]): Date | null {
   return latest
 }
 
+// Most common completion year among rows (null if none). HDB blocks are built as
+// a unit, so every unit in a block shares one completion year — the mode of the
+// block's own transactions IS the block's completion year.
+function mostCommonCompletionYear(rows: CleanedRow[]): number | null {
+  const counts = new Map<number, number>()
+  for (const row of rows) {
+    const y = row.completion_year
+    if (y === null || y === undefined || !Number.isFinite(y)) continue
+    counts.set(y, (counts.get(y) ?? 0) + 1)
+  }
+  let best: number | null = null
+  let bestCount = 0
+  for (const [year, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count
+      best = year
+    }
+  }
+  return best
+}
+
 async function buildHdbCandidate(
   allRows: CleanedRow[],
   radius: number,
@@ -446,11 +467,20 @@ async function buildHdbCandidate(
     ? (now - mostRecentSameBlock.getTime()) / (1000 * 60 * 60 * 24)
     : Infinity
 
-  const nearbyWithSimilarAge = subjectCompletionYear
+  // Fix 1: when the caller doesn't supply the subject's completion year (the
+  // Office valuation checker never does), derive it from the same-block rows in
+  // hand — completion_year is 100% populated and every unit in an HDB block
+  // shares it. Without this, nearbyWithSimilarAge is forced empty and the
+  // drift-adjusted tier silently falls through to hdb_same_block_stale. Only
+  // fills a null; a caller-provided value is never overridden.
+  const effectiveCompletionYear =
+    subjectCompletionYear ?? mostCommonCompletionYear(sameBlockRows)
+
+  const nearbyWithSimilarAge = effectiveCompletionYear
     ? allRows.filter((row) => {
         if (extractBlockNumber(row.address) === effectiveBlockNo) return false
         if (!row.completion_year) return false
-        return Math.abs(row.completion_year - subjectCompletionYear) <= 5
+        return Math.abs(row.completion_year - effectiveCompletionYear) <= 5
       })
     : []
 
@@ -547,7 +577,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     const recencyWeight = capRecency ? Math.min(rawRecencyWeight, 2.0) : rawRecencyWeight
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
     const blockWeight = effectiveBlockNo && extractBlockNumber(row.address) === effectiveBlockNo ? 3.0 : 1.0
-    const ageWeight = getHdbAgeWeight(row.completion_year, subjectCompletionYear)
+    const ageWeight = getHdbAgeWeight(row.completion_year, effectiveCompletionYear)
     return distanceWeight * sizeWeight * recencyWeight * floorWeight * blockWeight * ageWeight
   })
 
