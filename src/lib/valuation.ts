@@ -1299,6 +1299,23 @@ function repeatUnitKey(address: string | null | undefined): string {
   return decoded.toUpperCase().replace(/\s+/g, ' ').trim()
 }
 
+// Robust same-unit identity for matching a CALLER-supplied subject address against
+// stored transaction addresses. Stored addresses are "BLOCK STREET #FLOOR-STACK";
+// callers legitimately vary the surrounding text — appending "Singapore <postal>"
+// (the Office valuation checker does this) or spelling the street differently. Block
+// number + unit token uniquely identify a unit WITHIN an already same-project pool,
+// so we key on just those two and ignore street/postal. Exact full-string matching
+// here silently fails on any such variation — which left Stage 2 dormant for every
+// real caller. Returns '' when the address carries no unit token (not keyable).
+function robustUnitKey(address: string | null | undefined): string {
+  const norm = repeatUnitKey(address)
+  const unitMatch = norm.match(REPEAT_UNIT_TOKEN_RE)
+  if (!unitMatch) return ''
+  const unit = unitMatch[0].replace(/\s+/g, '')
+  const blockMatch = norm.match(/^(\d+[A-Z]?)\b/)
+  return `${blockMatch ? blockMatch[1] : ''}|${unit}`
+}
+
 // Project appreciation CAGR from same-unit consecutive resales within the pool:
 // median annualized return over pairs held >= 6 months. Falls back to the
 // citywide median when the project has < REPEAT_CAGR_MIN_PAIRS pairs. Clamped.
@@ -1306,8 +1323,8 @@ function projectCagrFromRows(sameProjectRows: CleanedRow[]): number {
   const byUnit = new Map<string, CleanedRow[]>()
   for (const row of sameProjectRows) {
     if (!row.transaction_date) continue
-    const key = repeatUnitKey(row.address)
-    if (!REPEAT_UNIT_TOKEN_RE.test(key)) continue
+    const key = robustUnitKey(row.address)
+    if (!key) continue
     const arr = byUnit.get(key)
     if (arr) arr.push(row)
     else byUnit.set(key, [row])
@@ -1341,12 +1358,12 @@ function findSubjectPriorSale(
   sameProjectRows: CleanedRow[],
   subjectAddress: string | null | undefined
 ): CleanedRow | null {
-  const key = repeatUnitKey(subjectAddress)
-  if (!key || !REPEAT_UNIT_TOKEN_RE.test(key)) return null
+  const key = robustUnitKey(subjectAddress)
+  if (!key) return null
   let best: CleanedRow | null = null
   for (const row of sameProjectRows) {
     if (!row.transaction_date) continue
-    if (repeatUnitKey(row.address) !== key) continue
+    if (robustUnitKey(row.address) !== key) continue
     if (!best || row.transaction_date > best.transaction_date!) best = row
   }
   return best
@@ -1438,8 +1455,8 @@ function buildSameProjectCondoEcCandidate(
       // back to the full-pool estimate if exclusion leaves nothing usable. (The
       // non-blend path above is untouched, so well-comped valuations are
       // byte-identical to Stage 1.)
-      const subjKey = repeatUnitKey(subjectAddress)
-      const looRows = sameProjectRows.filter((row) => repeatUnitKey(row.address) !== subjKey)
+      const subjKey = robustUnitKey(subjectAddress)
+      const looRows = sameProjectRows.filter((row) => robustUnitKey(row.address) !== subjKey)
       const looAnchor =
         looRows.length > 0
           ? getSameProjectSizeAdjustedPsm(looRows, floorAreaSqm, propertyCategory, subjectFloorLevel)
