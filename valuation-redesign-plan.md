@@ -69,32 +69,75 @@ sitting consistently above them.
 
 ---
 
-## Stage 2 — Repeat-sale anchor (condo/EC)
+## Stage 2 — Repeat-sale anchor (condo/EC), as a conditional fallback
 
-Use the **exact subject unit's own prior sale** as a first-class anchor before
-falling back to same-project comparables. The engine currently has *zero*
-exact-unit logic (`subjectAddress` is only used to extract an HDB block number).
+Blend the **exact subject unit's own prior sale** (trended forward by the
+project's appreciation CAGR) into the estimate — but, per the backtest below,
+**only when the same-project comparable pool is thin.** The engine currently has
+*zero* exact-unit logic (`subjectAddress` is only used to extract an HDB block
+number).
 
-**Feasibility (measured):** 40.7% of all strata units have a prior sale on
-record; **52% of units sold in the last 2 years** (the ones actually being
-valued) do. So a same-unit anchor is available for roughly half of live
-valuations.
+**The headline result: repeat-sale is NOT a broad win — it only helps where
+comparables are weak.** Two out-of-sample backtests (leave-one-out, no
+look-ahead, three approaches: comparable-only / repeat-only-trended / blended)
+settled this:
 
-**Mechanism:**
-- When the subject unit has a prior sale, trend it forward by the **project's
-  appreciation rate** to the valuation date, rather than using the raw prior
-  price.
-- **Confidence scales with staleness.** The prior→current gap distribution is
-  long: median **7.3 years**, only **5.3% under 2 years**, ~69% ≥5 years, ~30%
-  >10 years. And the *most-recent* per-unit sale is itself a median 5.7 years
-  old (only ~18% within 2 years). So the anchor almost always needs
-  trend-forwarding, and **the error concentrates in the appreciation multiplier,
-  not the prior price** — a 7-year forward at 3–5%/yr is a ~23–40% adjustment,
-  a >10-year one can exceed +50%.
-- **Prefer fresh comparables past a gap threshold.** For very stale prior sales
-  (e.g. >10 years), a repeat-sale anchor is weaker than recent same-project
-  comps; add a rule that down-weights or bypasses it beyond a threshold.
-- The band must widen with trend-forward distance.
+| Segment | comparable-only median APE | Does the repeat-sale blend help? |
+| --- | --- | --- |
+| **Well-comped** (majority of valuation volume; 15,940 subjects across 120 active projects) | ~3.3% | **No — ~0 net gain.** Comparable-only already wins at every staleness; repeat-only is worse (5–12% APE) because trending a stale price by CAGR compounds error. |
+| **Thin-comp** (illiquid long tail; 2,191 subjects across 510 quiet/boutique projects) | **6.26%** | **Yes — consistent improvement.** Blending lowers median APE to **6.08%**, and helps in *every* staleness bucket from 2 to 10+ years. |
+
+### Design: apply the blend ONLY when comparables are thin
+- **Gate:** engage the repeat-sale blend only when the same-project similar-size
+  comparable pool is **≤5 comps**. In the well-comped majority, use the Stage 1
+  comparable estimate unchanged (blending adds nothing and risks diluting a
+  good number).
+- **Blend:** `estimate = w(gap)·(prior_price · (1+CAGR)^gap) + (1−w(gap))·comparable`.
+- **CAGR:** project-level median of same-unit pair annualized returns, computed
+  only from pairs that completed *before* the valuation date (no look-ahead).
+  Density is fine: **88.3% of projects have ≥5 pairs, 77.6% ≥10, 60.7% ≥20**
+  (187,859 pairs across 2,343 projects). The ~12% with <5 pairs fall back to the
+  **citywide median appreciation, 3.28%/yr** (district-level is a possible
+  refinement). Clamp CAGR to a sane band (e.g. [−5%, +15%]).
+- Confidence band widens with the trend-forward distance.
+
+### Two weight functions, both empirically derived (only one is used)
+Both were fit to the optimal per-staleness-bin blend weight found by grid search
+in each segment:
+
+- **Well-comped (NOT implemented — kept for the record):**
+  `w(gap) = 0.75 / (1 + e^((gap − 1.5)/0.5))` — sharp logistic decay, effectively
+  **0 by ~3 years**. Only a very fresh prior sale would earn weight here, and
+  such units are rare (~0.2% of repeat-sales), so overall gain is ~0. **Not
+  used.**
+- **Thin-comp (IMPLEMENTED):**
+  `w(gap) = 0.40 · e^(−gap/3.5)` — lower peak but **slow decay, persisting to
+  ~8–10 years** (w: 1yr=0.30, 2yr=0.23, 3yr=0.17, 5yr=0.10, 8yr=0.04). When
+  comparables are weak, even a moderately-stale prior sale is worth a small,
+  steady vote.
+
+The shapes differ because the *relative* value of the prior sale depends on how
+good the comparable alternative is: strong comparable ⇒ trust the prior only if
+very fresh; weak comparable ⇒ give it a modest, longer-lived weight.
+
+### Backtest evidence (thin-comp segment, median APE by staleness)
+
+| Gap bucket | n | comparable | repeat-only | blended |
+| --- | --- | --- | --- | --- |
+| 2–5yr | 432 | 6.96% | 10.26% | **6.42%** |
+| 5–10yr | 624 | 6.03% | 12.38% | **5.82%** |
+| >10yr | 1,130 | 6.24% | 16.72% | **6.11%** |
+| **overall** | 2,191 | **6.26%** | — | **6.08%** |
+
+### ⚠ Honest scope note
+This is a **modest, targeted improvement (~0.2–0.5pp)** in the **hardest
+segment** — illiquid / boutique projects where the post-Stage-1 engine is
+weakest (~6.3% APE) and a wrong number is most consequential for agents and
+clients. It is **not a broad accuracy transformation.** Most valuation *volume*
+runs through active, well-comped projects, which already perform well (~3.3%
+APE) after Stage 1 and are **unaffected** by this stage. Whether the added
+complexity (exact-unit detection + CAGR + conditional blend) is worth ~0.2–0.5pp
+on the long tail is a product call, not a slam-dunk.
 
 ---
 
