@@ -62,6 +62,11 @@ type CandidateResult = {
   comparables: number
   radius: number
   method?: string
+  // Stage 2: set when the repeat-sale blend runs on a thin pool AND excluding the
+  // subject unit swung the comparable by more than REPEAT_SWING_THRESHOLD — a
+  // signal that the estimate leans heavily on one prior transaction. The UI can
+  // surface a "limited comparable data" caveat.
+  thinDataWarning?: boolean
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -1259,6 +1264,94 @@ function getCondoEcMarketMovement(anchorRows: CleanedRow[], supportRows: Cleaned
   return Number.isFinite(movement) && movement > 0 ? movement : 1
 }
 
+// ---- Stage 2: repeat-sale conditional fallback (condo/EC) ----
+// Blend the subject unit's own prior sale (trended forward by the project's
+// appreciation CAGR) into the same-project estimate, but ONLY when the
+// same-project similar-size comparable pool is thin. Backtests showed this helps
+// only in the thin-comp (illiquid) segment; the well-comped majority is
+// unaffected. See valuation-redesign-plan.md, Stage 2.
+const CITYWIDE_CAGR = 0.0328 // citywide median same-unit annualized appreciation (187,859 pairs)
+const REPEAT_THIN_POOL_MAX = 5 // gate: only blend when similar-size same-project comps <= this
+const REPEAT_SIZE_BAND = 0.15 // +-15% area band for the thin-pool gate (mirrors the backtest)
+const REPEAT_WINDOW_DAYS = 730 // recency window for the thin-pool gate
+const REPEAT_CAGR_MIN_PAIRS = 5
+const REPEAT_UNIT_TOKEN_RE = /#\s*\d{1,3}\s*-\s*\d{1,4}/
+// Large-swing safety net: when excluding the subject unit moves the same-project
+// comparable by more than REPEAT_SWING_THRESHOLD, the thin pool was leaning
+// heavily on the subject's own prior sale — genuine uncertainty. Widen the band
+// by (looShift capped at REPEAT_SWING_SPREAD_CAP) and flag thinDataWarning so the
+// UI can caveat that the estimate relies heavily on one prior transaction.
+const REPEAT_SWING_THRESHOLD = 0.075
+const REPEAT_SWING_SPREAD_CAP = 0.12
+
+// Decode the few HTML entities that appear in stored addresses, then upper/space
+// normalize, so a caller-supplied subject address matches stored rows for the
+// SAME physical unit (block + #floor-stack).
+function repeatUnitKey(address: string | null | undefined): string {
+  const decoded = (address || '')
+    .replace(/&#0*39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&#(\d+);/g, (whole, n) => {
+      const code = Number(n)
+      return Number.isFinite(code) ? String.fromCharCode(code) : whole
+    })
+  return decoded.toUpperCase().replace(/\s+/g, ' ').trim()
+}
+
+// Project appreciation CAGR from same-unit consecutive resales within the pool:
+// median annualized return over pairs held >= 6 months. Falls back to the
+// citywide median when the project has < REPEAT_CAGR_MIN_PAIRS pairs. Clamped.
+function projectCagrFromRows(sameProjectRows: CleanedRow[]): number {
+  const byUnit = new Map<string, CleanedRow[]>()
+  for (const row of sameProjectRows) {
+    if (!row.transaction_date) continue
+    const key = repeatUnitKey(row.address)
+    if (!REPEAT_UNIT_TOKEN_RE.test(key)) continue
+    const arr = byUnit.get(key)
+    if (arr) arr.push(row)
+    else byUnit.set(key, [row])
+  }
+  const returns: number[] = []
+  for (const arr of Array.from(byUnit.values())) {
+    if (arr.length < 2) continue
+    arr.sort((a, b) => (a.transaction_date! < b.transaction_date! ? -1 : 1))
+    for (let i = 1; i < arr.length; i++) {
+      const buy = arr[i - 1]
+      const sell = arr[i]
+      const yrs =
+        (Date.parse(sell.transaction_date!) - Date.parse(buy.transaction_date!)) /
+        (365.25 * 24 * 60 * 60 * 1000)
+      if (yrs >= 0.5 && buy.transaction_price > 0) {
+        returns.push(Math.pow(sell.transaction_price / buy.transaction_price, 1 / yrs) - 1)
+      }
+    }
+  }
+  if (returns.length < REPEAT_CAGR_MIN_PAIRS) return CITYWIDE_CAGR
+  returns.sort((a, b) => a - b)
+  const mid = Math.floor(returns.length / 2)
+  const cagr = returns.length % 2 ? returns[mid] : (returns[mid - 1] + returns[mid]) / 2
+  return Math.max(-0.05, Math.min(0.15, cagr))
+}
+
+// The subject unit's most recent recorded sale (same project + same unit token),
+// used as the repeat-sale anchor. null if the subject address carries no unit
+// token or the unit has no sale in the pool.
+function findSubjectPriorSale(
+  sameProjectRows: CleanedRow[],
+  subjectAddress: string | null | undefined
+): CleanedRow | null {
+  const key = repeatUnitKey(subjectAddress)
+  if (!key || !REPEAT_UNIT_TOKEN_RE.test(key)) return null
+  let best: CleanedRow | null = null
+  for (const row of sameProjectRows) {
+    if (!row.transaction_date) continue
+    if (repeatUnitKey(row.address) !== key) continue
+    if (!best || row.transaction_date > best.transaction_date!) best = row
+  }
+  return best
+}
+
 function buildSameProjectCondoEcCandidate(
   rows: CleanedRow[],
   radius: number,
@@ -1267,7 +1360,8 @@ function buildSameProjectCondoEcCandidate(
   subjectFloorLevel?: number,
   subjectProjectName?: string | null,
   subjectCompletionYear?: number | null,
-  subjectTenureBucket?: string
+  subjectTenureBucket?: string,
+  subjectAddress?: string | null
 ): CandidateResult | null {
   const normalizedSubjectProject = normalizeText(subjectProjectName)
   if (!normalizedSubjectProject) return null
@@ -1320,6 +1414,67 @@ function buildSameProjectCondoEcCandidate(
 
   const halfSpread = getCondoEcAnchorSpread(anchorRows, latestDaysOld)
 
+  // --- Stage 2: repeat-sale conditional fallback ---
+  // Gate on a THIN similar-size same-project pool (<= REPEAT_THIN_POOL_MAX recent
+  // rows). Above that, this block is skipped and behaviour is identical to Stage
+  // 1. When gated in and the subject unit has a prior sale, blend its
+  // CAGR-trended price with the comparable estimate using a slow-decay weight fit
+  // to the thin-comp backtest, and widen the band for trend-forward uncertainty.
+  const strictPool = sameProjectRows.filter((row) => {
+    const ratio = row.floor_area_sqm / floorAreaSqm
+    if (ratio < 1 - REPEAT_SIZE_BAND || ratio > 1 + REPEAT_SIZE_BAND) return false
+    const daysOld = getDaysOld(row.transaction_date)
+    return daysOld !== null && daysOld <= REPEAT_WINDOW_DAYS
+  })
+
+  if (strictPool.length <= REPEAT_THIN_POOL_MAX) {
+    const priorSale = findSubjectPriorSale(sameProjectRows, subjectAddress)
+    const priorDaysOld = priorSale ? getDaysOld(priorSale.transaction_date) : null
+    if (priorSale && priorDaysOld !== null && priorSale.transaction_price > 0) {
+      // Leave-one-out comparable: recompute the same-project anchor EXCLUDING the
+      // subject unit's own sales, so its history counts only once — through the
+      // repeat anchor, not also as a comparable. This matches the backtest's
+      // leave-one-out method and avoids double-counting in the thin pool. Falls
+      // back to the full-pool estimate if exclusion leaves nothing usable. (The
+      // non-blend path above is untouched, so well-comped valuations are
+      // byte-identical to Stage 1.)
+      const subjKey = repeatUnitKey(subjectAddress)
+      const looRows = sameProjectRows.filter((row) => repeatUnitKey(row.address) !== subjKey)
+      const looAnchor =
+        looRows.length > 0
+          ? getSameProjectSizeAdjustedPsm(looRows, floorAreaSqm, propertyCategory, subjectFloorLevel)
+          : null
+      const comparableEstimate =
+        looAnchor && looAnchor.psm && Number.isFinite(looAnchor.psm)
+          ? looAnchor.psm * marketMovement * floorAreaSqm
+          : estimated
+
+      const gapYrs = priorDaysOld / 365.25
+      const cagr = projectCagrFromRows(sameProjectRows)
+      const trended = priorSale.transaction_price * Math.pow(1 + cagr, gapYrs)
+      const w = 0.4 * Math.exp(-gapYrs / 3.5) // thin-comp weight fn, w(1y)=0.30 … w(8y)=0.04
+      const blended = w * trended + (1 - w) * comparableEstimate
+
+      // Large-swing detection: how far the leave-one-out comparable moved from the
+      // self-included comparable (`estimated`). A big move means the thin pool was
+      // dominated by the subject's own prior sale, so the estimate leans heavily on
+      // one transaction — widen the band and flag it.
+      const looShift = estimated > 0 ? Math.abs(comparableEstimate / estimated - 1) : 0
+      const largeSwing = looShift > REPEAT_SWING_THRESHOLD
+      const swingSpread = largeSwing ? Math.min(REPEAT_SWING_SPREAD_CAP, looShift) : 0
+      const blendSpread = halfSpread + w * Math.min(0.1, gapYrs * 0.02) + swingSpread
+      return {
+        estimated: blended,
+        low: blended * (1 - blendSpread),
+        high: blended * (1 + blendSpread),
+        comparables: anchorRows.length,
+        radius,
+        method: 'condo_ec_same_project_repeat_blend',
+        ...(largeSwing ? { thinDataWarning: true } : {}),
+      }
+    }
+  }
+
   return {
     estimated,
     low: estimated * (1 - halfSpread),
@@ -1367,7 +1522,8 @@ function buildCondoEcCandidate(
   subjectFloorLevel?: number,
   subjectProjectName?: string | null,
   subjectCompletionYear?: number | null,
-  subjectTenureBucket?: string
+  subjectTenureBucket?: string,
+  subjectAddress?: string | null
 ): CandidateResult | null {
   if (rows.length === 0) return null
 
@@ -1379,7 +1535,8 @@ function buildCondoEcCandidate(
     subjectFloorLevel,
     subjectProjectName,
     subjectCompletionYear,
-    subjectTenureBucket
+    subjectTenureBucket,
+    subjectAddress
   )
 
   if (sameProjectCandidate) return sameProjectCandidate
@@ -1467,7 +1624,8 @@ function buildCondoEcFallback(
   subjectFloorLevel?: number,
   subjectProjectName?: string | null,
   subjectCompletionYear?: number | null,
-  subjectTenureBucket?: string
+  subjectTenureBucket?: string,
+  subjectAddress?: string | null
 ): CandidateResult | null {
   if (rows.length === 0) return null
 
@@ -1479,7 +1637,8 @@ function buildCondoEcFallback(
     subjectFloorLevel,
     subjectProjectName,
     subjectCompletionYear,
-    subjectTenureBucket
+    subjectTenureBucket,
+    subjectAddress
   )
 
   if (sameProjectCandidate) return sameProjectCandidate
@@ -2277,7 +2436,8 @@ export async function getValuation({
       floorLevel,
       subjectProjectName,
       subjectCompletionYear,
-      subjectTenureBucket
+      subjectTenureBucket,
+      subjectAddress
     )
 
     if (!candidate) continue
@@ -2368,7 +2528,8 @@ export async function getValuation({
     floorLevel,
     subjectProjectName,
     subjectCompletionYear,
-    subjectTenureBucket
+    subjectTenureBucket,
+    subjectAddress
   )
   if (fallbackResult && cacheKey) await writeCache(cacheKey, fallbackResult)
   return fallbackResult
