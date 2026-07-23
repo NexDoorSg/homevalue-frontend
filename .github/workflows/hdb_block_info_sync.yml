@@ -1,0 +1,41 @@
+name: HDB Block Info Sync
+
+# Monthly sync of the data.gov.sg "HDB Property Information" dataset into
+# Supabase (hdb_block_info). This dataset changes rarely — year_completed is
+# fixed once a block completes, and only new BTOs / occasional unit-count
+# corrections appear — so monthly is ample. Also runnable on demand.
+on:
+  schedule:
+    # 03:00 UTC on the 1st of each month (~11:00 Singapore time). Cron is UTC.
+    - cron: '0 3 1 * *'
+  workflow_dispatch: {}
+
+# Avoid overlapping runs (manual + scheduled) writing at the same time.
+concurrency:
+  group: hdb-block-info-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # No pip dependencies — the script uses only the Python standard library.
+
+      - name: Run HDB block-info sync
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::SUPABASE_KEY secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          python -u scripts/hdb_sync/sync_hdb_block_info.py --write

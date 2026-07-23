@@ -383,6 +383,69 @@ function extractBlockNumber(address: string | null | undefined): string {
   return match ? match[1] : ''
 }
 
+// HDB street-key normaliser. Kept equivalent to normalizeStreetName() in
+// comparableRanking.ts and normalize_street() in
+// scripts/hdb_sync/sync_hdb_block_info.py, so a subject street resolves to the
+// exact key stored in hdb_block_info. The data.gov.sg HDB streets already use
+// these abbreviations (KG ARANG RD, BEDOK STH AVE 1), so most rules are no-ops
+// here; they exist to normalise the SUBJECT side, which may arrive fuller
+// ("MACPHERSON LANE" -> "MACPHERSON LN").
+const HDB_STREET_ABBREV: [RegExp, string][] = [
+  [/\bBUKIT\b/g, 'BT'], [/\bMOUNT\b/g, 'MT'], [/\bSAINT\b/g, 'ST'],
+  [/\bAVENUE\b/g, 'AVE'], [/\bSTREET\b/g, 'ST'], [/\bROAD\b/g, 'RD'],
+  [/\bDRIVE\b/g, 'DR'], [/\bCRESCENT\b/g, 'CRES'], [/\bPLACE\b/g, 'PL'],
+  [/\bCLOSE\b/g, 'CL'], [/\bLANE\b/g, 'LN'], [/\bTERRACE\b/g, 'TER'],
+  [/\bBOULEVARD\b/g, 'BLVD'], [/\bCENTRAL\b/g, 'CTRL'], [/\bHEIGHTS\b/g, 'HTS'],
+  [/\bGARDENS\b/g, 'GDNS'], [/\bNORTH\b/g, 'NTH'], [/\bSOUTH\b/g, 'STH'],
+  [/\bEAST\b/g, 'EST'], [/\bWEST\b/g, 'WEST'],
+]
+
+function normalizeHdbStreetKey(street: string | null | undefined): string {
+  let s = (street || '').toUpperCase().replace(/\s+/g, ' ').trim()
+  for (const [rx, rep] of HDB_STREET_ABBREV) s = s.replace(rx, rep)
+  return s.replace(/\s+/g, ' ').trim()
+}
+
+// Subject street from the explicit street name, else parsed off the address
+// (leading block token removed). Normalised to the hdb_block_info key form.
+function subjectHdbStreetKey(
+  streetName: string | null | undefined,
+  address: string | null | undefined
+): string {
+  const direct = normalizeHdbStreetKey(streetName)
+  if (direct) return direct
+  const fromAddress = normalizeText(address).replace(/^(\d+[A-Z]?)\s+/, '').trim()
+  return normalizeHdbStreetKey(fromAddress)
+}
+
+// Zero-history fallback: an HDB block with NO resale transactions has no
+// same-block completion year to derive (buildHdbCandidate's Fix 1 yields null),
+// so the valuation drops to the broadest hdb_nearby_all tier. The HDB Property
+// Information reference table (hdb_block_info, synced monthly from data.gov.sg)
+// supplies the block's authoritative year_completed, letting the valuation use
+// the age-matched hdb_nearby_same_age tier instead. Returns null on any
+// miss/error (incl. the table not existing yet) — the caller then behaves
+// exactly as before.
+async function lookupHdbBlockCompletionYear(
+  blockNo: string,
+  streetKey: string
+): Promise<number | null> {
+  if (!blockNo || !streetKey) return null
+  try {
+    const { data, error } = await supabase
+      .from('hdb_block_info')
+      .select('year_completed')
+      .eq('blk_no', blockNo.toUpperCase().trim())
+      .eq('street', streetKey)
+      .maybeSingle()
+    if (error || !data) return null
+    const yr = Number((data as { year_completed: number | null }).year_completed)
+    return Number.isFinite(yr) && yr > 0 ? yr : null
+  } catch {
+    return null
+  }
+}
+
 function getMostRecentDate(rows: CleanedRow[]): Date | null {
   let latest: Date | null = null
   for (const row of rows) {
@@ -2667,6 +2730,7 @@ export async function getValuation({
   subjectCompletionYear,
   subjectIsStrata,
   subjectAddress,
+  subjectStreetName,
   subjectBlockNo,
   subjectCompletionYearHdb,
   cacheKey,
@@ -2681,7 +2745,21 @@ export async function getValuation({
 
   if (propertyCategory === 'hdb') {
     const blockNo = subjectBlockNo || extractBlockNumber(subjectAddress)
-    const completionYear = subjectCompletionYearHdb ?? subjectCompletionYear ?? null
+    let completionYear = subjectCompletionYearHdb ?? subjectCompletionYear ?? null
+
+    // Zero-history blocks: no caller-supplied year, and (for a block with no
+    // resale history) no same-block rows for Fix 1 to derive one from. Look up
+    // the authoritative year_completed from hdb_block_info so the valuation can
+    // reach the age-matched nearby tier instead of hdb_nearby_all. One indexed
+    // PK lookup, reused across every radius below; only runs when the year is
+    // otherwise unknown, and a hit changes nothing for blocks that already have
+    // a derivable year (the table year equals the block's true completion year).
+    if (completionYear == null) {
+      completionYear = await lookupHdbBlockCompletionYear(
+        blockNo,
+        subjectHdbStreetKey(subjectStreetName, subjectAddress)
+      )
+    }
 
     let bestCandidate: CandidateResult | null = null
 
