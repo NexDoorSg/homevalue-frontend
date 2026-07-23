@@ -79,6 +79,16 @@ type CandidateResult = {
   // (that removed a bias, it does not compute a momentum). Exposed for reuse by
   // the upcoming Suggested Listing Price; see valuation-redesign-plan.md Stage 3b.
   marketMovementPct?: number
+  // Stage 3c: Suggested Listing Price — a seller-facing STRATEGIC figure, kept
+  // strictly separate from Market Value (estimated/low/high), never blended in.
+  // suggestedListingPrice = estimated × (1 + listingMarkupPct/100); the markup is
+  // a floored/capped fraction of a dedicated momentum reading (momentumPct, with
+  // momentumBasis exposing whether it came from same-project sales, a nearby
+  // fallback, or none). Present only on condo/EC same-project results.
+  suggestedListingPrice?: number
+  listingMarkupPct?: number
+  momentumPct?: number | null
+  momentumBasis?: MomentumBasis
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -1398,6 +1408,57 @@ function getCondoEcMarketMovement(
   return Number.isFinite(movement) && movement > 0 ? movement : null
 }
 
+// ─── Stage 3c: Suggested Listing Price momentum signal ───────────────────────
+// A DEDICATED, always-attempted momentum reading (distinct from the stale-anchor
+// getCondoEcMarketMovement above — see valuation-redesign-plan.md Stage 3b/3c).
+// Density-validated design: median psf trend, last-6mo vs prior-6-12mo, requiring
+// >= 3 sales in BOTH windows. Same-project first; when thin, fall back to nearby
+// (getCondoEcNearbySupportRows: other-project, similar age/tenure) with the same
+// window rule; else no signal. Live density: same-project ~70% of requests by
+// volume, nearby ~23%, none ~7%.
+const SLP_MARKUP_SCALE = 0.75
+const SLP_MARKUP_CAP_PCT = 8
+
+type MomentumBasis = 'same_project' | 'nearby' | 'none'
+
+// median psf(last 180d) / median psf(180–365d) − 1, as a percent. Null unless both
+// windows have >= 3 sales. (psm vs psf is irrelevant — it is a ratio.)
+function medianPsmWindowMomentumPct(rows: CleanedRow[]): number | null {
+  const last6: number[] = []
+  const prior: number[] = []
+  for (const row of rows) {
+    const daysOld = getDaysOld(row.transaction_date)
+    if (daysOld === null) continue
+    if (daysOld <= 180) last6.push(row.pricePerSqm)
+    else if (daysOld <= 365) prior.push(row.pricePerSqm)
+  }
+  if (last6.length < 3 || prior.length < 3) return null
+  const recent = getMedian(last6)
+  const older = getMedian(prior)
+  if (!recent || !older || older <= 0) return null
+  return (recent / older - 1) * 100
+}
+
+function getCondoEcMomentum(
+  sameProjectRows: CleanedRow[],
+  supportRows: CleanedRow[]
+): { momentumPct: number | null; basis: MomentumBasis } {
+  const sameProject = medianPsmWindowMomentumPct(sameProjectRows)
+  if (sameProject !== null) return { momentumPct: sameProject, basis: 'same_project' }
+  const nearby = medianPsmWindowMomentumPct(supportRows)
+  if (nearby !== null) return { momentumPct: nearby, basis: 'nearby' }
+  return { momentumPct: null, basis: 'none' }
+}
+
+// Strategic listing markup from a momentum reading: a fraction of recent upward
+// momentum, floored at 0 (never below Market Value) and capped (above which a
+// markup is not credible regardless of momentum). CAP justified against the real
+// momentum distribution (p95 ≈ +8%); binds only for the hot/noisy tail.
+function getSlpMarkupPct(momentumPct: number | null): number {
+  if (momentumPct === null || !Number.isFinite(momentumPct)) return 0
+  return Math.max(0, Math.min(SLP_MARKUP_CAP_PCT, momentumPct * SLP_MARKUP_SCALE))
+}
+
 // ---- Stage 2: repeat-sale conditional fallback (condo/EC) ----
 // Blend the subject unit's own prior sale (trended forward by the project's
 // appreciation CAGR) into the same-project estimate, but ONLY when the
@@ -1735,6 +1796,19 @@ function buildSameProjectCondoEcCandidate(
 
   const halfSpread = getCondoEcAnchorSpread(anchorRows, latestDaysOld)
 
+  // Stage 3c: Suggested Listing Price. A pure ADD-ON, computed from the same-
+  // project / nearby momentum reading and layered on top of the Market Value
+  // (`estimated`/`blended`) — it never alters Market Value, its band, or any
+  // existing field. suggestedListingPrice = marketValue × (1 + markup/100).
+  const momentum = getCondoEcMomentum(sameProjectRows, supportRows)
+  const listingMarkupPct = getSlpMarkupPct(momentum.momentumPct)
+  const slpFields = (marketValue: number) => ({
+    suggestedListingPrice: marketValue * (1 + listingMarkupPct / 100),
+    listingMarkupPct,
+    momentumPct: momentum.momentumPct,
+    momentumBasis: momentum.basis,
+  })
+
   // --- Stage 2: repeat-sale conditional fallback ---
   // Gate on a THIN similar-size same-project pool (<= REPEAT_THIN_POOL_MAX recent
   // rows). Above that, this block is skipped and behaviour is identical to Stage
@@ -1793,6 +1867,7 @@ function buildSameProjectCondoEcCandidate(
         method: 'condo_ec_same_project_repeat_blend',
         ...(largeSwing ? { thinDataWarning: true } : {}),
         ...(marketMovementPct !== undefined ? { marketMovementPct } : {}),
+        ...slpFields(blended),
       }
     }
   }
@@ -1808,6 +1883,7 @@ function buildSameProjectCondoEcCandidate(
         ? 'condo_ec_same_project_size_curve_market_adjusted'
         : 'condo_ec_same_project_size_curve',
     ...(marketMovementPct !== undefined ? { marketMovementPct } : {}),
+    ...slpFields(estimated),
   }
 }
 
