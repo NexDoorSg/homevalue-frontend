@@ -1,13 +1,17 @@
-// Vendored from NexDoor-Calculator (src/App.jsx MRT_STATIONS) — the same station
-// set powering the Wealth Planner / Calculator map. Static snapshot: 171 stations,
-// 145 currently open. Used by the condo/EC cross-project fallback to weight
-// comparables by walking-distance-to-MRT similarity (Stage 4).
+// Heavy-rail MRT stations vendored from NexDoor-Calculator (src/App.jsx
+// MRT_STATIONS) — the same set powering the Wealth Planner / Calculator map:
+// 171 stations, 145 currently open. Plus 38 LRT stops (Bukit Panjang, Sengkang
+// east/west, Punggol east/west loops), all open, sourced from OpenStreetMap
+// (railway station/stop nodes, refs BP*/SW*/SE*/PW*/PE*; interchanges CCK, Bukit
+// Panjang, Sengkang, Punggol already appear in the MRT set and are excluded).
+// Total: 209 stations, 183 open. Used by the condo/EC cross-project fallback to
+// weight comparables by walking-distance-to-nearest-open-station similarity
+// (Stage 4). LRT stops carry `line: 'lrt'` so they stay distinguishable, but the
+// nearest-station distance term counts them the same as MRT — an LRT-served
+// project's real transit access is the LRT stop, not the MRT 1–2 km away.
 //
-// Refresh when new MRT lines open (currently CRL/JRL are 'future'). NOTE: this set
-// contains NO LRT stations (Bukit Panjang / Sengkang / Punggol LRT) — LRT-served
-// projects fall back to their nearest MRT, which overstates transit distance. See
-// the LRT-points follow-up task.
-export type MrtStation = { lat: number; lon: number; status: 'open' | 'future' }
+// Refresh when new MRT lines open (currently CRL/JRL are 'future').
+export type MrtStation = { lat: number; lon: number; status: 'open' | 'future'; line?: 'lrt' }
 
 export const MRT_STATIONS: MrtStation[] = [
   { lat: 1.3329, lon: 103.7424, status: 'open' }, // Jurong East
@@ -155,6 +159,45 @@ export const MRT_STATIONS: MrtStation[] = [
   { lat: 1.3832, lon: 103.893, status: 'open' }, // Buangkok
   { lat: 1.3916, lon: 103.8954, status: 'open' }, // Sengkang
   { lat: 1.4053, lon: 103.9022, status: 'open' }, // Punggol
+  // ─── LRT stops (OpenStreetMap, all open) — Bukit Panjang / Sengkang / Punggol ───
+  { lat: 1.38027, lon: 103.74528, status: 'open', line: 'lrt' }, // South View (BPLRT BP2)
+  { lat: 1.3786, lon: 103.74902, status: 'open', line: 'lrt' }, // Keat Hong (BPLRT BP3)
+  { lat: 1.37667, lon: 103.75365, status: 'open', line: 'lrt' }, // Teck Whye (BPLRT BP4)
+  { lat: 1.37862, lon: 103.75801, status: 'open', line: 'lrt' }, // Phoenix (BPLRT BP5)
+  { lat: 1.37777, lon: 103.76663, status: 'open', line: 'lrt' }, // Petir (BPLRT BP7)
+  { lat: 1.37618, lon: 103.77126, status: 'open', line: 'lrt' }, // Pending (BPLRT BP8)
+  { lat: 1.38004, lon: 103.77265, status: 'open', line: 'lrt' }, // Bangkit (BPLRT BP9)
+  { lat: 1.38459, lon: 103.77088, status: 'open', line: 'lrt' }, // Fajar (BPLRT BP10)
+  { lat: 1.38779, lon: 103.76958, status: 'open', line: 'lrt' }, // Segar (BPLRT BP11)
+  { lat: 1.38669, lon: 103.76451, status: 'open', line: 'lrt' }, // Jelapang (BPLRT BP12)
+  { lat: 1.38268, lon: 103.76238, status: 'open', line: 'lrt' }, // Senja (BPLRT BP13)
+  { lat: 1.39629, lon: 103.89379, status: 'open', line: 'lrt' }, // Cheng Lim (SKLRT SW1)
+  { lat: 1.39719, lon: 103.88922, status: 'open', line: 'lrt' }, // Farmway (SKLRT SW2)
+  { lat: 1.3982, lon: 103.88125, status: 'open', line: 'lrt' }, // Kupang (SKLRT SW3)
+  { lat: 1.39733, lon: 103.87563, status: 'open', line: 'lrt' }, // Thanggam (SKLRT SW4)
+  { lat: 1.3919, lon: 103.87628, status: 'open', line: 'lrt' }, // Fernvale (SKLRT SW5)
+  { lat: 1.39208, lon: 103.88003, status: 'open', line: 'lrt' }, // Layar (SKLRT SW6)
+  { lat: 1.38941, lon: 103.88583, status: 'open', line: 'lrt' }, // Tongkang (SKLRT SW7)
+  { lat: 1.38673, lon: 103.89053, status: 'open', line: 'lrt' }, // Renjong (SKLRT SW8)
+  { lat: 1.39452, lon: 103.90043, status: 'open', line: 'lrt' }, // Compassvale (SKLRT SE1)
+  { lat: 1.39147, lon: 103.90597, status: 'open', line: 'lrt' }, // Rumbia (SKLRT SE2)
+  { lat: 1.38801, lon: 103.90542, status: 'open', line: 'lrt' }, // Bakau (SKLRT SE3)
+  { lat: 1.38393, lon: 103.90221, status: 'open', line: 'lrt' }, // Kangkar (SKLRT SE4)
+  { lat: 1.38405, lon: 103.89736, status: 'open', line: 'lrt' }, // Ranggung (SKLRT SE5)
+  { lat: 1.40972, lon: 103.90489, status: 'open', line: 'lrt' }, // Sam Kee (PGLRT PW1)
+  { lat: 1.41276, lon: 103.90657, status: 'open', line: 'lrt' }, // Teck Lee (PGLRT PW2)
+  { lat: 1.41685, lon: 103.90666, status: 'open', line: 'lrt' }, // Punggol Point (PGLRT PW3)
+  { lat: 1.41592, lon: 103.90218, status: 'open', line: 'lrt' }, // Samudera (PGLRT PW4)
+  { lat: 1.41189, lon: 103.90037, status: 'open', line: 'lrt' }, // Nibong (PGLRT PW5)
+  { lat: 1.40848, lon: 103.89858, status: 'open', line: 'lrt' }, // Sumang (PGLRT PW6)
+  { lat: 1.40532, lon: 103.89726, status: 'open', line: 'lrt' }, // Soo Teck (PGLRT PW7)
+  { lat: 1.39946, lon: 103.90577, status: 'open', line: 'lrt' }, // Cove (PGLRT PE1)
+  { lat: 1.39694, lon: 103.90888, status: 'open', line: 'lrt' }, // Meridian (PGLRT PE2)
+  { lat: 1.39386, lon: 103.91266, status: 'open', line: 'lrt' }, // Coral Edge (PGLRT PE3)
+  { lat: 1.39453, lon: 103.91615, status: 'open', line: 'lrt' }, // Riviera (PGLRT PE4)
+  { lat: 1.39955, lon: 103.91651, status: 'open', line: 'lrt' }, // Kadaloor (PGLRT PE5)
+  { lat: 1.40227, lon: 103.91274, status: 'open', line: 'lrt' }, // Oasis (PGLRT PE6)
+  { lat: 1.40524, lon: 103.90862, status: 'open', line: 'lrt' }, // Damai (PGLRT PE7)
   { lat: 1.36, lon: 103.985, status: 'future' }, // Aviation Park
   { lat: 1.37, lon: 103.97, status: 'future' }, // Loyang
   { lat: 1.375, lon: 103.96, status: 'future' }, // Pasir Ris East
