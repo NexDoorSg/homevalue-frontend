@@ -154,26 +154,58 @@ interpolate psm against floor in log-log space from same-project comps).
 - **Segment-level fallback:** for thin projects, fall back to a global/segment
   (district × property-age × tenure) floor-premium curve rather than a
   same-project fit.
-- **⚠ Known flaw in the existing size curve — fix before mirroring it for floor.**
-  The current size curve introduces a **momentum-sensitive downward lean**
-  (median **−3.4%**, correlated with recent price momentum at **r = −0.61** in a
-  small n=10 sample). Cause: the curve's **wide area window (0.45–1.90×)** plus
-  its **fallback to all-time same-project rows** when recent similar-size comps
-  are thin — this dilutes fast-rising prices with older/cheaper comps far more
-  than a plain recent-weighted average does. Clearest example: **TREVISTA**
-  (momentum +5%, curve lean **−13.4%**). This was confirmed **NOT** caused by
-  trailing-anchor market lag — that hypothesis was tested and refuted
-  (correlation of momentum with the plain-average path's error was ~0). **Fix
-  direction:** tighten the curve's area window and/or require recency-bounded
-  comps for the side-anchors, so the curve stops under-shooting live momentum.
-  The floor curve (3a) must not inherit this behaviour.
+- **✅ RESOLVED — size-curve momentum lean (Stage 3, PR #47).** The lean's cause
+  was NOT the wide area window or the side anchors (decomposition testing
+  falsified that): it was the **25% `similarWeightedPsm` blend** drawing
+  similar-size comps from the full ~5y history with no recency bound. Fix:
+  recency-bound that path to 12 months (fall back to full history only when < 3
+  recent). Backtested median APE 3.20% → 2.93%, floor-error/momentum slope
+  halved. The floor curve (3a, shipped in PR #48) was built clean on top of the
+  fixed base. **Important:** this fix removed a momentum-correlated *bias* — the
+  size curve does **not** compute or expose a momentum value.
 
-**3b. Momentum thresholds.** Formalize when momentum is computed same-project vs
-nearby-project. Same-project momentum (≥3 sales in both the last-6mo and prior
-6–12mo windows) is feasible for only **~18% of projects by count** (58% have at
-least one window empty) but ~66% by volume — so the nearby-project fallback the
-engine already uses for drift must remain the default for the long tail. Define
-explicit minimum-sample thresholds for each tier.
+**3b. Momentum thresholds — AS BUILT (documented, PR pending) + the gap.**
+
+*What the engine actually does today.* The only momentum/drift signal in the
+condo/EC engine is `getCondoEcMarketMovement`, used solely by the same-project
+path (`buildSameProjectCondoEcCandidate`) and only to correct a **stale**
+same-project anchor:
+
+- **Trigger:** applied only when the same-project anchor's latest sale is **> 365
+  days old**. For a fresh anchor the engine assumes it ≈ current and applies no
+  movement (ratio = 1).
+- **Signal:** median psm of **nearby** support rows in the **last 12 months** ÷
+  median psm of nearby support rows within **±6 months of the anchor's latest
+  sale date**. Data source is **nearby (other-project)** similar-age/tenure comps
+  (`getCondoEcNearbySupportRows`), **not** the subject's own project.
+- **Thresholds (all required, else "not measured"):** `supportRows ≥ 6`,
+  `recent (12mo) ≥ 3`, `anchor-period (±6mo) ≥ 3`.
+- **Clamp:** ±3% (≤1y, moot), ±6% (1–2y), ±8% (2–3y), ±12% (>3y), widening with
+  anchor staleness.
+- The strict-nearby and broad fallback builders apply **no** movement at all.
+  HDB's former nearby-drift multiplier was **removed** in HDB Fix 2 (redundant
+  once same-block recency weighting was added), so HDB has no momentum signal
+  today either.
+
+*Gap vs the density investigation.* The density work framed momentum as
+**same-project**, `≥3 sales in the last 6mo AND ≥3 in the prior 6–12mo`
+(feasible for ~18% of projects by count, ~66% by volume). The as-built signal
+differs on **both** axes: it uses **nearby** rows (not same-project) and its
+windows are **last-12mo vs the anchor's ±6mo** (not 6mo vs 6–12mo). **A proper
+same-project momentum along the density design has not been built.**
+
+*Reusable value (small refactor, this PR).* `getCondoEcMarketMovement` now
+returns `null` when unmeasurable (vs the old silent `1`), and the same-project
+candidate exposes a clean **`marketMovementPct`** on its result — the raw
+(unclamped) measured nearby-drift as a percent, `undefined` when not measured.
+No valuation numbers change (the estimate still uses the clamped ratio, `1` when
+absent). **Caveat for Suggested Listing Price:** this handle is (a) nearby-drift,
+not same-project momentum, and (b) only populated for **stale-anchor** valuations
+— it is `undefined` for the common fresh-anchor case, so it is *not* a
+general-purpose momentum reading. **Decision for 3c:** either accept this
+nearby-drift signal, or build the density-design same-project momentum (last-6mo
+vs prior-6-12mo, ≥3/≥3) as a dedicated, always-computed signal for SLP. That
+choice belongs to the SLP stage, not this documentation pass.
 
 **3c. Suggested Listing Price.** Build the strategic markup as a **separate
 output** layered on top of the neutral Estimated Market Value:
