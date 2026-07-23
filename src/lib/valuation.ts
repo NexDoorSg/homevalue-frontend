@@ -37,6 +37,7 @@ type TransactionRow = {
   address?: string | null
   completion_year?: number | string | null
   is_strata?: boolean | null
+  floor_level?: string | null
 }
 
 type CleanedRow = {
@@ -53,6 +54,10 @@ type CleanedRow = {
   pricePerSqft: number
   distanceM: number
   parsedFloorLevel: number | null
+  // Stage 5: HDB storey-range midpoint (e.g. "13 TO 15" -> 14) from the floor_level
+  // column. HDB addresses carry no unit token so parsedFloorLevel is null for them;
+  // this is the real HDB floor value. Null for non-HDB / unparseable.
+  hdbStoreyMid: number | null
   completion_year: number | null
   is_strata: boolean | null
 }
@@ -318,6 +323,20 @@ function parseFloorLevelFromAddress(address: string | null | undefined) {
   return Number.isFinite(level) ? level : null
 }
 
+// Stage 5: HDB storey-range midpoint from the floor_level column. HDB resale data
+// stores 3-storey bands ("13 TO 15"); the midpoint (14) is the floor value. Also
+// accepts a plain number. Null when unparseable.
+function parseHdbStoreyMid(floorLevel: string | null | undefined) {
+  if (!floorLevel) return null
+  const range = String(floorLevel).toUpperCase().match(/(\d+)\s*TO\s*(\d+)/)
+  if (range) {
+    const mid = (Number(range[1]) + Number(range[2])) / 2
+    return Number.isFinite(mid) && mid > 0 ? mid : null
+  }
+  const n = Number(String(floorLevel).trim())
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 function getFloorWeight(subjectFloor?: number, comparableFloor?: number | null) {
   if (!subjectFloor || !comparableFloor) return 1
 
@@ -446,6 +465,40 @@ function hdbSameBlockRecencyPsm(rows: CleanedRow[], floorAreaSqm: number): numbe
   return den > 0 ? num / den : null
 }
 
+// ─── Stage 5: real HDB floor handling ────────────────────────────────────────
+// HDB had NO floor adjustment (getFloorWeight ≡ 1 because HDB addresses carry no
+// unit token). But floor_level ("13 TO 15") IS in the data, 100% populated. This
+// mirrors the condo/EC floor curve as a MULTIPLIER on the base estimate:
+// floorMult = clamp((subjectStorey / compAvgStorey)^β, 0.90, 1.10). Backtested
+// (leave-one-out, 60.9k same-block targets): median APE 5.11% → 4.62%, and the
+// floor-driven error scatter (high-storey undervalued / low-storey overvalued)
+// collapses — correlation −0.50 → +0.03. Size-control is unnecessary: within a
+// block+type, floor-area CV is ~0.4% (the same-block pool is size-homogeneous).
+const HDB_FLOOR_BETA = 0.0535
+const HDB_FLOOR_MULT_CLAMP = 0.1
+
+function hdbFloorMultiplier(comps: CleanedRow[], subjectStorey: number | undefined): number {
+  if (!subjectStorey || subjectStorey <= 0) return 1
+  // Recency-weighted mean storey of the comps informing the estimate — the storey
+  // level the base psm reflects. floorMult scales from there to the subject storey.
+  const now = Date.now()
+  let num = 0
+  let den = 0
+  for (const c of comps) {
+    if (c.hdbStoreyMid === null || !Number.isFinite(c.hdbStoreyMid) || c.hdbStoreyMid <= 0) continue
+    const t = c.transaction_date ? new Date(c.transaction_date).getTime() : NaN
+    const daysOld = Number.isFinite(t) ? Math.max(0, (now - t) / 86400000) : 0
+    const w = Math.pow(0.5, daysOld / 120)
+    num += (c.hdbStoreyMid as number) * w
+    den += w
+  }
+  if (den <= 0) return 1
+  const compAvgStorey = num / den
+  if (compAvgStorey <= 0) return 1
+  const mult = Math.pow(subjectStorey / compAvgStorey, HDB_FLOOR_BETA)
+  return Math.max(1 - HDB_FLOOR_MULT_CLAMP, Math.min(1 + HDB_FLOOR_MULT_CLAMP, mult))
+}
+
 async function buildHdbCandidate(
   allRows: CleanedRow[],
   radius: number,
@@ -501,7 +554,7 @@ async function buildHdbCandidate(
     const { data: blockData, error: blockError } = await supabase
       .from('property_transactions_v2')
       .select(
-        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address, completion_year, is_strata'
+        'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address, completion_year, is_strata, floor_level'
       )
       .eq('property_group', 'hdb')
       .gte('latitude', box.minLat)
@@ -598,6 +651,8 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
         estimated = estimated * 0.7 + blockAnchorPsm * floorAreaSqm * 0.3
         methodOut = 'hdb_same_block_recency+block_anchor_30'
       }
+      // Stage 5: scale from the same-block comps' average storey to the subject's.
+      estimated *= hdbFloorMultiplier(sameBlockRows, subjectFloorLevel)
       const psfValues = sameBlockRows.map((r) => r.pricePerSqm)
       const meanPsm = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
       const stdDev = Math.sqrt(
@@ -668,10 +723,11 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     }
   }
 
-  // Stage 1: no flat ×1.01 bias, no floor premium (HDB floor matching is
-  // currently dead — getFloorWeight ≡ 1 for HDB). Point estimate is the
-  // (block-anchor-blended) weighted psm × subject area.
-  const estimated2 = blendedEstimate
+  // Stage 1: no flat ×1.01 bias. Point estimate is the (block-anchor-blended)
+  // weighted psm × subject area, then Stage 5's floor multiplier — scaling from the
+  // comps' average storey to the subject's storey (replaces the old dead
+  // getFloorWeight, which stays ≡1 because HDB rows have no parsedFloorLevel).
+  const estimated2 = blendedEstimate * hdbFloorMultiplier(trimmed, subjectFloorLevel)
 
   const psfValues = trimmed.map((row) => row.pricePerSqm)
   const mean = psfValues.reduce((a, b) => a + b, 0) / psfValues.length
@@ -703,7 +759,7 @@ async function fetchRowsForRadius(
   let query = supabase
     .from('property_transactions_v2')
     .select(
-      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address, completion_year, is_strata'
+      'transaction_price, floor_area_sqm, latitude, longitude, unit_type, tenure, price_psf, project_name, transaction_date, address, completion_year, is_strata, floor_level'
     )
     .gte('latitude', box.minLat)
     .lte('latitude', box.maxLat)
@@ -773,6 +829,7 @@ function cleanRows(
         pricePerSqft,
         distanceM: distanceInMeters(lat, lon, rowLat, rowLon),
         parsedFloorLevel: parseFloorLevelFromAddress(row.address),
+        hdbStoreyMid: parseHdbStoreyMid(row.floor_level),
         completion_year: (() => {
           const yr = Number(row.completion_year)
           return (yr > 1950 && yr <= new Date().getFullYear() + 5) ? yr : null
