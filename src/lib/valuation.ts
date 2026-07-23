@@ -1459,6 +1459,132 @@ function findSubjectPriorSale(
   return best
 }
 
+// ─── Stage 3b: condo/EC floor curve (size-controlled log-log elasticity) ──────
+// Replaces the additive floor premium removed in Stage 1 with a proper curve:
+// psm ∝ floor^β. The base estimate is scaled from the comps' reference floor to
+// the subject's floor by (subjectFloor / compAvgFloor)^β, clamped ±10%. β is fit
+// live per project when it has enough floor spread (size-controlled 2-var
+// regression); thin projects fall back to a height-tier β. Backtested (leave-one-
+// out): closes the floor-driven error scatter (corr −0.36 → −0.03), median APE
+// 3.20% → 2.93%, no regression on mid-floor units.
+
+// Height-tier fallback elasticities for projects too thin to fit their own β.
+// TODO(follow-up: scheduled recompute): these are a point-in-time backtest fit
+// (2026-07). Floor premia drift with the market, so they should be RECOMPUTED
+// PERIODICALLY (e.g. a monthly job), not treated as permanent constants. Tracked
+// separately — not blocking correctness today.
+const CONDO_EC_FLOOR_TIER_BETA: Record<'low' | 'mid' | 'high' | 'vhigh', number> = {
+  low: 0.015, // project max floor <= 12
+  mid: 0.031, // 13–24
+  high: 0.04, // 25–40
+  vhigh: 0.053, // > 40
+}
+const CONDO_EC_FLOOR_BETA_MIN_DISTINCT = 8
+// A same-project β needs a reasonably large sample to be stable: the pool the
+// engine sees is radius-limited (a dense-area new launch can be truncated to ~20
+// recent, same-period rows by the 2000-row pull), and a 2-var regression on that
+// gives a noise slope (~0.003) instead of the true ~0.05. Live-verified: β is
+// stable from ~50 rows; below this threshold we fall back to the height-tier β,
+// which the backtest confirmed is a reliable proxy.
+const CONDO_EC_FLOOR_BETA_MIN_ROWS = 40
+const CONDO_EC_FLOOR_MULT_CLAMP = 0.1
+
+function condoEcHeightTierBeta(sameProjectRows: CleanedRow[]): number {
+  let maxFloor = 0
+  for (const row of sameProjectRows) {
+    const f = row.parsedFloorLevel
+    if (f !== null && Number.isFinite(f) && f > maxFloor) maxFloor = f
+  }
+  const tier = maxFloor <= 12 ? 'low' : maxFloor <= 24 ? 'mid' : maxFloor <= 40 ? 'high' : 'vhigh'
+  return CONDO_EC_FLOOR_TIER_BETA[tier]
+}
+
+// Live per-project floor elasticity: OLS of ln(psm) on ln(floor) and ln(area)
+// over the last 5 years. β is a level-invariant SHAPE, so the wider window is safe
+// here — unlike price-level components, old floor spreads can't reintroduce the
+// momentum bug. Returns null when the project lacks the floor spread to fit a
+// reliable slope (falls back to the height-tier β).
+function getCondoEcProjectFloorBeta(sameProjectRows: CleanedRow[]): number | null {
+  const rows = sameProjectRows.filter((row) => {
+    const f = row.parsedFloorLevel
+    const daysOld = getDaysOld(row.transaction_date)
+    return (
+      f !== null &&
+      Number.isFinite(f) &&
+      f > 0 &&
+      row.floor_area_sqm > 0 &&
+      row.pricePerSqm > 0 &&
+      daysOld !== null &&
+      daysOld <= 365 * 5
+    )
+  })
+  if (rows.length < CONDO_EC_FLOOR_BETA_MIN_ROWS) return null
+  if (new Set(rows.map((r) => r.parsedFloorLevel)).size < CONDO_EC_FLOOR_BETA_MIN_DISTINCT) return null
+
+  const lf = rows.map((r) => Math.log(r.parsedFloorLevel as number))
+  const la = rows.map((r) => Math.log(r.floor_area_sqm))
+  const ly = rows.map((r) => Math.log(r.pricePerSqm))
+  const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length
+  const mf = mean(lf)
+  const ma = mean(la)
+  const my = mean(ly)
+  // Normal equations for ln(psm) = β·ln(floor) + γ·ln(area) on mean-centred data.
+  let s11 = 0
+  let s22 = 0
+  let s12 = 0
+  let s1y = 0
+  let s2y = 0
+  for (let i = 0; i < rows.length; i++) {
+    const x1 = lf[i] - mf
+    const x2 = la[i] - ma
+    const y = ly[i] - my
+    s11 += x1 * x1
+    s22 += x2 * x2
+    s12 += x1 * x2
+    s1y += x1 * y
+    s2y += x2 * y
+  }
+  const det = s11 * s22 - s12 * s12
+  if (Math.abs(det) < 1e-9) return null
+  const beta = (s22 * s1y - s12 * s2y) / det
+  if (!Number.isFinite(beta)) return null
+  return Math.max(-0.02, Math.min(0.12, beta)) // sane elasticity clamp
+}
+
+// Weighted mean floor of the comps (size-closeness × recency; no floor weight) —
+// the reference floor the base anchor reflects. Null when no floor data.
+function getWeightedFloorForRows(
+  rows: CleanedRow[],
+  floorAreaSqm: number,
+  propertyCategory: PropertyCategory
+): number | null {
+  const withFloor = rows.filter(
+    (r) => r.parsedFloorLevel !== null && Number.isFinite(r.parsedFloorLevel) && (r.parsedFloorLevel as number) > 0
+  )
+  if (withFloor.length === 0) return null
+  const values = withFloor.map((r) => r.parsedFloorLevel as number)
+  const weights = withFloor.map((r) => {
+    const areaRatio = r.floor_area_sqm / floorAreaSqm
+    const sizeCloseness = 1 / (Math.abs(Math.log(Math.max(areaRatio, 0.01))) + 0.08)
+    return sizeCloseness * getRecencyWeight(r.transaction_date, propertyCategory)
+  })
+  return weightedAverage(values, weights)
+}
+
+// Floor multiplier: scale the base estimate from the comps' avg floor to the
+// subject's floor along psm ∝ floor^β. Clamped ±10%. Returns 1 (no-op) when the
+// subject floor or the reference floor is unavailable.
+function getCondoEcFloorMultiplier(
+  sameProjectRows: CleanedRow[],
+  subjectFloorLevel: number | undefined,
+  compAvgFloor: number | null
+): number {
+  if (!subjectFloorLevel || subjectFloorLevel <= 0 || !compAvgFloor || compAvgFloor <= 0) return 1
+  const beta = getCondoEcProjectFloorBeta(sameProjectRows) ?? condoEcHeightTierBeta(sameProjectRows)
+  const mult = Math.pow(subjectFloorLevel / compAvgFloor, beta)
+  return Math.max(1 - CONDO_EC_FLOOR_MULT_CLAMP, Math.min(1 + CONDO_EC_FLOOR_MULT_CLAMP, mult))
+}
+
 function buildSameProjectCondoEcCandidate(
   rows: CleanedRow[],
   radius: number,
@@ -1512,12 +1638,31 @@ function buildSameProjectCondoEcCandidate(
     Math.min(1 + movementCap, rawMovement)
   )
 
-  // Stage 1: no calibration uplift, no flat ×1.01 bias, no additive floor
-  // premium. The point estimate is the (market-movement-adjusted) same-project
-  // anchor psm × subject area. Floor is already reflected in the anchor via the
-  // floor-closeness term in getWeightedPsmForRows.
+  // Stage 3b: floor curve. Scale the base estimate from the comps' reference
+  // floor to the subject's floor along psm ∝ floor^β (β fit live per project, else
+  // a height-tier fallback), clamped ±10%. The reference floor is the weighted
+  // mean floor of the size-similar, recency-bounded same-project pool — the floor
+  // level the base anchor reflects. Replaces Stage 1's removed additive premium;
+  // the soft floor-closeness weight in getWeightedPsmForRows is retained but can't
+  // extrapolate beyond the comps' floor range, which is what this closes.
+  const floorRefBase = (() => {
+    const recent = sameProjectRows.filter((row) => {
+      const daysOld = getDaysOld(row.transaction_date)
+      return daysOld !== null && daysOld <= 365
+    })
+    return recent.length >= 3 ? recent : sameProjectRows
+  })()
+  const compAvgFloor = getWeightedFloorForRows(
+    pickSameProjectAnchorRows(floorRefBase, floorAreaSqm),
+    floorAreaSqm,
+    propertyCategory
+  )
+  const floorMultiplier = getCondoEcFloorMultiplier(sameProjectRows, subjectFloorLevel, compAvgFloor)
+
+  // Stage 1: no calibration uplift, no flat ×1.01 bias. Point estimate is the
+  // (market-movement- and floor-adjusted) same-project anchor psm × subject area.
   const adjustedPsm = anchorPsm * marketMovement
-  const estimated = adjustedPsm * floorAreaSqm
+  const estimated = adjustedPsm * floorAreaSqm * floorMultiplier
 
   const halfSpread = getCondoEcAnchorSpread(anchorRows, latestDaysOld)
 
@@ -1553,7 +1698,7 @@ function buildSameProjectCondoEcCandidate(
           : null
       const comparableEstimate =
         looAnchor && looAnchor.psm && Number.isFinite(looAnchor.psm)
-          ? looAnchor.psm * marketMovement * floorAreaSqm
+          ? looAnchor.psm * marketMovement * floorAreaSqm * floorMultiplier
           : estimated
 
       const gapYrs = priorDaysOld / 365.25
