@@ -98,7 +98,7 @@ export const MRT_STATIONS: MrtStation[] = [
   { lat: 1.2705, lon: 103.8097, status: 'open' }, // Telok Blangah
   { lat: 1.2652, lon: 103.8203, status: 'open' }, // Harbourfront
   { lat: 1.2822, lon: 103.8597, status: 'open' }, // Bayfront
-  { lat: 1.3784, lon: 103.7762, status: 'open' }, // Bukit Panjang
+  { lat: 1.3787, lon: 103.7619, status: 'open' }, // Bukit Panjang (DTL/BPLRT interchange; was 103.7762, ~1.6km too far east)
   { lat: 1.3694, lon: 103.7764, status: 'open' }, // Cashew
   { lat: 1.3623, lon: 103.7672, status: 'open' }, // Hillview
   { lat: 1.3412, lon: 103.7759, status: 'open' }, // Beauty World
