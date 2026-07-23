@@ -68,6 +68,17 @@ type CandidateResult = {
   // signal that the estimate leans heavily on one prior transaction. The UI can
   // surface a "limited comparable data" caveat.
   thinDataWarning?: boolean
+  // Stage 3b (momentum thresholds): the market-movement signal the same-project
+  // condo/EC path measured for this valuation, as a clean percentage (e.g. +6.2
+  // means the nearby similar-age/tenure market rose ~6.2% between when the
+  // same-project anchor comps transacted and the last 12 months). This is a
+  // NEARBY-project drift signal, and it is ONLY measured when the same-project
+  // anchor is stale (>365d old) and enough nearby support exists — it is
+  // `undefined` otherwise (fresh anchor, or thin support). It is NOT a
+  // same-project momentum, and it is NOT the size curve's Stage 3 recency fix
+  // (that removed a bias, it does not compute a momentum). Exposed for reuse by
+  // the upcoming Suggested Listing Price; see valuation-redesign-plan.md Stage 3b.
+  marketMovementPct?: number
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -940,11 +951,16 @@ function getMostRecentDaysOld(rows: CleanedRow[]) {
   return Math.min(...dayValues)
 }
 
+// Cap on the market-movement adjustment applied to a stale same-project anchor,
+// widening with anchor staleness (an older anchor may legitimately need a larger
+// drift correction). Note: getCondoEcMarketMovement is only invoked when the
+// anchor is > 365d old, so the <= 365 branch (±3%) is effectively unreachable via
+// that path (a fresh anchor gets movement = 1, i.e. no adjustment).
 function getCondoEcMarketMovementCap(daysOld: number | null) {
   if (daysOld === null || daysOld <= 365) return 0.03
-  if (daysOld <= 730) return 0.06
-  if (daysOld <= 1095) return 0.08
-  return 0.12
+  if (daysOld <= 730) return 0.06 // anchor 1–2y old
+  if (daysOld <= 1095) return 0.08 // 2–3y
+  return 0.12 // > 3y
 }
 
 function getCondoEcAnchorSpread(rows: CleanedRow[], daysOld: number | null) {
@@ -1320,9 +1336,36 @@ function getCondoEcNearbySupportRows(
     .slice(0, 30)
 }
 
-function getCondoEcMarketMovement(anchorRows: CleanedRow[], supportRows: CleanedRow[]) {
+// ─── Market-movement momentum (condo/EC) ─────────────────────────────────────
+// The ONLY momentum/drift signal in the condo/EC engine. Used only by the
+// same-project path, and only to correct a STALE same-project anchor (its caller
+// invokes it only when the anchor's latest sale is > 365d old).
+//
+// Signal = median psm of NEARBY support rows in the last 12 months ÷ median psm
+// of NEARBY support rows within ±6 months of the same-project anchor's latest
+// sale date. I.e. "how much has the comparable NEARBY market moved between when
+// the same-project anchor comps transacted and now." Data source is NEARBY
+// (other-project) rows of similar age/tenure (see getCondoEcNearbySupportRows) —
+// NOT the subject's own project.
+//
+// Thresholds (all must hold, else returns null = "not measurable"):
+//   • supportRows.length >= 6            (enough nearby comps overall)
+//   • recentSupportRows.length >= 3      (>= 3 nearby sales in the last 12 months)
+//   • anchorPeriodSupportRows.length >= 3 (>= 3 nearby sales in the anchor's ±6mo)
+//
+// NOTE — mismatch with the density investigation: that framed momentum as
+// same-project sales, >= 3 in the last 6mo AND >= 3 in the prior 6–12mo. This
+// function differs on both axes: it uses NEARBY (not same-project) rows, and its
+// windows are last-12mo vs the anchor's ±6mo period (not 6mo vs 6–12mo). A proper
+// same-project momentum along the density design has NOT been built — see the
+// Stage 3b section of valuation-redesign-plan.md. Returns the raw (unclamped)
+// ratio; the caller clamps it (getCondoEcMarketMovementCap) before applying.
+function getCondoEcMarketMovement(
+  anchorRows: CleanedRow[],
+  supportRows: CleanedRow[]
+): number | null {
   const latestAnchorDate = getMostRecentDate(anchorRows)
-  if (!latestAnchorDate || supportRows.length < 6) return 1
+  if (!latestAnchorDate || supportRows.length < 6) return null
 
   const dayMs = 24 * 60 * 60 * 1000
   const now = Date.now()
@@ -1344,15 +1387,15 @@ function getCondoEcMarketMovement(anchorRows: CleanedRow[], supportRows: Cleaned
     )
   })
 
-  if (recentSupportRows.length < 3 || anchorPeriodSupportRows.length < 3) return 1
+  if (recentSupportRows.length < 3 || anchorPeriodSupportRows.length < 3) return null
 
   const recentMedian = getMedianPsm(recentSupportRows)
   const anchorPeriodMedian = getMedianPsm(anchorPeriodSupportRows)
 
-  if (!recentMedian || !anchorPeriodMedian || anchorPeriodMedian <= 0) return 1
+  if (!recentMedian || !anchorPeriodMedian || anchorPeriodMedian <= 0) return null
 
   const movement = recentMedian / anchorPeriodMedian
-  return Number.isFinite(movement) && movement > 0 ? movement : 1
+  return Number.isFinite(movement) && movement > 0 ? movement : null
 }
 
 // ---- Stage 2: repeat-sale conditional fallback (condo/EC) ----
@@ -1645,15 +1688,24 @@ function buildSameProjectCondoEcCandidate(
     subjectTenureBucket
   )
 
-  const rawMovement =
+  // Market-movement drift correction — only when the same-project anchor is stale
+  // (> 365d). `measuredMovement` is null when not applicable (fresh anchor) or not
+  // measurable (thin nearby support); the estimate then uses 1 (no adjustment).
+  const measuredMovement =
     latestDaysOld !== null && latestDaysOld > 365
       ? getCondoEcMarketMovement(anchorRows, supportRows)
-      : 1
+      : null
+  const rawMovement = measuredMovement ?? 1
   const movementCap = getCondoEcMarketMovementCap(latestDaysOld)
   const marketMovement = Math.max(
     1 - movementCap,
     Math.min(1 + movementCap, rawMovement)
   )
+  // Clean, reusable momentum handle for Suggested Listing Price: the RAW measured
+  // nearby-market drift as a percent (undefined when not measured). Reflects the
+  // market signal, not the valuation-clamped version applied above.
+  const marketMovementPct =
+    measuredMovement !== null ? (measuredMovement - 1) * 100 : undefined
 
   // Stage 3b: floor curve. Scale the base estimate from the comps' reference
   // floor to the subject's floor along psm ∝ floor^β (β fit live per project, else
@@ -1740,6 +1792,7 @@ function buildSameProjectCondoEcCandidate(
         radius,
         method: 'condo_ec_same_project_repeat_blend',
         ...(largeSwing ? { thinDataWarning: true } : {}),
+        ...(marketMovementPct !== undefined ? { marketMovementPct } : {}),
       }
     }
   }
@@ -1754,6 +1807,7 @@ function buildSameProjectCondoEcCandidate(
       latestDaysOld !== null && latestDaysOld > 365
         ? 'condo_ec_same_project_size_curve_market_adjusted'
         : 'condo_ec_same_project_size_curve',
+    ...(marketMovementPct !== undefined ? { marketMovementPct } : {}),
   }
 }
 
