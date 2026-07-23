@@ -1,0 +1,96 @@
+name: Floor Beta Recompute
+
+# Monthly recompute of the condo/EC floor-elasticity height-tier fallback betas
+# (src/lib/condoEcFloorTierBeta.json, read by src/lib/valuation.ts). Mirrors the
+# weekly HDB sync Action. Recompute is read-only against Supabase; when the betas
+# change it opens a PR with the diff (a human merges → Vercel deploys). Also
+# runnable on demand.
+on:
+  schedule:
+    # 03:00 UTC on the 1st of each month (~11:00 Singapore time). Cron is UTC.
+    - cron: '0 3 1 * *'
+  workflow_dispatch: {}
+
+# Avoid overlapping runs (manual + scheduled) racing on the same branch/PR.
+concurrency:
+  group: floor-beta-recompute
+  cancel-in-progress: false
+
+# GITHUB_TOKEN needs to push a branch and open a PR.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  recompute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # No pip dependencies — the script uses only the Python standard library
+      # and reads Supabase with the public anon key (no secret required).
+
+      - name: Recompute tier betas
+        run: python -u scripts/floor_beta_recompute/recompute_floor_betas.py
+
+      - name: Open PR if betas changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          FILE=src/lib/condoEcFloorTierBeta.json
+          # Gate on the betas ONLY. The script also refreshes meta (date, sample
+          # counts) every run, so a whole-file diff is never empty — but a
+          # metadata-only change isn't worth a monthly PR. Compare the sorted
+          # .betas object of HEAD vs the working tree.
+          OLD_BETAS="$(git show "HEAD:$FILE" | jq -Sc '.betas')"
+          NEW_BETAS="$(jq -Sc '.betas' "$FILE")"
+          if [ "$OLD_BETAS" = "$NEW_BETAS" ]; then
+            echo "Tier betas unchanged (${NEW_BETAS}) — nothing to open."
+            exit 0
+          fi
+
+          echo "Betas changed:"
+          git --no-pager diff -- "$FILE"
+
+          MONTH="$(date -u +%Y-%m)"
+          BRANCH="auto/floor-beta-recompute-${MONTH}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add "$FILE"
+          git commit -m "chore(valuation): monthly condo/EC floor tier-beta recompute (${MONTH})"
+          # Force-push so a re-run within the same month refreshes the branch (and
+          # thus the open PR) rather than failing on a stale ref.
+          git push -f origin "$BRANCH"
+
+          # Build the PR body from the committed diff, so a reviewer sees exactly
+          # which tiers moved and by how much.
+          {
+            echo "Automated monthly recompute of the condo/EC floor-elasticity height-tier"
+            echo "fallback betas from \`property_transactions_v2\` (last 5y, within-project-"
+            echo "demeaned pooled OLS). Implausible or thin-sample tiers keep their prior"
+            echo "value; see the script log for any warnings."
+            echo
+            echo "Merging deploys the new betas (Vercel on \`main\`). If a tier looks wrong,"
+            echo "close this PR — the static/prior value stays in effect."
+            echo
+            echo '```diff'
+            git --no-pager diff HEAD~1 -- "$FILE"
+            echo '```'
+          } > /tmp/pr_body.md
+
+          # Create the PR, or update the existing one if this month's already open.
+          if ! gh pr create --base main --head "$BRANCH" \
+                --title "Monthly condo/EC floor tier-beta recompute (${MONTH})" \
+                --body-file /tmp/pr_body.md; then
+            echo "PR already exists for ${BRANCH}; updating its body."
+            gh pr edit "$BRANCH" --body-file /tmp/pr_body.md
+          fi

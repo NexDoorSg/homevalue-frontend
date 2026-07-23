@@ -1,0 +1,15 @@
+{
+  "betas": {
+    "low": 0.015,
+    "mid": 0.031,
+    "high": 0.04,
+    "vhigh": 0.053
+  },
+  "meta": {
+    "updated": "2026-07",
+    "source": "seed (Stage 3b point-in-time backtest fit, 2026-07)",
+    "method": "within-project-demeaned pooled OLS  ln(psm) ~ b*ln(floor) + g*ln(area)  over condo/EC transactions in the last 5y, pooled by project-max-floor height tier (low<=12 / mid 13-24 / high 25-40 / vhigh>40)",
+    "samples": { "low": null, "mid": null, "high": null, "vhigh": null },
+    "warnings": []
+  }
+}
