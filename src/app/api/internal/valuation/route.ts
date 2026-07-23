@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getValuation } from '@/lib/valuation'
+import { getRenovationConditionTiers } from '@/lib/renovationTiers'
 import { supabase } from '@/lib/supabase'
 
 type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
@@ -206,8 +207,23 @@ export async function POST(request: NextRequest) {
       subjectCompletionYearHdb: body.subjectCompletionYearHdb ? Number(body.subjectCompletionYearHdb) : null,
     })
 
+    // Renovation-condition tiers: a COST-APPROACH overlay computed from the Market
+    // Value baseline, deliberately layered on top of (never blended into) the
+    // engine's output. Null for landed / unusable inputs, in which case no
+    // condition fields are returned at all.
+    const conditionTiers = result
+      ? getRenovationConditionTiers(
+          Number(result.estimated),
+          body.propertyCategory,
+          Number(body.floorAreaSqm)
+        )
+      : null
+
     const comparables = await getComparableTransactions(body)
-    return NextResponse.json({ result, comparables })
+    return NextResponse.json({
+      result: result && conditionTiers ? { ...result, ...conditionTiers } : result,
+      comparables,
+    })
   } catch (error) {
     console.error('Internal valuation error:', error)
     return NextResponse.json({ error: 'Unable to generate valuation.' }, { status: 500 })
