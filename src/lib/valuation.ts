@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import condoEcFloorTierBetaCache from './condoEcFloorTierBeta.json'
 
 type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
 
@@ -1469,16 +1470,32 @@ function findSubjectPriorSale(
 // 3.20% → 2.93%, no regression on mid-floor units.
 
 // Height-tier fallback elasticities for projects too thin to fit their own β.
-// TODO(follow-up: scheduled recompute): these are a point-in-time backtest fit
-// (2026-07). Floor premia drift with the market, so they should be RECOMPUTED
-// PERIODICALLY (e.g. a monthly job), not treated as permanent constants. Tracked
-// separately — not blocking correctness today.
-const CONDO_EC_FLOOR_TIER_BETA: Record<'low' | 'mid' | 'high' | 'vhigh', number> = {
+// Baked-in static fit (2026-07 Stage 3b backtest) — the fallback of last resort
+// and the source of truth for any tier the cache doesn't validly override.
+const CONDO_EC_FLOOR_TIER_BETA_STATIC: Record<'low' | 'mid' | 'high' | 'vhigh', number> = {
   low: 0.015, // project max floor <= 12
   mid: 0.031, // 13–24
   high: 0.04, // 25–40
   vhigh: 0.053, // > 40
 }
+
+// Floor premia drift with the market, so the tier betas are RECOMPUTED monthly by
+// scripts/floor_beta_recompute/recompute_floor_betas.py (mirrors the weekly HDB
+// sync Action) and cached in ./condoEcFloorTierBeta.json, which is imported above.
+// The cache is merged over the static table per tier, but only for a value that
+// passes the same plausibility guard the recompute applies before writing:
+// finite and within [0, 0.10]. Anything else (a hand-edited or corrupt cache, a
+// missing tier) silently falls back to the static value — the cache can refresh
+// the numbers but can never make the engine worse than its shipped baseline.
+const CONDO_EC_FLOOR_TIER_BETA: Record<'low' | 'mid' | 'high' | 'vhigh', number> = (() => {
+  const cached = (condoEcFloorTierBetaCache as { betas?: Record<string, unknown> }).betas ?? {}
+  const merged = { ...CONDO_EC_FLOOR_TIER_BETA_STATIC }
+  for (const tier of ['low', 'mid', 'high', 'vhigh'] as const) {
+    const v = cached[tier]
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 0.1) merged[tier] = v
+  }
+  return merged
+})()
 const CONDO_EC_FLOOR_BETA_MIN_DISTINCT = 8
 // A same-project β needs a reasonably large sample to be stable: the pool the
 // engine sees is radius-limited (a dense-area new launch can be truncated to ~20
