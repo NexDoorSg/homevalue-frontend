@@ -1,0 +1,91 @@
+name: HDB Sync Watchdog
+
+# Reactive watchdog for the "HDB Sync" workflow.
+#
+# hdb_sync.yml has its own in-job retry + alert, but that alert can only run if
+# the sync job's runner actually starts. When a run fails at startup — the
+# 2026-07-17 incident, where no step ever executed — the in-job alert never
+# fires. This watchdog closes that gap: workflow_run triggers on the sync's
+# COMPLETION and runs on a fresh runner of its own, so it sees the failed
+# conclusion regardless of whether the sync's runner ever came up.
+#
+# On a failing conclusion it emails admin@nexdoor.sg via Resend, reusing the
+# exact pattern from hdb_sync.yml's alert step. It does nothing on success.
+#
+# Note: workflow_run only fires for runs that were CREATED. A scheduled run that
+# never gets created at all (e.g. GitHub auto-disabling cron on an idle repo) is
+# a separate, liveness concern that needs a scheduled heartbeat, not this file.
+#
+# workflow_run only triggers when this file is on the default branch.
+
+on:
+  workflow_run:
+    workflows: ["HDB Sync"]
+    types: [completed]
+
+concurrency:
+  # One alert per triggering run (keyed on the sync run id, not this watchdog's).
+  group: hdb-sync-watchdog-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  alert:
+    # Alert on genuine failure conclusions only. Success/cancelled/skipped/neutral
+    # are intentional or benign and stay quiet. startup_failure is the runner-never-
+    # started mode this watchdog exists for; the 2026-07-17 run surfaced as 'failure'.
+    if: ${{ contains(fromJSON('["failure","startup_failure","timed_out","stale","action_required"]'), github.event.workflow_run.conclusion) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Alert on HDB Sync failure
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPO: ${{ github.repository }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -u
+          echo "HDB Sync run $RUN_ID concluded '$CONCLUSION' (event: $RUN_EVENT, attempt: $RUN_ATTEMPT)."
+
+          # Always-on signal — visible in the Actions UI with no secret required.
+          {
+            echo "### ⚠️ HDB Sync watchdog — run concluded \`$CONCLUSION\`"
+            echo ""
+            echo "- Run: $RUN_URL"
+            echo "- Event: \`$RUN_EVENT\` (attempt $RUN_ATTEMPT)"
+            echo "- Commit: \`$HEAD_SHA\`"
+            echo ""
+            echo "Fired via workflow_run, so it catches failures where the sync job never started and its own alert step could not run."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          ALERT_SUBJECT="⚠️ HDB Sync $CONCLUSION — $REPO"
+          ALERT_HTML="The HDB Sync workflow concluded <b>$CONCLUSION</b>.<br><br>Run: <a href=\"$RUN_URL\">$RUN_URL</a><br>Event: $RUN_EVENT (attempt $RUN_ATTEMPT)<br>Commit: $HEAD_SHA<br><br>This alert came from the watchdog (workflow_run), which catches failures where the sync job never started — no in-job step ran. Investigate and re-run."
+          export ALERT_SUBJECT ALERT_HTML
+
+          if [ -z "${RESEND_API_KEY:-}" ]; then
+            echo "::error::HDB Sync $CONCLUSION — $RUN_URL  (email SKIPPED: RESEND_API_KEY not set)"
+            exit 0
+          fi
+
+          echo "::error::HDB Sync $CONCLUSION — $RUN_URL  (sending email alert to admin@nexdoor.sg…)"
+          PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'from': 'NexDoor Alerts <onboarding@resend.dev>', 'to': ['admin@nexdoor.sg'], 'subject': os.environ['ALERT_SUBJECT'], 'html': os.environ['ALERT_HTML']}))")
+          http=$(curl -s -o /tmp/resend_resp.json -w '%{http_code}' -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "Resend HTTP $http"
+          cat /tmp/resend_resp.json 2>/dev/null || true
+          echo
+          if [ "$http" -lt 300 ]; then
+            echo "Watchdog alert email sent."
+          else
+            echo "::warning::Resend returned HTTP $http — alert email may not have been delivered."
+            exit 1
+          fi
