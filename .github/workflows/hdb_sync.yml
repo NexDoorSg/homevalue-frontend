@@ -2,11 +2,26 @@ name: HDB Sync
 
 # Weekly sync of data.gov.sg HDB resale prices into Supabase
 # (property_transactions_v2). Also runnable on demand.
+#
+# Safety net (a scheduled failure must never slip by unnoticed):
+#   1. The sync runs with ONE automatic retry (120s apart) — catches transient
+#      data.gov.sg / Supabase blips, the common case, without failing the run.
+#   2. On failure (both attempts), an alert step fires: it always writes a job
+#      summary + an ::error:: annotation (no secret needed), and additionally
+#      emails admin@nexdoor.sg via Resend when RESEND_API_KEY is set.
+#   Note: this in-job net covers script-level failures. A failure at runner
+#   startup (no step runs at all — the Jul-2026-07-17 mode) is caught only by
+#   GitHub's native "failed workflow" email; see the watchdog follow-up.
 on:
   schedule:
     # 02:00 UTC every Friday (~10:00 Singapore time). GitHub Actions cron is UTC.
     - cron: '0 2 * * 5'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_fail:
+        description: 'Force the sync to fail (safety-net test only — writes nothing)'
+        type: boolean
+        default: false
 
 # Avoid overlapping runs (manual + scheduled) writing at the same time.
 concurrency:
@@ -28,12 +43,89 @@ jobs:
 
       # No pip dependencies — the script uses only the Python standard library.
 
-      - name: Run HDB sync
+      - name: Run HDB sync (one automatic retry)
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          FORCE_FAIL: ${{ inputs.force_fail }}
         run: |
-          if [ -z "$SUPABASE_KEY" ]; then
+          set -uo pipefail
+
+          # Retry wait: short under a force_fail test so the proof run is quick,
+          # 120s in real operation to let a transient upstream blip clear.
+          if [ "$FORCE_FAIL" = "true" ]; then RETRY_WAIT=5; else RETRY_WAIT=120; fi
+
+          if [ "$FORCE_FAIL" = "true" ]; then
+            echo "::warning::force_fail is set — simulating a sync failure to exercise the retry + alert path. No data is written."
+          elif [ -z "$SUPABASE_KEY" ]; then
             echo "::error::SUPABASE_KEY secret is not set. Add it under Settings > Secrets and variables > Actions."
             exit 1
           fi
-          python -u scripts/hdb_sync/sync_hdb_datagov.py
+
+          run_sync() {
+            if [ "$FORCE_FAIL" = "true" ]; then
+              echo "Simulated failure (force_fail) — not running the real sync."
+              return 1
+            fi
+            python -u scripts/hdb_sync/sync_hdb_datagov.py
+          }
+
+          attempt=1
+          max_attempts=2
+          until run_sync; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::HDB sync failed after ${attempt} attempt(s)."
+              exit 1
+            fi
+            echo "Attempt ${attempt}/${max_attempts} failed — waiting ${RETRY_WAIT}s before retrying…"
+            sleep "$RETRY_WAIT"
+            attempt=$((attempt + 1))
+          done
+          echo "HDB sync succeeded on attempt ${attempt}."
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT: ${{ github.event_name }}
+          ATTEMPT: ${{ github.run_attempt }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -u
+
+          # Always-on signal — visible in the Actions UI with no secret required,
+          # and backs up GitHub's native failure email.
+          {
+            echo "### ⚠️ HDB Sync failed"
+            echo ""
+            echo "- Run: $RUN_URL"
+            echo "- Event: \`$EVENT\` (run attempt $ATTEMPT)"
+            echo "- Commit: \`$SHA\`"
+            echo ""
+            echo "New HDB resale data may be missing this week. Fix the cause and re-run."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          ALERT_SUBJECT="⚠️ HDB Sync failed — $REPO"
+          ALERT_HTML="The weekly HDB Sync workflow failed after its automatic retry.<br><br>Run: <a href=\"$RUN_URL\">$RUN_URL</a><br>Event: $EVENT (attempt $ATTEMPT)<br>Commit: $SHA<br><br>New HDB resale data may be missing this week — investigate and re-run."
+          export ALERT_SUBJECT ALERT_HTML
+
+          if [ -z "${RESEND_API_KEY:-}" ]; then
+            echo "::error::HDB Sync failed — $RUN_URL  (email SKIPPED: RESEND_API_KEY not set; add it as a repo secret to enable email alerts)"
+            exit 0
+          fi
+
+          echo "::error::HDB Sync failed — $RUN_URL  (sending email alert to admin@nexdoor.sg…)"
+          PAYLOAD=$(python3 -c "import json, os; print(json.dumps({'from': 'NexDoor Alerts <onboarding@resend.dev>', 'to': ['admin@nexdoor.sg'], 'subject': os.environ['ALERT_SUBJECT'], 'html': os.environ['ALERT_HTML']}))")
+          http=$(curl -s -o /tmp/resend_resp.json -w '%{http_code}' -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "Resend HTTP $http"
+          cat /tmp/resend_resp.json 2>/dev/null || true
+          echo
+          if [ "$http" -lt 300 ]; then
+            echo "Alert email sent."
+          else
+            echo "::warning::Resend returned HTTP $http — alert email may not have been delivered."
+          fi
