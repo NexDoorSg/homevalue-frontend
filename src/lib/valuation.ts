@@ -423,7 +423,7 @@ function subjectHdbStreetKey(
 // so the valuation drops to the broadest hdb_nearby_all tier. The HDB Property
 // Information reference table (hdb_block_info, synced monthly from data.gov.sg)
 // supplies the block's authoritative year_completed, letting the valuation use
-// the age-matched hdb_nearby_same_age tier instead. Returns null on any
+// the age-matched hdb_nearby_age_weighted tier instead. Returns null on any
 // miss/error (incl. the table not existing yet) — the caller then behaves
 // exactly as before.
 async function lookupHdbBlockCompletionYear(
@@ -660,18 +660,30 @@ async function buildHdbCandidate(
   // Fix 1: when the caller doesn't supply the subject's completion year (the
   // Office valuation checker never does), derive it from the same-block rows in
   // hand — completion_year is 100% populated and every unit in an HDB block
-  // shares it. Without this, nearbyWithSimilarAge is forced empty and the
+  // shares it. Without this, the nearby-age-weighted tier is forced empty and the
   // drift-adjusted tier silently falls through to hdb_same_block_stale. Only
   // fills a null; a caller-provided value is never overridden.
   const effectiveCompletionYear =
     subjectCompletionYear ?? mostCommonCompletionYear(sameBlockRows)
 
-  const nearbyWithSimilarAge = effectiveCompletionYear
-    ? allRows.filter((row) => {
-        if (extractBlockNumber(row.address) === effectiveBlockNo) return false
-        if (!row.completion_year) return false
-        return Math.abs(row.completion_year - effectiveCompletionYear) <= 5
-      })
+  // Nearby-block tier: all same-type comparables near the subject (same block
+  // excluded — it has its own tiers above), age-GRADED by getHdbAgeWeight in the
+  // weighting below rather than hard-filtered. The former hard
+  // |completion - subject| <= 5 exclusion was removed after backtesting
+  // (leave-one-out, 3,028 nearby-tier HDB targets, engine radius-selection): the
+  // hard cutoff regressed accuracy vs relying on the existing soft age weight —
+  // median APE 12.87% (hard ±5) → 12.21% (±15) → 11.03% (no cutoff), monotonic;
+  // on the subset where out-of-window comps exist, soft wins 67.5%. Why it helps
+  // here but NOT for the same-block 730-day window (where extending REGRESSED
+  // 7.18%→13.42%): a recent nearby sale of a different vintage carries real
+  // current-market signal and earns a high recency weight, while a stale one is
+  // already down-weighted — recency × age sorts it out. completion_year is still
+  // required so getHdbAgeWeight can grade the row (it's ~100% populated on HDB).
+  const nearbyAgeWeighted = effectiveCompletionYear
+    ? allRows.filter(
+        (row) =>
+          extractBlockNumber(row.address) !== effectiveBlockNo && row.completion_year != null
+      )
     : []
 
   let valuationPool: CleanedRow[]
@@ -735,9 +747,9 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     valuationPool = sameBlockRows
     method = 'hdb_same_block_recency'
 
-  } else if (nearbyWithSimilarAge.length >= 3) {
-    valuationPool = nearbyWithSimilarAge
-    method = 'hdb_nearby_same_age'
+  } else if (nearbyAgeWeighted.length >= 3) {
+    valuationPool = nearbyAgeWeighted
+    method = 'hdb_nearby_age_weighted'
 
   } else {
     valuationPool = allRows
