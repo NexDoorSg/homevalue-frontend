@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { displayEmailHtmlValue } from "@/lib/emailHtml";
+import { buildLeadSyncPayload } from "@/lib/propertyIdentity";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -178,7 +180,7 @@ async function sendHomeValueWhatsappIntro({
   console.info(`WhatsApp intro sent for HomeValue lead assigned to ${assignedTo}`);
 }
 
-async function syncLeadToOffice(body: any) {
+async function syncLeadToOffice(body: Record<string, unknown>) {
   const officeUrl = process.env.NEXDOOR_OFFICE_URL;
   const syncToken = process.env.HOMEVALUE_OFFICE_SYNC_TOKEN;
 
@@ -218,12 +220,14 @@ async function syncLeadToOffice(body: any) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as Record<string, unknown>;
 
     const {
       name,
       phone,
       email,
+      project_name,
+      postal_code,
       address,
       unit_number,
       unit_type,
@@ -236,6 +240,12 @@ export async function POST(req: Request) {
       estimatedLow,
       estimatedHigh,
     } = body;
+    const officePayload = buildLeadSyncPayload(body, {
+      canonicalProjectName: project_name,
+      postalCode: postal_code,
+      address,
+      unitNumber: unit_number,
+    });
 
     const intent = displayValue(plan || "Pending");
     const isIntentUpdate = !!plan;
@@ -248,7 +258,7 @@ export async function POST(req: Request) {
         ? "-"
         : `${formatMoney(lowRange)} - ${formatMoney(highRange)}`;
 
-    const officeSync = await syncLeadToOffice(body).catch((error) => {
+    const officeSync = await syncLeadToOffice(officePayload).catch((error) => {
       console.error("Office lead sync crash:", error);
       return { ok: false, skipped: false, assignedTo: null as string | null };
     });
@@ -282,20 +292,22 @@ export async function POST(req: Request) {
       html: `
         <h2>${isIntentUpdate ? "HomeValue lead intent updated." : "New HomeValue lead received."}</h2>
 
-        <p><strong>Name:</strong> ${displayValue(name)}</p>
-        <p><strong>Phone:</strong> ${displayValue(phone)}</p>
-        <p><strong>Email:</strong> ${displayValue(email)}</p>
+        <p><strong>Name:</strong> ${displayEmailHtmlValue(name)}</p>
+        <p><strong>Phone:</strong> ${displayEmailHtmlValue(phone)}</p>
+        <p><strong>Email:</strong> ${displayEmailHtmlValue(email)}</p>
 
-        <p><strong>Address:</strong> ${displayValue(address)}</p>
-        <p><strong>Unit:</strong> ${displayValue(unit_number)}</p>
-        <p><strong>Property Type:</strong> ${displayValue(unit_type)}</p>
+        <p><strong>Property / Development:</strong> ${displayEmailHtmlValue(officePayload.project_name)}</p>
+        <p><strong>Postal Code:</strong> ${displayEmailHtmlValue(officePayload.postal_code)}</p>
+        <p><strong>Address:</strong> ${displayEmailHtmlValue(officePayload.address)}</p>
+        <p><strong>Unit:</strong> ${displayEmailHtmlValue(officePayload.unit_number)}</p>
+        <p><strong>Property Type:</strong> ${displayEmailHtmlValue(unit_type)}</p>
         <p><strong>Floor Area:</strong> ${formatSqftFromSqm(floor_area_sqm)}</p>
 
         <p><strong>Estimated Value:</strong> ${formatMoney(estimatedValue)}</p>
         <p><strong>Range:</strong> ${rangeText}</p>
 
-        <p><strong>Intent:</strong> ${intent}</p>
-        <p><strong>Assigned To:</strong> ${displayValue(officeSync.assignedTo)}</p>
+        <p><strong>Intent:</strong> ${displayEmailHtmlValue(intent)}</p>
+        <p><strong>Assigned To:</strong> ${displayEmailHtmlValue(officeSync.assignedTo)}</p>
         <p><strong>Office Sync:</strong> ${officeSync.ok ? "Synced" : officeSync.skipped ? "Skipped" : "Failed"}</p>
       `,
     });
@@ -309,10 +321,18 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true, data, officeSync });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Send lead route error:", err);
+    const errorMessage =
+      typeof err === "object" &&
+      err !== null &&
+      "message" in err &&
+      typeof err.message === "string" &&
+      err.message
+        ? err.message
+        : "Unexpected server error";
     return NextResponse.json(
-      { success: false, error: err.message || "Unexpected server error" },
+      { success: false, error: errorMessage },
       { status: 500 }
     );
   }

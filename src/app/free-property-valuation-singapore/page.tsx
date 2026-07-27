@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
+import { buildLeadSyncPayload } from '@/lib/propertyIdentity'
 
 declare global {
   interface Window {
@@ -719,6 +720,7 @@ export default function Home() {
   const [selectedStreetName, setSelectedStreetName] = useState<string | null>(null)
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null)
   const [selectedPostal, setSelectedPostal] = useState<string | null>(null)
+  const [resolvedProjectNameState, setResolvedProjectNameState] = useState<string | null>(null)
   const [lookupCandidates, setLookupCandidates] = useState<string[]>([])
 
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
@@ -929,6 +931,7 @@ export default function Home() {
     setRadiusUsedM(null)
     setSubjectCompletionYearState(null)
     setSubjectIsStrataState(null)
+    setResolvedProjectNameState(null)
     setRecentComparables([])
     setHasTeaser(false)
     setHasReport(false)
@@ -990,6 +993,7 @@ export default function Home() {
       address: address,
       streetName: selectedStreetName,
       projectName: selectedProjectName,
+      postalCode: selectedPostal,
       blkNo: selectedBlkNo,
       lookupCandidates,
     }
@@ -1023,12 +1027,14 @@ export default function Home() {
       chosen.BUILDING && chosen.BUILDING !== 'NIL'
         ? chosen.BUILDING.toUpperCase().trim()
         : null
+    const resolvedPostal = chosen.POSTAL || null
     const resolvedLookupCandidates = buildLookupCandidates(chosen)
     
     setSelectedLat(lat)
     setSelectedLon(lon)
     setSelectedStreetName(resolvedStreetName)
     setSelectedProjectName(resolvedProjectName)
+    setSelectedPostal(resolvedPostal)
     setLookupCandidates(resolvedLookupCandidates)
     setAddress(chosen.ADDRESS)
     
@@ -1038,6 +1044,7 @@ export default function Home() {
       address: chosen.ADDRESS,
       streetName: resolvedStreetName,
       projectName: resolvedProjectName,
+      postalCode: resolvedPostal,
       lookupCandidates: resolvedLookupCandidates,
     }
   } catch (error) {
@@ -1052,6 +1059,7 @@ export default function Home() {
     setShowUnlockModal(false)
     setHasTeaser(false)
     setHasReport(false)
+    setResolvedProjectNameState(null)
     setRecentComparables([])
   
     if (!address.trim()) {
@@ -1352,6 +1360,7 @@ export default function Home() {
       setRadiusUsedM(result.radius)
       setSubjectCompletionYearState(subjectCompletionYear)
       setSubjectIsStrataState(subjectIsStrata)
+      setResolvedProjectNameState(resolvedProjectName)
       setHasTeaser(true)
       setHasReport(false)
       setLeadFormMessage('')
@@ -1570,10 +1579,21 @@ export default function Home() {
     payload: Record<string, unknown>
   ): Promise<EmailResult> => {
     try {
+      const propertyContextExists = hasPropertyContext()
+      const outgoingPayload = buildLeadSyncPayload(payload, {
+        canonicalProjectName: propertyContextExists ? resolvedProjectNameState : null,
+        oneMapBuilding: propertyContextExists ? selectedProjectName : null,
+        postalCode: propertyContextExists ? selectedPostal : null,
+        address: propertyContextExists ? address.trim() || null : null,
+        unitNumber: propertyContextExists
+          ? buildUnitNumber(floorLevel, stackNumber, true) || null
+          : null,
+      })
+
       const response = await fetch('/api/send-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(outgoingPayload),
       })
 
       const result = await response.json().catch(() => null)
