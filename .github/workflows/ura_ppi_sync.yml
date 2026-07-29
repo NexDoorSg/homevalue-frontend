@@ -1,0 +1,43 @@
+name: URA PPI Sync
+
+# Monthly sync of the data.gov.sg "Private Property Price Index of Non-landed
+# Residential Properties by Locality" (CCR/RCR/OCR) into Supabase (ura_ppi_index).
+# URA publishes one new quarter roughly 3–4 weeks after each quarter-end, so a
+# monthly cron always picks up a freshly published quarter and any revisions to
+# recent ones. Also runnable on demand. Powers Stage 6 Indexed Market Value.
+on:
+  schedule:
+    # 03:00 UTC on the 2nd of each month (~11:00 Singapore time). Cron is UTC.
+    # The 2nd (vs the 1st) leaves the 1st free for HDB Block Info Sync.
+    - cron: '0 3 2 * *'
+  workflow_dispatch: {}
+
+# Avoid overlapping runs (manual + scheduled) writing at the same time.
+concurrency:
+  group: ura-ppi-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # No pip dependencies — the script uses only the Python standard library.
+
+      - name: Run URA PPI sync
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::SUPABASE_KEY secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          python -u scripts/ura_sync/sync_ura_ppi_datagov.py --write
