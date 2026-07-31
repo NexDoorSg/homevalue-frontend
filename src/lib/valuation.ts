@@ -95,6 +95,29 @@ type CandidateResult = {
   listingMarkupPct?: number
   momentumPct?: number | null
   momentumBasis?: MomentumBasis
+  // Stage 6: Indexed Market Value (condo/EC only). An additive second figure
+  // computed from the nearest size-matched (±10% area) same-project transaction,
+  // scaled forward by the matching URA PPI segment (CCR/RCR/OCR) from the
+  // anchor's sale quarter to today. It closes the neutral valuation's structural
+  // under-prediction in THIN-volume, appreciating projects (backtested: thin
+  // condo median APE 5.85% neutral → 4.58% with a size-matched anchor). Blended
+  // into `blendedEstimate` via a volume taper (weight 1 at ≤3 same-project
+  // sales/yr, 0 at ≥6). NEVER folded into the neutral valuation's own comp math,
+  // and NEVER applied to HDB (nationwide RPI too coarse — tested and rejected).
+  // The existing `estimated`/`low`/`high` (neutral Market Value) are untouched.
+  // Field is `indexedMarketValue` — the plain `marketValue` name is already taken
+  // by the neutral estimate the Suggested Listing Price is layered on. Always
+  // populated on getValuation output: null / weight 0 / blended = neutral when
+  // MV is unavailable (any segment / anchor / index piece missing) or for
+  // HDB/landed. See valuation-redesign-plan.md Stage 6.
+  indexedMarketValue?: number | null
+  indexedMarketValueWeight?: number
+  indexedMarketValueAnchor?: {
+    psf: number
+    areaSqm: number
+    transactionDate: string
+  } | null
+  blendedEstimate?: number
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -2726,9 +2749,252 @@ async function writeCache(cacheKey: string, result: CandidateResult): Promise<vo
   }
 }
 
+// ─── Stage 6: Indexed Market Value (condo/EC only) ────────────────────────────
+// A second, additive valuation figure for condo/EC: the nearest size-matched
+// same-project transaction, scaled forward by the matching URA PPI segment
+// (CCR/RCR/OCR) from the anchor's sale quarter to today, then blended into the
+// neutral estimate via a same-project-volume taper. It targets the one place the
+// neutral valuation is structurally weak — thin-volume, appreciating projects —
+// without touching the neutral number anywhere else. HDB is out of scope (its
+// only published RPI is nationwide, too coarse — tested and rejected).
+// See valuation-redesign-plan.md Stage 6.
+
+type MarketSegment = 'CCR' | 'RCR' | 'OCR'
+
+type IndexedMvAnchor = {
+  // NOTE: `psf` here is price ÷ floor_area_sqm — price per SQUARE METRE, not per
+  // square foot — so that computeMarketValue's `psf × indexRatio × areaSqm`
+  // stays dimensionally correct. The DB's own price_psf column (per sqft) is
+  // deliberately NOT used, as it would silently break the area multiplication.
+  psf: number
+  areaSqm: number
+  transactionDate: Date
+  segment: MarketSegment
+}
+
+// 1. Resolve a project's CCR/RCR/OCR market segment from projects_master (which
+//    already stores a clean market_segment). Case-insensitive project match.
+//    Returns null when the project isn't found or the value isn't a known
+//    segment — the caller then falls back to the neutral valuation only.
+async function getProjectMarketSegment(
+  projectName: string
+): Promise<MarketSegment | null> {
+  const name = normalizeText(projectName)
+  if (!name) return null
+  try {
+    const { data, error } = await supabase
+      .from('projects_master')
+      .select('market_segment')
+      .ilike('project_name', name)
+      .limit(1)
+    if (error || !data || data.length === 0) return null
+    const seg = normalizeText((data[0] as { market_segment: string | null }).market_segment)
+    return seg === 'CCR' || seg === 'RCR' || seg === 'OCR' ? seg : null
+  } catch {
+    return null
+  }
+}
+
+// 2. Index value for `segment` at `date`: the most recent quarter whose
+//    quarter_start_date <= date. No publication-lag arithmetic is needed here —
+//    ura_ppi_index only ever contains quarters URA has already published, and the
+//    live engine always values as-of *now*, so the latest row <= now IS the
+//    latest published quarter. (The publication-lag / no-look-ahead discipline
+//    only matters for backtesting a past date against today's full table.)
+//    Returns null when no row exists (caller falls back to neutral).
+async function getIndexValueAsOf(
+  segment: string,
+  date: Date
+): Promise<number | null> {
+  const iso = date.toISOString().slice(0, 10)
+  try {
+    const { data, error } = await supabase
+      .from('ura_ppi_index')
+      .select('index_value')
+      .eq('segment', segment)
+      .lte('quarter_start_date', iso)
+      .order('quarter_start_date', { ascending: false })
+      .limit(1)
+    if (error || !data || data.length === 0) return null
+    const v = Number((data[0] as { index_value: number | string }).index_value)
+    return Number.isFinite(v) && v > 0 ? v : null
+  } catch {
+    return null
+  }
+}
+
+// 3. Nearest same-project transaction within ±10% of the subject's floor area,
+//    strictly before asOfDate (no look-ahead), most recent first.
+//    MANDATORY: there is NO fallback to "most recent sale regardless of size".
+//    Testing confirmed a naive most-recent anchor erases most of the Indexed
+//    Market Value's accuracy advantage (fattens the tail, worsens coverage), so
+//    when no size-matched anchor exists we return null and the feature simply
+//    switches off for that valuation (weight becomes 0 / neutral-only) — see the
+//    fail-safe in the wiring below.
+async function findSizeMatchedAnchor(
+  projectName: string,
+  targetAreaSqm: number,
+  asOfDate: Date,
+  segment: MarketSegment
+): Promise<IndexedMvAnchor | null> {
+  const name = normalizeText(projectName)
+  if (!name || !(targetAreaSqm > 0)) return null
+  const lo = targetAreaSqm * 0.9
+  const hi = targetAreaSqm * 1.1
+  const beforeIso = asOfDate.toISOString().slice(0, 10)
+  try {
+    const { data, error } = await supabase
+      .from('property_transactions_v2')
+      .select('transaction_price, floor_area_sqm, transaction_date')
+      .ilike('project_name', name)
+      .in('unit_type', ['Condominium', 'Apartment', 'Executive Condominium'])
+      .gte('floor_area_sqm', lo)
+      .lte('floor_area_sqm', hi)
+      .lt('transaction_date', beforeIso)
+      .order('transaction_date', { ascending: false })
+      .limit(1)
+    if (error || !data || data.length === 0) return null
+    const row = data[0] as {
+      transaction_price: number | string | null
+      floor_area_sqm: number | string | null
+      transaction_date: string | null
+    }
+    const price = Number(row.transaction_price)
+    const areaSqm = Number(row.floor_area_sqm)
+    if (!(price > 0) || !(areaSqm > 0) || !row.transaction_date) return null
+    const transactionDate = new Date(row.transaction_date)
+    if (Number.isNaN(transactionDate.getTime())) return null
+    return { psf: price / areaSqm, areaSqm, transactionDate, segment }
+  } catch {
+    return null
+  }
+}
+
+// 4. Indexed Market Value = anchor psm × (index@today / index@anchor) × subject
+//    area. Null-safe at every step: any missing piece (segment, size-matched
+//    anchor, either index value) yields null, and the caller uses the neutral
+//    valuation alone. Returns the anchor alongside the value for UI transparency.
+async function computeMarketValue(
+  projectName: string,
+  targetAreaSqm: number,
+  asOfDate: Date
+): Promise<{ value: number; anchor: IndexedMvAnchor } | null> {
+  const segment = await getProjectMarketSegment(projectName)
+  if (!segment) return null
+  const anchor = await findSizeMatchedAnchor(projectName, targetAreaSqm, asOfDate, segment)
+  if (!anchor) return null
+  const indexAtAnchor = await getIndexValueAsOf(segment, anchor.transactionDate)
+  const indexAtTarget = await getIndexValueAsOf(segment, asOfDate)
+  if (!indexAtAnchor || !indexAtTarget) return null
+  const value = anchor.psf * (indexAtTarget / indexAtAnchor) * targetAreaSqm
+  if (!Number.isFinite(value) || value <= 0) return null
+  return { value, anchor }
+}
+
+// 5. Same-project sales in the trailing 12 months before asOfDate — the volume
+//    signal that drives the taper weight. (No existing helper returns a count;
+//    the size-curve/thin-data logic filters recent rows but doesn't expose a
+//    per-project sales-per-year figure, so this is purpose-built.)
+async function getSameProjectVolume(
+  projectName: string,
+  asOfDate: Date
+): Promise<number> {
+  const name = normalizeText(projectName)
+  if (!name) return 0
+  const fromIso = new Date(asOfDate.getTime() - 365 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10)
+  const beforeIso = asOfDate.toISOString().slice(0, 10)
+  try {
+    const { count, error } = await supabase
+      .from('property_transactions_v2')
+      .select('*', { count: 'exact', head: true })
+      .ilike('project_name', name)
+      .in('unit_type', ['Condominium', 'Apartment', 'Executive Condominium'])
+      .gte('transaction_date', fromIso)
+      .lt('transaction_date', beforeIso)
+    if (error || count == null) return 0
+    return count
+  } catch {
+    return 0
+  }
+}
+
+// 6. Volume taper: full Indexed-MV weight in thin projects, none in liquid ones,
+//    linear between. Chosen over a hard switch (avoids valuation jumps at the
+//    threshold) and a flat blend (matches hard-switch accuracy without the cliff).
+function getMarketValueWeight(salesPerYear: number): number {
+  if (salesPerYear <= 3) return 1
+  if (salesPerYear >= 6) return 0
+  return 1 - (salesPerYear - 3) / 3
+}
+
+const EMPTY_INDEXED_MV = {
+  indexedMarketValue: null,
+  indexedMarketValueWeight: 0,
+  indexedMarketValueAnchor: null,
+} as const
+
+// 7. Attach the Indexed Market Value fields to a neutral result. Purely additive:
+//    existing fields are never modified. Condo/EC only; HDB & landed get inert
+//    defaults (null / 0 / blended = neutral) so the response shape is uniform.
+async function attachIndexedMarketValue(
+  result: CandidateResult,
+  params: ValuationParams
+): Promise<CandidateResult> {
+  const neutral = result.estimated
+  const { propertyCategory, subjectProjectName, floorAreaSqm } = params
+
+  if (propertyCategory !== 'condo' && propertyCategory !== 'ec') {
+    return { ...result, ...EMPTY_INDEXED_MV, blendedEstimate: neutral }
+  }
+  if (!subjectProjectName || !(floorAreaSqm > 0)) {
+    return { ...result, ...EMPTY_INDEXED_MV, blendedEstimate: neutral }
+  }
+
+  const asOfDate = new Date()
+  const mv = await computeMarketValue(subjectProjectName, floorAreaSqm, asOfDate)
+
+  // Fail-safe (mandatory): when no size-matched anchor / segment / index exists,
+  // Indexed Market Value is simply unavailable — weight is 0 REGARDLESS of the
+  // same-project sales-per-year count, and the blend collapses to neutral-only.
+  if (!mv) {
+    return { ...result, ...EMPTY_INDEXED_MV, blendedEstimate: neutral }
+  }
+
+  const salesPerYear = await getSameProjectVolume(subjectProjectName, asOfDate)
+  const weight = getMarketValueWeight(salesPerYear)
+  const blendedEstimate = weight * mv.value + (1 - weight) * neutral
+
+  return {
+    ...result,
+    indexedMarketValue: mv.value,
+    indexedMarketValueWeight: weight,
+    indexedMarketValueAnchor: {
+      psf: mv.anchor.psf,
+      areaSqm: mv.anchor.areaSqm,
+      transactionDate: mv.anchor.transactionDate.toISOString().slice(0, 10),
+    },
+    blendedEstimate,
+  }
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export async function getValuation({
+// Public entry point. Runs the (unchanged) neutral valuation, then layers the
+// additive Stage 6 Indexed Market Value fields on top. Wrapping here — rather
+// than at each of getValuationCore's internal return points — means both fresh
+// and cached results get the fields uniformly, and the neutral core stays
+// byte-identical on every existing field.
+export async function getValuation(
+  params: ValuationParams
+): Promise<CandidateResult | null> {
+  const result = await getValuationCore(params)
+  if (!result) return result
+  return attachIndexedMarketValue(result, params)
+}
+
+async function getValuationCore({
   lat,
   lon,
   floorAreaSqm,
