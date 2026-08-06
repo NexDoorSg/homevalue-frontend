@@ -24,6 +24,12 @@ function normalizeStreetName(streetName: string | null | undefined) {
     .replace(/\bSOUTH\b/g, 'STH')
     .replace(/\bEAST\b/g, 'EST')
     .replace(/\bWEST\b/g, 'WEST')
+    .replace(/\bKAMPONG\b/g, 'KG')
+    .replace(/\bJALAN\b/g, 'JLN')
+    .replace(/\bLORONG\b/g, 'LOR')
+    .replace(/\bUPPER\b/g, 'UPP')
+    .replace(/\bCOMMONWEALTH\b/g, "C'WEALTH")
+    .replace(/\bTANJONG\b/g, 'TG')
     .replace(/\s+/g, ' ')
     .trim()
 }
