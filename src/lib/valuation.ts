@@ -421,6 +421,8 @@ const HDB_STREET_ABBREV: [RegExp, string][] = [
   [/\bBOULEVARD\b/g, 'BLVD'], [/\bCENTRAL\b/g, 'CTRL'], [/\bHEIGHTS\b/g, 'HTS'],
   [/\bGARDENS\b/g, 'GDNS'], [/\bNORTH\b/g, 'NTH'], [/\bSOUTH\b/g, 'STH'],
   [/\bEAST\b/g, 'EST'], [/\bWEST\b/g, 'WEST'],
+  [/\bKAMPONG\b/g, 'KG'], [/\bJALAN\b/g, 'JLN'], [/\bLORONG\b/g, 'LOR'],
+  [/\bUPPER\b/g, 'UPP'], [/\bCOMMONWEALTH\b/g, "C'WEALTH"], [/\bTANJONG\b/g, 'TG'],
 ]
 
 function normalizeHdbStreetKey(street: string | null | undefined): string {

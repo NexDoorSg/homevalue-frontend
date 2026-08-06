@@ -83,6 +83,12 @@ _STREET_ABBREV = [
     (r"\bSOUTH\b", "STH"),
     (r"\bEAST\b", "EST"),
     (r"\bWEST\b", "WEST"),
+    (r"\bKAMPONG\b", "KG"),
+    (r"\bJALAN\b", "JLN"),
+    (r"\bLORONG\b", "LOR"),
+    (r"\bUPPER\b", "UPP"),
+    (r"\bCOMMONWEALTH\b", "C'WEALTH"),
+    (r"\bTANJONG\b", "TG"),
 ]
 _STREET_ABBREV_RE = [(re.compile(p), r) for p, r in _STREET_ABBREV]
 
