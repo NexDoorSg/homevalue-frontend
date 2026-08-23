@@ -221,9 +221,12 @@ async function fetchTransactions(
     }
 
     const { data, error } = await query
+    // These rows are the matcher's primary input; a swallowed error here would
+    // silently return "no matching projects" (or a truncated shortlist) for what
+    // is actually a backend failure. An empty budget/size window legitimately
+    // returns `data: []` with no error and still yields zero results.
     if (error) {
-      console.error('project-matcher query error:', error)
-      break
+      throw new Error(`project-matcher transactions query failed: ${error.message}`)
     }
     if (!data || data.length === 0) break
     rows.push(...(data as TxRow[]))

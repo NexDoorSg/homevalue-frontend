@@ -51,9 +51,12 @@ async function fetchUnitTransactions(projectName: string): Promise<RawRow[]> {
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1)
 
+    // Propagate query failures rather than returning a partial page set — an
+    // empty `blocks: []` is indistinguishable from a project that has no
+    // unit-level records, which is how a DB failure used to reach the UI as
+    // "no data". Zero matching rows is still a clean empty result.
     if (error) {
-      console.error('tower transactions query error:', error)
-      break
+      throw new Error(`tower transactions query failed: ${error.message}`)
     }
     if (!data || data.length === 0) break
     rows.push(...(data as RawRow[]))
@@ -155,12 +158,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!decoded) return json({ error: 'A project slug is required.' }, { status: 400 })
 
     // Master row gives the canonical name + header details (district/tenure/units).
-    const { data: master } = await supabase
+    // A missing row is fine — the slug is then used as-is — but a query *error*
+    // is a real failure and must not be mistaken for "no master row".
+    const { data: master, error: masterError } = await supabase
       .from('projects_master')
       .select('project_name, district, tenure, total_units')
       .ilike('project_name', decoded)
       .limit(1)
       .maybeSingle()
+
+    if (masterError) {
+      throw new Error(`tower master query failed: ${masterError.message}`)
+    }
 
     const canonicalName = (master?.project_name as string) || decoded
     const rows = await fetchUnitTransactions(canonicalName)

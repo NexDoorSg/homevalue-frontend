@@ -2848,7 +2848,12 @@ async function findSizeMatchedAnchor(
     const { data, error } = await supabase
       .from('property_transactions_v2')
       .select('transaction_price, floor_area_sqm, transaction_date')
-      .ilike('project_name', name)
+      // eq, not ilike: `name` is already upper-cased by normalizeText and every
+      // project_name in the table is stored upper-case, so this matches exactly
+      // what ilike matched — but a plain btree cannot serve ~~*, so ilike forced
+      // a full sequential scan of ~877k rows (~642ms, against a 3s anon
+      // statement_timeout). eq uses idx_ptx_v2_project_name_id.
+      .eq('project_name', name)
       .in('unit_type', ['Condominium', 'Apartment', 'Executive Condominium'])
       .gte('floor_area_sqm', lo)
       .lte('floor_area_sqm', hi)
@@ -2911,7 +2916,8 @@ async function getSameProjectVolume(
     const { count, error } = await supabase
       .from('property_transactions_v2')
       .select('*', { count: 'exact', head: true })
-      .ilike('project_name', name)
+      // eq rather than ilike, for the same reason as findSizeMatchedAnchor above.
+      .eq('project_name', name)
       .in('unit_type', ['Condominium', 'Apartment', 'Executive Condominium'])
       .gte('transaction_date', fromIso)
       .lt('transaction_date', beforeIso)
