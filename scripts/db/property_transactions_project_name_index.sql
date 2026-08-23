@@ -1,0 +1,30 @@
+-- Index supporting every per-project read of property_transactions_v2.
+--
+-- Background: the table carries ~877k rows / ~290MB but was indexed only on
+-- (id) and (address, transaction_date, transaction_price). Nothing covered
+-- project_name, so every "one project's transactions" query — the Project
+-- Directory stats and tower views here, and NexDoor Office's Project Info,
+-- profitability-summary, rental-summary and deck price-trend sections — ran a
+-- full sequential scan of the whole table.
+--
+-- That scan costs ~0.2-0.6s uncontended, but the anon role's statement_timeout
+-- is 3s and the instance has 256MB of shared_buffers for a 212MB heap. Opening
+-- one project page fires two to four of these scans concurrently; they lose
+-- their parallel workers (max_parallel_workers = 2 cluster-wide) and evict each
+-- other from cache, so each one runs long and Postgres cancels it with 57014.
+-- PostgREST returns 500, and the callers rendered that as an empty project.
+-- Observed on THE PALETTE (1,308 rows); any of the 101 projects with more than
+-- 1,000 transactions is equally exposed.
+--
+-- The composite serves both halves of those queries: project_name for the
+-- equality filter and id for the `order=id.asc` paging, so the planner gets an
+-- index scan that is already in id order and drops the sort node entirely.
+--
+-- Measured on production, same query, before -> after:
+--   Parallel Seq Scan + Sort, 27,216 buffers, 560ms  ->  Index Scan, 229 buffers, 1.5ms
+--
+-- CONCURRENTLY so it can be built against a live table without taking a write
+-- lock. It cannot run inside a transaction block — execute this statement on
+-- its own, not wrapped in BEGIN/COMMIT.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ptx_v2_project_name_id
+  ON public.property_transactions_v2 (project_name, id);

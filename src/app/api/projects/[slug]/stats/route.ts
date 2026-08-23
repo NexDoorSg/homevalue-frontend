@@ -33,9 +33,10 @@ type PriceHistoryPoint = {
 // The physical unit lives inside `address` (e.g. "38 MOUNT VERNON ROAD #06-25"),
 // so the full address is used as the per-unit key for profitability.
 
-// property_transactions_v2 has no index that keeps a project + transaction_date
-// sort fast, so we fetch unordered (by id) and aggregate in memory. Projects top
-// out around ~2.5k transactions, comfortably within a few pages.
+// property_transactions_v2 is indexed on (project_name, id), so filtering by
+// project and paging in id order is an index scan with no sort step. There is no
+// index that also carries transaction_date, so the quarterly bucketing below is
+// done in memory. Projects top out around ~3k transactions, a few pages at most.
 async function fetchProjectTransactions(projectName: string): Promise<TxRow[]> {
   const PAGE = 1000
   const MAX_ROWS = 20000
@@ -49,9 +50,13 @@ async function fetchProjectTransactions(projectName: string): Promise<TxRow[]> {
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1)
 
+    // A query error is a real failure (timeout, permissions, bad column) and must
+    // not be swallowed — returning the rows fetched so far would render as a
+    // legitimately empty or half-complete project. A project with genuinely zero
+    // transactions comes back as `data: []` with no error and still ends up as a
+    // clean empty result below.
     if (error) {
-      console.error('project stats transactions query error:', error)
-      break
+      throw new Error(`project stats transactions query failed: ${error.message}`)
     }
     if (!data || data.length === 0) break
     rows.push(...(data as TxRow[]))
