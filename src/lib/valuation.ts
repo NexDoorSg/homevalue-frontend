@@ -118,6 +118,12 @@ type CandidateResult = {
     transactionDate: string
   } | null
   blendedEstimate?: number
+  // Subject completion ("built") year, surfaced for display. HDB: the same
+  // resolved value used internally for age-weighting — the full fallback chain
+  // subjectCompletionYearHdb → subjectCompletionYear → hdb_block_info.year_completed
+  // → mode of same-block transactions (i.e. buildHdbCandidate's effectiveCompletionYear).
+  // Condo/EC/landed: the caller's subjectCompletionYear. null when unresolved.
+  completionYear?: number | null
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -794,6 +800,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
         comparables: sameBlockRows.length,
         radius,
         method: methodOut,
+        completionYear: effectiveCompletionYear,
       }
     }
     // Estimator unusable (no valid same-block psm) — fall through to shared weighting.
@@ -872,6 +879,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     comparables: trimmed.length,
     radius,
     method: blendedMethod,
+    completionYear: effectiveCompletionYear,
   }
 }
 
@@ -3027,7 +3035,12 @@ export async function getValuation(
 ): Promise<CandidateResult | null> {
   const result = await getValuationCore(params)
   if (!result) return result
-  return attachIndexedMarketValue(result, params)
+  const withIndexed = await attachIndexedMarketValue(result, params)
+  // Surface the subject "built" year. HDB already carries the fully-resolved
+  // value from buildHdbCandidate (effectiveCompletionYear); condo/EC/landed fall
+  // back to the caller's subjectCompletionYear. null when unresolved.
+  withIndexed.completionYear = withIndexed.completionYear ?? params.subjectCompletionYear ?? null
+  return withIndexed
 }
 
 async function getValuationCore({
