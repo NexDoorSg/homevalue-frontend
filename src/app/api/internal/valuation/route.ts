@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getValuation } from '@/lib/valuation'
+import { getValuation, subjectHdbStreetKey } from '@/lib/valuation'
 import { getRenovationConditionTiers } from '@/lib/renovationTiers'
 import { supabase } from '@/lib/supabase'
 
@@ -163,8 +163,19 @@ async function getComparableTransactions(body: Payload) {
 
   if (category === 'hdb') {
     const subjectBlock = normalizeText(body.subjectBlockNo) || extractBlockNumber(body.subjectAddress)
-    const primary = cleaned.filter((row) => extractBlockNumber(row.address) === subjectBlock).slice(0, 12)
-    const nearby = cleaned.filter((row) => extractBlockNumber(row.address) !== subjectBlock).slice(0, 12)
+    // Same-block requires the same block number AND the same street: the block
+    // number alone collides across streets (e.g. "40 BEDOK STH RD" and "40 CHAI
+    // CHEE AVE" both extract "40"), which wrongly pulled a different street 1.5km
+    // away into the "Same Block" table. Street key reuses the engine's normaliser
+    // so "BEDOK SOUTH ROAD" (subject) resolves to the stored "BEDOK STH RD" form.
+    // When the subject street is unknown, fall back to block-only (never drop a
+    // legitimate match to zero).
+    const subjectStreet = subjectHdbStreetKey(body.subjectStreetName, body.subjectAddress)
+    const isSameBlock = (row: (typeof cleaned)[number]) =>
+      extractBlockNumber(row.address) === subjectBlock &&
+      (!subjectStreet || subjectHdbStreetKey(row.streetName, row.address) === subjectStreet)
+    const primary = cleaned.filter(isSameBlock).slice(0, 12)
+    const nearby = cleaned.filter((row) => !isSameBlock(row)).slice(0, 12)
     return { primary, nearby }
   }
 

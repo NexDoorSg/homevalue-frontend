@@ -433,7 +433,10 @@ function normalizeHdbStreetKey(street: string | null | undefined): string {
 
 // Subject street from the explicit street name, else parsed off the address
 // (leading block token removed). Normalised to the hdb_block_info key form.
-function subjectHdbStreetKey(
+// Exported so the internal-valuation route reuses the exact same normaliser for
+// its "same block" comparable split (block number alone collides across streets
+// — e.g. "40 BEDOK STH RD" vs "40 CHAI CHEE AVE" both extract block "40").
+export function subjectHdbStreetKey(
   streetName: string | null | undefined,
   address: string | null | undefined
 ): string {
@@ -595,35 +598,63 @@ async function buildHdbCandidate(
   subjectBlockNo: string,
   subjectCompletionYear: number | null,
   subjectLat: number,
-  subjectLon: number
+  subjectLon: number,
+  subjectStreetKey: string
 ): Promise<CandidateResult | null> {
   if (allRows.length === 0) return null
+
+  // Street key for a transaction row (block token stripped, normalised the same
+  // way as the subject). CleanedRow carries no street_name, so derive it from the
+  // address — subjectHdbStreetKey with a null name does exactly that.
+  const rowStreetKey = (address: string | null) => subjectHdbStreetKey(null, address)
 
   // The subject block number can arrive null/empty (e.g. from the internal
   // checker). Fall back to the most common block number among rows that are
   // essentially at the subject location (within 50m) so same-block filtering
   // still works instead of always falling through to hdb_nearby_all.
   let effectiveBlockNo = subjectBlockNo
-  if (!effectiveBlockNo) {
+  // Same for the street: prefer the passed subject street key, else adopt the
+  // dominant street among those <50m rows (the subject sits at 0m, so its own
+  // street dominates). This keeps block+street coming from the same cluster.
+  let effectiveStreetKey = subjectStreetKey
+  if (!effectiveBlockNo || !effectiveStreetKey) {
     const blockCounts = new Map<string, number>()
+    const streetCounts = new Map<string, number>()
     for (const row of allRows) {
       if (row.distanceM > 50) continue
       const block = extractBlockNumber(row.address)
-      if (!block) continue
-      blockCounts.set(block, (blockCounts.get(block) ?? 0) + 1)
+      if (block) blockCounts.set(block, (blockCounts.get(block) ?? 0) + 1)
+      const skey = rowStreetKey(row.address)
+      if (skey) streetCounts.set(skey, (streetCounts.get(skey) ?? 0) + 1)
     }
-    let bestCount = 0
-    for (const [block, count] of blockCounts) {
-      if (count > bestCount) {
-        bestCount = count
-        effectiveBlockNo = block
+    if (!effectiveBlockNo) {
+      let bestCount = 0
+      for (const [block, count] of blockCounts) {
+        if (count > bestCount) {
+          bestCount = count
+          effectiveBlockNo = block
+        }
+      }
+    }
+    if (!effectiveStreetKey) {
+      let bestCount = 0
+      for (const [skey, count] of streetCounts) {
+        if (count > bestCount) {
+          bestCount = count
+          effectiveStreetKey = skey
+        }
       }
     }
   }
 
-  let sameBlockRows = effectiveBlockNo
-    ? allRows.filter((row) => extractBlockNumber(row.address) === effectiveBlockNo)
-    : []
+  // True same-block test: same block number AND same street. When the street is
+  // unknown (no subject street and none derivable), fall back to block-only so a
+  // legitimate match is never dropped to zero.
+  const isSameBlockRow = (row: CleanedRow) =>
+    extractBlockNumber(row.address) === effectiveBlockNo &&
+    (!effectiveStreetKey || rowStreetKey(row.address) === effectiveStreetKey)
+
+  let sameBlockRows = effectiveBlockNo ? allRows.filter(isSameBlockRow) : []
 
   // Second fallback: if we still couldn't identify same-block rows, treat rows
   // within 50m (essentially the same location) as a same-block proxy.
@@ -662,7 +693,7 @@ async function buildHdbCandidate(
         blockData as TransactionRow[],
         subjectLat,
         subjectLon
-      ).filter((row) => extractBlockNumber(row.address) === effectiveBlockNo)
+      ).filter(isSameBlockRow)
 
       const sorted = sameBlockAnyTypeRows
         .map((r) => r.pricePerSqm)
@@ -705,10 +736,7 @@ async function buildHdbCandidate(
   // already down-weighted — recency × age sorts it out. completion_year is still
   // required so getHdbAgeWeight can grade the row (it's ~100% populated on HDB).
   const nearbyAgeWeighted = effectiveCompletionYear
-    ? allRows.filter(
-        (row) =>
-          extractBlockNumber(row.address) !== effectiveBlockNo && row.completion_year != null
-      )
+    ? allRows.filter((row) => !isSameBlockRow(row) && row.completion_year != null)
     : []
 
   let valuationPool: CleanedRow[]
@@ -797,7 +825,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     const rawRecencyWeight = getRecencyWeight(row.transaction_date, 'hdb')
     const recencyWeight = capRecency ? Math.min(rawRecencyWeight, 2.0) : rawRecencyWeight
     const floorWeight = getFloorWeight(subjectFloorLevel, row.parsedFloorLevel)
-    const blockWeight = effectiveBlockNo && extractBlockNumber(row.address) === effectiveBlockNo ? 3.0 : 1.0
+    const blockWeight = effectiveBlockNo && isSameBlockRow(row) ? 3.0 : 1.0
     const ageWeight = getHdbAgeWeight(row.completion_year, effectiveCompletionYear)
     return distanceWeight * sizeWeight * recencyWeight * floorWeight * blockWeight * ageWeight
   })
@@ -3031,6 +3059,10 @@ async function getValuationCore({
 
   if (propertyCategory === 'hdb') {
     const blockNo = subjectBlockNo || extractBlockNumber(subjectAddress)
+    // Normalised subject street key — pairs with the block number so same-block
+    // filtering requires BOTH (a shared block number across two different streets
+    // must not be treated as the same block).
+    const subjectStreetKey = subjectHdbStreetKey(subjectStreetName, subjectAddress)
     let completionYear = subjectCompletionYearHdb ?? subjectCompletionYear ?? null
 
     // Zero-history blocks: no caller-supplied year, and (for a block with no
@@ -3041,10 +3073,7 @@ async function getValuationCore({
     // otherwise unknown, and a hit changes nothing for blocks that already have
     // a derivable year (the table year equals the block's true completion year).
     if (completionYear == null) {
-      completionYear = await lookupHdbBlockCompletionYear(
-        blockNo,
-        subjectHdbStreetKey(subjectStreetName, subjectAddress)
-      )
+      completionYear = await lookupHdbBlockCompletionYear(blockNo, subjectStreetKey)
     }
 
     let bestCandidate: CandidateResult | null = null
@@ -3076,7 +3105,8 @@ async function getValuationCore({
         blockNo,
         completionYear,
         lat,
-        lon
+        lon,
+        subjectStreetKey
       )
 
       if (!candidate) continue
@@ -3131,7 +3161,7 @@ async function getValuationCore({
     const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
     if (fallbackRows.length === 0) return null
 
-    const fallbackResult = await buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear, lat, lon)
+    const fallbackResult = await buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear, lat, lon, subjectStreetKey)
     if (fallbackResult && cacheKey) await writeCache(cacheKey, fallbackResult)
     return fallbackResult
   }
