@@ -94,7 +94,15 @@ export function getRenovationConditionTiers(
   const bands = propertyCategory === 'hdb' ? HDB_BANDS : CONDO_BANDS
   const band = pickBand(bands, floorAreaSqm)
 
-  const rawOriginal = marketValue - band.cost
+  // "Original" (as-built) is priced at Market Value minus 40% of a full
+  // renovation — a buyer of an unrenovated unit discounts for the reno they will
+  // do, but not the whole cost (they inherit the shell, location and layout). The
+  // 0.70×MV floor stays as a defensive backstop against garbage inputs; at a 40%
+  // deduction it can only bind when MV < 1.333 × band.cost (max ~$147k for the
+  // $110k Executive band), which no realistic property in that band ever hits, so
+  // it never binds in practice.
+  const ORIGINAL_DEDUCTION_SHARE = 0.4
+  const rawOriginal = marketValue - band.cost * ORIGINAL_DEDUCTION_SHARE
   const floor = marketValue * ORIGINAL_CONDITION_FLOOR_SHARE
   const conditionOriginal = Math.max(floor, rawOriginal)
 
