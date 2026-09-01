@@ -302,6 +302,36 @@ function extractBlockNumber(address: string | null | undefined) {
   return match ? match[1] : ''
 }
 
+// Same-street check for HDB "same block" matching: a block NUMBER alone collides
+// across streets (e.g. "40 BEDOK STH RD" and "40 CHAI CHEE AVE" both extract
+// block "40"), so the same-block ranking boost must also require the same street.
+// Mirrors the subjectHdbStreetKey normalizer in src/lib/valuation.ts — strip the
+// block token + postal, then apply the HDB street abbreviations so a fuller
+// subject address ("BEDOK SOUTH ROAD") resolves to the stored "BEDOK STH RD".
+const HDB_STREET_ABBREV: [RegExp, string][] = [
+  [/\bBUKIT\b/g, 'BT'], [/\bMOUNT\b/g, 'MT'], [/\bSAINT\b/g, 'ST'],
+  [/\bAVENUE\b/g, 'AVE'], [/\bSTREET\b/g, 'ST'], [/\bROAD\b/g, 'RD'],
+  [/\bDRIVE\b/g, 'DR'], [/\bCRESCENT\b/g, 'CRES'], [/\bPLACE\b/g, 'PL'],
+  [/\bCLOSE\b/g, 'CL'], [/\bLANE\b/g, 'LN'], [/\bTERRACE\b/g, 'TER'],
+  [/\bBOULEVARD\b/g, 'BLVD'], [/\bCENTRAL\b/g, 'CTRL'], [/\bHEIGHTS\b/g, 'HTS'],
+  [/\bGARDENS\b/g, 'GDNS'], [/\bNORTH\b/g, 'NTH'], [/\bSOUTH\b/g, 'STH'],
+  [/\bEAST\b/g, 'EST'], [/\bWEST\b/g, 'WEST'],
+  [/\bKAMPONG\b/g, 'KG'], [/\bJALAN\b/g, 'JLN'], [/\bLORONG\b/g, 'LOR'],
+  [/\bUPPER\b/g, 'UPP'], [/\bCOMMONWEALTH\b/g, "C'WEALTH"], [/\bTANJONG\b/g, 'TG'],
+]
+
+function normalizeHdbStreetKey(street: string | null | undefined) {
+  let s = (street || '').toUpperCase().replace(/\s+/g, ' ').trim()
+  for (const [rx, rep] of HDB_STREET_ABBREV) s = s.replace(rx, rep)
+  return s.replace(/\s+/g, ' ').trim()
+}
+
+// Normalised street key from a full address (block token + postal stripped via
+// the existing getStreetLikeSearchTerm, then abbreviated).
+function hdbStreetKeyFromAddress(address: string | null | undefined) {
+  return normalizeHdbStreetKey(getStreetLikeSearchTerm(address))
+}
+
 function getBedroomCount(value: string | null | undefined) {
   const text = normaliseComparableText(value)
   const match = text.match(/\b([1-6])\s*(BEDROOM|BED|BR)\b/)
@@ -528,7 +558,16 @@ function getTransactionScore(form: ReportForm, row: any, distanceM: number) {
   const recencyScore = rowDate > 0 ? rowDate / 10000000000000 : 0
 
   if (propertyCategory === 'hdb') {
-    const sameBlock = extractBlockNumber(form.property_address) && extractBlockNumber(form.property_address) === extractBlockNumber(row.address)
+    // Same block requires the same block number AND the same street — a shared
+    // block number across two different streets is not the same block. When the
+    // subject street can't be derived, fall back to block-only (don't drop a
+    // legitimate boost to zero).
+    const subjectBlock = extractBlockNumber(form.property_address)
+    const subjectStreet = hdbStreetKeyFromAddress(form.property_address)
+    const sameBlock =
+      Boolean(subjectBlock) &&
+      subjectBlock === extractBlockNumber(row.address) &&
+      (!subjectStreet || subjectStreet === hdbStreetKeyFromAddress(row.address))
     return (sameBlock ? 500 : 0) + sizeScore * 120 + distanceScore * 10000 + recencyScore
   }
 
