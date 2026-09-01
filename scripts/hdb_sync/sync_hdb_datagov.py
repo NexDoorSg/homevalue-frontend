@@ -34,7 +34,13 @@ from datetime import date, timedelta
 
 # ---- data.gov.sg ----
 DATAGOV = "https://data.gov.sg/api/action/datastore_search"
-RID = "f1765b54-a209-4718-8d38-a39237f502b3"
+# Published dataset identifier shown by the current official data.gov.sg page.
+# The older resource identifier remains a live alias (same row count and boundary
+# records when last verified on 2026-09-01), so the production writer retains it
+# to avoid changing a working ingestion contract in this integrity-only PR.
+OFFICIAL_DATASET_ID = "d_8b84c4ee58e3cfc0ece0d773c8ca6abc"
+LEGACY_RESOURCE_ID = "f1765b54-a209-4718-8d38-a39237f502b3"
+RID = LEGACY_RESOURCE_ID
 
 # Always sync the previous + current calendar month, computed at runtime,
 # so a recurring (e.g. weekly) job never freezes on a stale month list.
@@ -46,11 +52,14 @@ this_month = today.replace(day=1)
 prev_month = (this_month - timedelta(days=1)).replace(day=1)
 MONTHS = [month_str(prev_month), month_str(this_month)]
 PAGE = 1000
-DATAGOV_PACING_S = 0.3
+# Official unauthenticated datastore quota is currently 4 calls / 10 seconds.
+# Stay just below it so a complete reconciliation does not exhaust the shared
+# public allowance and starve the next request.
+DATAGOV_PACING_S = 2.6
 
 # ---- HTTP (shared by get_json) ----
 HTTP_MAX_RETRIES = 4
-HTTP_BACKOFF_S = 0.4
+HTTP_BACKOFF_S = 2.5
 
 # ---- OneMap ----
 ONEMAP = "https://www.onemap.gov.sg/api/common/elastic/search"
@@ -139,25 +148,51 @@ def get_json(url, headers=None):
             raise
 
 
-def fetch_datagov_month(month):
-    rows, offset = [], 0
+def fetch_datagov_rows(filters=None, resource_id=RID, page_size=PAGE, pace_s=DATAGOV_PACING_S):
+    """Fetch every row for optional exact-match filters, with count validation.
+
+    This is shared by the incremental writer and the read-only reconciliation
+    job.  A short/empty page before the advertised total is an error: silently
+    accepting it would make a partial source read look complete.
+    """
+    rows, offset, expected_total = [], 0, None
     while True:
-        qs = urllib.parse.urlencode(
-            {"resource_id": RID, "filters": json.dumps({"month": month}), "limit": PAGE, "offset": offset}
-        )
+        params = {"resource_id": resource_id, "limit": page_size, "offset": offset}
+        if filters:
+            params["filters"] = json.dumps(filters)
+        qs = urllib.parse.urlencode(params)
         data, _ = get_json(f"{DATAGOV}?{qs}")
         result = data.get("result", {})
         recs = result.get("records", [])
+        total = int(result.get("total", 0))
+        if expected_total is None:
+            expected_total = total
+        elif total != expected_total:
+            raise RuntimeError(
+                f"data.gov.sg total changed during pagination: {expected_total} -> {total}"
+            )
         rows.extend(recs)
-        total = result.get("total", 0)
-        offset += PAGE
+        offset += len(recs)
         # Pace every request, including the last one of a month: the rate limit is
         # account-wide, so the next month's first page needs the gap just as much
         # as the next page does.
-        time.sleep(DATAGOV_PACING_S)
-        if not recs or offset >= total:
+        if pace_s:
+            time.sleep(pace_s)
+        if offset >= total:
             break
+        if not recs:
+            raise RuntimeError(
+                f"data.gov.sg pagination stopped at {offset}/{total}; refusing a partial result"
+            )
+    if len(rows) != (expected_total or 0):
+        raise RuntimeError(
+            f"data.gov.sg returned {len(rows)} rows but advertised {expected_total or 0}"
+        )
     return rows
+
+
+def fetch_datagov_month(month):
+    return fetch_datagov_rows({"month": month})
 
 
 def to_float(v):

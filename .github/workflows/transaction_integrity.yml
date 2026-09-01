@@ -1,0 +1,64 @@
+name: Residential Transaction Integrity
+
+# Deep, read-only reconciliation complements the normal weekly HDB write sync.
+# It detects older official additions, corrections or removals without attempting
+# an automatic historical repair.
+on:
+  workflow_dispatch:
+    inputs:
+      max_rows:
+        description: 'Optional per-source row cap for a partial diagnostic (0 = complete)'
+        type: string
+        default: '0'
+
+# Manual-only while known HDB/private integrity backlog makes
+# --fail-on-divergence intentionally red. Enable periodic scheduling only after
+# repair or a separately reviewed baseline-aware monitoring policy exists.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: residential-transaction-integrity
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Reconcile transaction data (read only)
+        env:
+          REQUESTED_MAX_ROWS: ${{ inputs.max_rows || '0' }}
+        run: |
+          set -uo pipefail
+          case "$REQUESTED_MAX_ROWS" in
+            ''|*[!0-9]*)
+              echo "::error::max_rows must be a non-negative integer"
+              exit 2
+              ;;
+          esac
+
+          set +e
+          python -u scripts/transaction_integrity/reconcile_transactions.py \
+            --max-rows "$REQUESTED_MAX_ROWS" \
+            --max-examples 8 \
+            --fail-on-divergence \
+            --output /tmp/transaction-integrity.json \
+            --markdown-output /tmp/transaction-integrity.md
+          reconcile_status=$?
+          set -e
+
+          cat /tmp/transaction-integrity.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$reconcile_status" -ne 0 ]; then
+            echo "::error::Residential transaction divergence detected. Review the bounded job summary; no repair was attempted."
+          fi
+          exit "$reconcile_status"

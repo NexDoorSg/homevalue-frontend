@@ -18,15 +18,17 @@ Why this exists:
   out-of-scope task — next week's pull still lands broken until then).
 
 What it does, per realis row:
-  1. Geocode (A): if latitude/longitude is null, resolve lat/lon/postal via OneMap
-     from the block+street (unit token stripped), reusing the HDB sync's geocode()
-     (same pacing / retry / NIL handling). Geocoding is per distinct block-address.
+  1. Geocode (A): if latitude/longitude is null, first reuse one unambiguous
+     coordinate from an exact stored address, then an exact project. Only then
+     query OneMap, accepting an exact normalized block/street match rather than
+     its first plausible search result. Geocoding is per distinct block-address.
   2. Remap (B): set
        property_subtype := the transaction type (read from the current unit_type),
        unit_type        := the property type, resolved by priority:
-                             (i)  current property_subtype if it names a property type,
-                             (ii) else derived from property_group,
-                             (iii) else UNRESOLVED → row skipped + reported (never guessed).
+                             (i)  existing valid unit_type/property_subtype,
+                             (ii) an explicit property_group,
+                             (iii) one unambiguous exact projects_master type,
+                             (iv) else UNRESOLVED → skipped + reported (never guessed).
 
 Safety:
   - --dry-run (default) writes NOTHING. Resolves + reports only.
@@ -45,7 +47,6 @@ Usage:
 """
 
 import os
-import re
 import sys
 import json
 import time
@@ -55,6 +56,11 @@ import urllib.parse
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS_DIR = os.path.dirname(HERE)
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
+from transaction_integrity import core
+
 # Reuse the HDB sync's geocoder + constants (same OneMap pacing/retry/NIL guard).
 _spec = importlib.util.spec_from_file_location("sync_hdb", os.path.join(HERE, "..", "hdb_sync", "sync_hdb_datagov.py"))
 sync = importlib.util.module_from_spec(_spec)
@@ -66,110 +72,53 @@ TABLE = sync.TABLE
 SERVICE_KEY = os.environ.get("SUPABASE_KEY", "")
 PAGE = 1000
 
-UNIT_RE = re.compile(r"\s*#\s*\d+[-/]\S+\s*$")  # strip a trailing "#07-15" unit token
-
 # ── Canonicalisation ─────────────────────────────────────────────────────────
-# Target property-type vocabulary the valuation engine filters on.
-_PTYPE = {
-    "condominium": "Condominium",
-    "condo": "Condominium",
-    "apartment": "Apartment",
-    "executive condominium": "Executive Condominium",
-    "ec": "Executive Condominium",
-    "terrace house": "Terrace House",
-    "semi-detached house": "Semi-Detached House",
-    "detached house": "Detached House",
-}
-_TXN = {"resale": "Resale", "new sale": "New Sale", "sub sale": "Sub Sale"}
-# property_group values that are a property type (not a region / not "private").
-_GROUP_PTYPE = {
-    "condo": "Condominium",
-    "condominium": "Condominium",
-    "apartment": "Apartment",
-    "ec": "Executive Condominium",
-    "executive condominium": "Executive Condominium",
-    "terrace house": "Terrace House",
-    # "Landed" is deliberately absent: it does not disambiguate Terrace/Semi-D/Detached.
-}
-
-
-# projects_master.property_type vocabulary → engine vocabulary.
-_PM_PTYPE = {
-    "apartment": "Apartment",
-    "condominium": "Condominium",
-    "executive condominium": "Executive Condominium",
-    "terrace": "Terrace House",
-    "strata terrace": "Terrace House",
-    "semi-detached": "Semi-Detached House",
-    "strata semi-detached": "Semi-Detached House",
-    "detached": "Detached House",
-    "strata detached": "Detached House",
-}
-
-
 def ptype_of(v):
-    return _PTYPE.get((v or "").strip().lower())
+    return core.canonical_property_type(v)
 
 
 def txn_of(v):
-    return _TXN.get((v or "").strip().lower())
+    return core.canonical_activity(v)
 
 
 def group_ptype_of(v):
-    return _GROUP_PTYPE.get((v or "").strip().lower())
+    return core.property_type_from_group(v)
 
 
 def norm_name(v):
-    return (v or "").strip().upper()
+    return core.normalize_name(v)
 
 
 def resolve_remap(row, pm_types):
     """-> (new_unit_type, new_property_subtype, reason_if_unresolved, ptype_source).
 
-    Property type is resolved by priority:
-      (i)  current property_subtype if it names a property type,
-      (ii) else property_group if it names a property type (Condo/EC/…),
-      (iii)else projects_master.property_type by project_name,
-      (iv) else UNRESOLVED — the property type is absent from the row and not in
-           projects_master, so it cannot be recovered by this backfill.
+    Classification uses only explicit, unambiguous evidence; see
+    transaction_integrity.core.resolve_classification.
     """
-    txn = txn_of(row.get("unit_type")) or txn_of(row.get("property_subtype"))
-    src = "subtype"
-    ptype = ptype_of(row.get("property_subtype"))
-    if ptype is None:
-        ptype = group_ptype_of(row.get("property_group")); src = "group"
-    if ptype is None:
-        ptype = pm_types.get(norm_name(row.get("project_name"))); src = "projects_master"
-    if ptype is None:
-        return (None, None, f"property-type absent (group={row.get('property_group')!r}, subtype={row.get('property_subtype')!r}, project not in projects_master)", None)
-    if txn is None:
-        return (None, None, f"txn-type unresolved (unit_type={row.get('unit_type')!r})", None)
-    return (ptype, txn, None, src)
+    ptype, txn, reason, source = core.resolve_classification(row, pm_types)
+    return ptype, txn, reason, source
 
 
 def strip_unit(address):
-    return UNIT_RE.sub("", (address or "").strip()).strip()
+    return core.strip_unit(address)
 
 
 # ── Supabase read ────────────────────────────────────────────────────────────
 def fetch_projects_master_types():
     """{normalised project_name: engine property type} from projects_master."""
     base = f"{SUPABASE_URL}/rest/v1/projects_master"
-    out, frm = {}, 0
+    rows, frm = [], 0
     while True:
         qs = urllib.parse.urlencode({"select": "project_name,property_type", "order": "project_name"})
-        req = urllib.request.Request(f"{base}?{qs}", headers={"apikey": ANON_KEY, "Authorization": f"Bearer {ANON_KEY}", "Range": f"{frm}-{frm + PAGE - 1}"})
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = json.load(r)
-        for row in data:
-            pt = _PM_PTYPE.get((row.get("property_type") or "").strip().lower())
-            nm = norm_name(row.get("project_name"))
-            if pt and nm:
-                out.setdefault(nm, pt)
+        data, _ = sync.get_json(
+            f"{base}?{qs}",
+            {"apikey": ANON_KEY, "Authorization": f"Bearer {ANON_KEY}", "Range": f"{frm}-{frm + PAGE - 1}"},
+        )
+        rows.extend(data)
         if len(data) < PAGE:
             break
         frm += PAGE
-    return out
+    return core.collapse_project_types(rows)
 
 
 def fetch_realis_rows(project=None, limit=0):
@@ -184,9 +133,10 @@ def fetch_realis_rows(project=None, limit=0):
         if project:
             params["project_name"] = f"eq.{project}"
         qs = urllib.parse.urlencode(params)
-        req = urllib.request.Request(f"{base}?{qs}", headers={"apikey": ANON_KEY, "Authorization": f"Bearer {ANON_KEY}", "Range": f"{frm}-{frm + PAGE - 1}"})
-        with urllib.request.urlopen(req, timeout=60) as r:
-            data = json.load(r)
+        data, _ = sync.get_json(
+            f"{base}?{qs}",
+            {"apikey": ANON_KEY, "Authorization": f"Bearer {ANON_KEY}", "Range": f"{frm}-{frm + PAGE - 1}"},
+        )
         out.extend(data)
         if len(data) < PAGE:
             break
@@ -194,6 +144,112 @@ def fetch_realis_rows(project=None, limit=0):
         if limit and len(out) >= limit:
             break
     return out[:limit] if limit else out
+
+
+def _fetch_coordinate_rows(column, values):
+    """Fetch coordinate-bearing rows for exact raw values, fully paginated."""
+    base = f"{SUPABASE_URL}/rest/v1/{TABLE}"
+    out = []
+    clean_values = sorted({str(value).replace('"', "").strip() for value in values if str(value or "").strip()})
+    for start in range(0, len(clean_values), 20):
+        chunk = clean_values[start:start + 20]
+        in_values = ",".join(f'"{value}"' for value in chunk)
+        frm = 0
+        while True:
+            params = {
+                "select": "address,project_name,latitude,longitude,postal_code",
+                column: f"in.({in_values})",
+                "latitude": "not.is.null",
+                "longitude": "not.is.null",
+                "order": "id",
+            }
+            qs = urllib.parse.urlencode(params)
+            data, _ = sync.get_json(
+                f"{base}?{qs}",
+                {"apikey": ANON_KEY, "Authorization": f"Bearer {ANON_KEY}", "Range": f"{frm}-{frm + PAGE - 1}"},
+            )
+            out.extend(data)
+            if len(data) < PAGE:
+                break
+            frm += PAGE
+    return out
+
+
+def fetch_trusted_coordinate_maps(rows):
+    """Return unambiguous coordinates keyed by exact normalized address/project."""
+    candidates = _fetch_coordinate_rows("address", [row.get("address") for row in rows])
+    candidates.extend(_fetch_coordinate_rows("project_name", [row.get("project_name") for row in rows]))
+    by_address, by_project = {}, {}
+    for candidate in candidates:
+        address = core.normalize_address(candidate.get("address"))
+        project = core.normalize_name(candidate.get("project_name"))
+        if address:
+            by_address.setdefault(address, []).append(candidate)
+        if project and project != "N A":
+            by_project.setdefault(project, []).append(candidate)
+    address_map = {
+        key: chosen
+        for key, values in by_address.items()
+        if (chosen := core.select_unambiguous_coordinate(values)) is not None
+    }
+    project_map = {
+        key: chosen
+        for key, values in by_project.items()
+        if (chosen := core.select_unambiguous_coordinate(values)) is not None
+    }
+    return address_map, project_map
+
+
+_onemap_exact_cache = {}
+
+
+def lookup_onemap_exact(address):
+    """Resolve one exact address; never accept OneMap's first fuzzy result."""
+    query = strip_unit(address)
+    if query in _onemap_exact_cache:
+        return _onemap_exact_cache[query]
+    chosen = None
+    variants = core.onemap_query_variants(query)
+    variants.extend(candidate for candidate in (sync.expand_ln(query), sync.expand_ctrl(query)) if candidate)
+    for candidate_query in dict.fromkeys(variants):
+        if not candidate_query:
+            continue
+        url = (
+            f"{sync.ONEMAP}?searchVal={urllib.parse.quote(candidate_query)}"
+            "&returnGeom=Y&getAddrDetails=Y&pageNum=1"
+        )
+        data, _ = sync.get_json(url, {"User-Agent": "Mozilla/5.0"})
+        chosen = core.onemap_result_coordinate(query, data.get("results", []))
+        if chosen:
+            break
+    _onemap_exact_cache[query] = chosen
+    return chosen
+
+
+def resolve_coordinate(row, address_map, project_map, allow_onemap=True):
+    existing = core.coordinate_pair(row)
+    if existing:
+        return {
+            "latitude": existing[0],
+            "longitude": existing[1],
+            "postal_code": row.get("postal_code"),
+        }, "existing"
+    address = core.normalize_address(row.get("address"))
+    if address and address in address_map:
+        return address_map[address], "exact_address"
+    project = core.normalize_name(row.get("project_name"))
+    if project and project != "N A" and project in project_map:
+        return project_map[project], "exact_project"
+    if allow_onemap and strip_unit(row.get("address")):
+        chosen = lookup_onemap_exact(row.get("address"))
+        if chosen:
+            return chosen, "onemap_exact"
+    return None, "unresolved"
+
+
+def require_write_credentials(write, service_key):
+    if write and not service_key:
+        raise SystemExit("SUPABASE_KEY (service_role) not set — refusing to write.")
 
 
 # ── Supabase write ───────────────────────────────────────────────────────────
@@ -214,9 +270,10 @@ def main():
     ap.add_argument("--write", action="store_true", help="Actually write. Default is a dry run.")
     ap.add_argument("--project", default=None, help="Restrict to one project_name (e.g. LAKEVILLE).")
     ap.add_argument("--limit", type=int, default=0, help="Only the first N realis rows (0 = all).")
-    ap.add_argument("--no-geocode", action="store_true", help="Skip OneMap in dry-run (remap analysis only).")
+    ap.add_argument("--no-geocode", action="store_true", help="Skip OneMap; exact stored-coordinate reuse still runs.")
     args = ap.parse_args()
     dry = not args.write
+    require_write_credentials(args.write, SERVICE_KEY)
 
     print(f"Mode: {'DRY RUN (no writes)' if dry else 'WRITE'} | project: {args.project or 'ALL'} | limit: {args.limit or 'none'}\n")
 
@@ -224,7 +281,7 @@ def main():
     print(f"projects_master types loaded   : {len(pm_types):,}")
     rows = fetch_realis_rows(project=args.project, limit=args.limit)
     print(f"realis rows in scope           : {len(rows):,}")
-    need_geo = [r for r in rows if r.get("latitude") is None or r.get("longitude") is None]
+    need_geo = [r for r in rows if core.coordinate_pair(r) is None]
     print(f"  rows needing geocode (null xy): {len(need_geo):,}")
 
     # Remap analysis (exact, read-only).
@@ -243,44 +300,36 @@ def main():
         for reason, c in Counter(u[3] for u in unresolved).most_common(12):
             print(f"      {c:>4}  {reason}")
 
-    # Distinct block-addresses to geocode.
-    addr_map = {}
-    for r in need_geo:
-        a = strip_unit(r.get("address"))
-        if a:
-            addr_map.setdefault(a, []).append(r)
-    print(f"  distinct block-addresses      : {len(addr_map):,}")
+    address_coords, project_coords = fetch_trusted_coordinate_maps(need_geo)
+    print(f"  trusted exact address mappings: {len(address_coords):,}")
+    print(f"  trusted exact project mappings: {len(project_coords):,}")
 
-    geo_ok, geo_fail = {}, []
-    if not args.no_geocode and addr_map:
-        est = len(addr_map) * sync.GEO_PACING_S / 60
-        print(f"\nGeocoding {len(addr_map):,} distinct addresses via OneMap (~{est:.1f} min)…")
-        for i, a in enumerate(sorted(addr_map), 1):
-            g = sync.geocode(a)
-            if g and g[0] is not None and g[1] is not None:
-                geo_ok[a] = g
-            else:
-                geo_fail.append(a)
+    coordinates, coordinate_source_by_id, coordinate_sources = {}, {}, Counter()
+    for i, row in enumerate(need_geo, 1):
+        chosen, source = resolve_coordinate(
+            row, address_coords, project_coords, allow_onemap=not args.no_geocode
+        )
+        coordinates[row["id"]] = chosen
+        coordinate_source_by_id[row["id"]] = source
+        coordinate_sources[source] += 1
+        if source == "onemap_exact":
             time.sleep(sync.GEO_PACING_S)
-            if i % 50 == 0:
-                print(f"  … {i}/{len(addr_map)}  ok={len(geo_ok)} fail={len(geo_fail)}")
-        print(f"\n  geocode resolved  : {len(geo_ok):,} addresses")
-        print(f"  geocode FAILED    : {len(geo_fail):,} addresses")
-        for a in geo_fail[:20]:
-            print(f"      UNRESOLVED ADDR: {a}  ({len(addr_map[a])} row(s))")
+        if i % 100 == 0:
+            print(f"  coordinate resolution … {i}/{len(need_geo)}")
+    print(f"  coordinate resolution by source: {dict(coordinate_sources)}")
 
     # ── Write ────────────────────────────────────────────────────────────────
     if not dry:
         updated = 0
         for r, nu, ns, why in resolvable:
             payload = {}
-            if r.get("latitude") is None or r.get("longitude") is None:
-                a = strip_unit(r.get("address"))
-                g = geo_ok.get(a)
-                if g:
-                    payload["latitude"], payload["longitude"] = g[0], g[1]
-                    if g[2] and not r.get("postal_code"):
-                        payload["postal_code"] = g[2]
+            if core.coordinate_pair(r) is None:
+                chosen = coordinates.get(r["id"])
+                if chosen:
+                    payload["latitude"] = chosen["latitude"]
+                    payload["longitude"] = chosen["longitude"]
+                    if chosen.get("postal_code") and not r.get("postal_code"):
+                        payload["postal_code"] = chosen["postal_code"]
             # Only rewrite the columns when they actually change.
             if nu != r.get("unit_type"):
                 payload["unit_type"] = nu
@@ -295,10 +344,8 @@ def main():
     # Preview a few concrete remaps.
     print("\nSample remaps (id: unit_type/subtype  ->  unit_type/subtype  | geocode):")
     for r, nu, ns, why in resolvable[:12]:
-        a = strip_unit(r.get("address"))
-        g = geo_ok.get(a)
-        gtxt = f"{g[0]:.5f},{g[1]:.5f}" if g else ("(has xy)" if r.get("latitude") is not None else "(no geo)")
-        print(f"  {r['id']}: {r.get('unit_type')!r}/{r.get('property_subtype')!r} -> {nu!r}/{ns!r}  | {gtxt}")
+        source = "existing" if core.coordinate_pair(r) else coordinate_source_by_id.get(r["id"], "unresolved")
+        print(f"  {r['id']}: {r.get('unit_type')!r}/{r.get('property_subtype')!r} -> {nu!r}/{ns!r}  | {source}")
 
 
 if __name__ == "__main__":
