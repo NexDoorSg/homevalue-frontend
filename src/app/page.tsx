@@ -1297,6 +1297,7 @@ export default function Home() {
         subjectCompletionYear: subjectCompletionYear,
         subjectIsStrata: subjectIsStrata,
         subjectAddress: propertyCategory === 'hdb' ? resolved.address : undefined,
+        subjectStreetName: propertyCategory === 'hdb' ? resolved.streetName : undefined,
         subjectBlockNo: propertyCategory === 'hdb'
           ? (resolved.address || '').toUpperCase().trim().match(/^(\d+[A-Z]?)\s/)?.[1] || ''
           : undefined,
@@ -1328,6 +1329,9 @@ export default function Home() {
       setHasReport(false)
       setLeadFormMessage('')
       setShowUnlockModal(false)
+      if (result.blockTypeMismatchWarning) {
+        setFormMessage(result.blockTypeMismatchWarning)
+      }
 
       void savePartialLead({
         estimated_price: result.estimated,

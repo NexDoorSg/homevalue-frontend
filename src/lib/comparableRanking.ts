@@ -30,6 +30,7 @@ function normalizeStreetName(streetName: string | null | undefined) {
     .replace(/\bUPPER\b/g, 'UPP')
     .replace(/\bCOMMONWEALTH\b/g, "C'WEALTH")
     .replace(/\bTANJONG\b/g, 'TG')
+    .replace(/\bPARK\b/g, 'PK')
     .replace(/\s+/g, ' ')
     .trim()
 }

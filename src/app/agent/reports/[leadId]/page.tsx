@@ -318,6 +318,7 @@ const HDB_STREET_ABBREV: [RegExp, string][] = [
   [/\bEAST\b/g, 'EST'], [/\bWEST\b/g, 'WEST'],
   [/\bKAMPONG\b/g, 'KG'], [/\bJALAN\b/g, 'JLN'], [/\bLORONG\b/g, 'LOR'],
   [/\bUPPER\b/g, 'UPP'], [/\bCOMMONWEALTH\b/g, "C'WEALTH"], [/\bTANJONG\b/g, 'TG'],
+  [/\bPARK\b/g, 'PK'],
 ]
 
 function normalizeHdbStreetKey(street: string | null | undefined) {
@@ -330,6 +331,21 @@ function normalizeHdbStreetKey(street: string | null | undefined) {
 // the existing getStreetLikeSearchTerm, then abbreviated).
 function hdbStreetKeyFromAddress(address: string | null | undefined) {
   return normalizeHdbStreetKey(getStreetLikeSearchTerm(address))
+}
+
+// The subject's address has no separate "street name" field — only a single
+// freeform property_address — so a building name after the street (e.g.
+// "BIDADARI PK DR ALKAFF OASIS", from an OneMap address like "110A Bidadari
+// Park Drive Alkaff Oasis Singapore 341110") stays stuck to hdbStreetKeyFromAddress's
+// output; there's no reliable way to strip it via text alone. Stored
+// transaction addresses never carry a building name, so the row's key is
+// always the "clean" side of any real match — accept it as a whole-word
+// PREFIX of the subject key, not just an exact match, so same-block rows
+// still get the boost below even when the subject address names its block.
+function streetKeysMatch(subjectKey: string, rowKey: string): boolean {
+  if (!subjectKey || !rowKey) return false
+  if (subjectKey === rowKey) return true
+  return subjectKey.startsWith(rowKey) && subjectKey[rowKey.length] === ' '
 }
 
 function getBedroomCount(value: string | null | undefined) {
@@ -567,7 +583,7 @@ function getTransactionScore(form: ReportForm, row: any, distanceM: number) {
     const sameBlock =
       Boolean(subjectBlock) &&
       subjectBlock === extractBlockNumber(row.address) &&
-      (!subjectStreet || subjectStreet === hdbStreetKeyFromAddress(row.address))
+      (!subjectStreet || streetKeysMatch(subjectStreet, hdbStreetKeyFromAddress(row.address)))
     return (sameBlock ? 500 : 0) + sizeScore * 120 + distanceScore * 10000 + recencyScore
   }
 
