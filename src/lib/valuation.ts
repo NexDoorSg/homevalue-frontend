@@ -124,6 +124,13 @@ type CandidateResult = {
   // → mode of same-block transactions (i.e. buildHdbCandidate's effectiveCompletionYear).
   // Condo/EC/landed: the caller's subjectCompletionYear. null when unresolved.
   completionYear?: number | null
+  // Set when the selected property type has ZERO same-block transactions but the
+  // block DOES have recorded transactions under other unit types — signals the
+  // caller likely selected the wrong flat type (e.g. "3 ROOM" for a block that
+  // is actually all 4/5-Room), which would otherwise silently fall through to a
+  // generic nearby-radius estimate with no same-block signal and no indication
+  // anything was off. HDB only; undefined when the type matches or is unknown.
+  blockTypeMismatchWarning?: string
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -429,6 +436,7 @@ const HDB_STREET_ABBREV: [RegExp, string][] = [
   [/\bEAST\b/g, 'EST'], [/\bWEST\b/g, 'WEST'],
   [/\bKAMPONG\b/g, 'KG'], [/\bJALAN\b/g, 'JLN'], [/\bLORONG\b/g, 'LOR'],
   [/\bUPPER\b/g, 'UPP'], [/\bCOMMONWEALTH\b/g, "C'WEALTH"], [/\bTANJONG\b/g, 'TG'],
+  [/\bPARK\b/g, 'PK'],
 ]
 
 function normalizeHdbStreetKey(street: string | null | undefined): string {
@@ -605,7 +613,8 @@ async function buildHdbCandidate(
   subjectCompletionYear: number | null,
   subjectLat: number,
   subjectLon: number,
-  subjectStreetKey: string
+  subjectStreetKey: string,
+  subjectPropertyType?: string
 ): Promise<CandidateResult | null> {
   if (allRows.length === 0) return null
 
@@ -674,6 +683,10 @@ async function buildHdbCandidate(
   // type upstream) to derive a stable block-level price-per-sqm reference. This
   // gives a sensible anchor even when same-type comparables are too few.
   let blockAnchorPsm: number | null = null
+  // Bug B: surfaced alongside the anchor query below (same "all unit types in
+  // this block" pool), only when the selected type has NO same-block rows at
+  // all — a block with 1-2 same-type rows is thin data, not a type mismatch.
+  let blockTypeMismatchWarning: string | undefined
   if (sameBlockRows.length < 3 && effectiveBlockNo) {
     const box = getBoundingBox(subjectLat, subjectLon, 250)
     const { data: blockData, error: blockError } = await supabase
@@ -709,6 +722,19 @@ async function buildHdbCandidate(
         const mid = Math.floor(sorted.length / 2)
         blockAnchorPsm =
           sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+      }
+
+      if (sameBlockRows.length === 0 && subjectPropertyType) {
+        const presentTypes = Array.from(
+          new Set(
+            sameBlockAnyTypeRows
+              .map((r) => (r.unit_type || '').trim())
+              .filter((t) => t.length > 0 && t.toUpperCase() !== subjectPropertyType.toUpperCase())
+          )
+        )
+        if (presentTypes.length > 0) {
+          blockTypeMismatchWarning = `No ${subjectPropertyType} transactions found for this block. This block's recorded unit types: ${presentTypes.join(', ')}. Please confirm the property type is correct.`
+        }
       }
     }
   }
@@ -801,6 +827,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
         radius,
         method: methodOut,
         completionYear: effectiveCompletionYear,
+        ...(blockTypeMismatchWarning ? { blockTypeMismatchWarning } : {}),
       }
     }
     // Estimator unusable (no valid same-block psm) — fall through to shared weighting.
@@ -880,6 +907,7 @@ if (sameBlockRows.length >= 1 && daysSinceSameBlock <= 365) {
     radius,
     method: blendedMethod,
     completionYear: effectiveCompletionYear,
+    ...(blockTypeMismatchWarning ? { blockTypeMismatchWarning } : {}),
   }
 }
 
@@ -3119,7 +3147,8 @@ async function getValuationCore({
         completionYear,
         lat,
         lon,
-        subjectStreetKey
+        subjectStreetKey,
+        propertyType
       )
 
       if (!candidate) continue
@@ -3174,7 +3203,7 @@ async function getValuationCore({
     const fallbackRows = cleanRows(data as TransactionRow[], lat, lon)
     if (fallbackRows.length === 0) return null
 
-    const fallbackResult = await buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear, lat, lon, subjectStreetKey)
+    const fallbackResult = await buildHdbCandidate(fallbackRows, 2000, floorAreaSqm, floorLevel, blockNo, completionYear, lat, lon, subjectStreetKey, propertyType)
     if (fallbackResult && cacheKey) await writeCache(cacheKey, fallbackResult)
     return fallbackResult
   }

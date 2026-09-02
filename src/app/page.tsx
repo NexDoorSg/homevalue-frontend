@@ -1328,6 +1328,9 @@ export default function Home() {
       setHasReport(false)
       setLeadFormMessage('')
       setShowUnlockModal(false)
+      if (result.blockTypeMismatchWarning) {
+        setFormMessage(result.blockTypeMismatchWarning)
+      }
 
       void savePartialLead({
         estimated_price: result.estimated,

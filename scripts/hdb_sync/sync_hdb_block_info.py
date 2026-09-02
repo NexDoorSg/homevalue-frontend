@@ -89,6 +89,7 @@ _STREET_ABBREV = [
     (r"\bUPPER\b", "UPP"),
     (r"\bCOMMONWEALTH\b", "C'WEALTH"),
     (r"\bTANJONG\b", "TG"),
+    (r"\bPARK\b", "PK"),
 ]
 _STREET_ABBREV_RE = [(re.compile(p), r) for p, r in _STREET_ABBREV]
 
