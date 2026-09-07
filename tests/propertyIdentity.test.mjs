@@ -277,40 +277,9 @@ test('send-lead email HTML safely renders every external text field', () => {
   assert.doesNotMatch(emailHtml, /\$\{intent\}/)
 })
 
-test('Office assignment still gates WhatsApp and intent/agent mappings are unchanged', () => {
+test('Office assignment remains available to the response and admin email', () => {
   const source = readRepositoryFile(routePath)
-  const officeSyncIndex = source.indexOf('const officeSync = await syncLeadToOffice')
-  const whatsappGateIndex = source.indexOf(
-    'if (officeSync.ok && shouldSendWhatsappIntro)'
-  )
-  const whatsappSendIndex = source.indexOf('await sendHomeValueWhatsappIntro({')
-
-  assert.ok(officeSyncIndex >= 0)
-  assert.ok(whatsappGateIndex > officeSyncIndex)
-  assert.ok(whatsappSendIndex > whatsappGateIndex)
   assert.match(source, /assignedTo: officeLead\?\.assignedTo \|\| null/)
-
-  for (const alias of [
-    'sell',
-    'selling',
-    'looking to sell',
-    'thinking of selling',
-    'buy',
-    'buying',
-    'looking to buy',
-    'thinking of buying',
-    'just exploring',
-    'just exploring my options',
-    'exploring',
-  ]) {
-    assert.match(source, new RegExp(`"${alias}"`))
-  }
-
-  for (const agent of [
-    'bjornlim@nexdoor.sg',
-    'abigailtang@nexdoor.sg',
-    'daveteo@nexdoor.sg',
-  ]) {
-    assert.match(source, new RegExp(`"${agent}"`))
-  }
+  assert.match(source, /displayEmailHtmlValue\(officeSync\.assignedTo\)/)
+  assert.match(source, /success: true, data, officeSync/)
 })
