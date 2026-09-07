@@ -3,6 +3,8 @@ import { Resend } from "resend";
 import { displayEmailHtmlValue } from "@/lib/emailHtml";
 import { buildLeadSyncPayload } from "@/lib/propertyIdentity";
 
+import { parseHomeValueWhatsAppConsent } from "@/lib/whatsappConsent";
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 function displayValue(value: unknown) {
@@ -68,6 +70,10 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as Record<string, unknown>;
 
+    let whatsappConsent;
+    try { whatsappConsent = parseHomeValueWhatsAppConsent(body.whatsappConsent); }
+    catch { return NextResponse.json({ success: false, error: "Invalid WhatsApp consent evidence" }, { status: 400 }); }
+
     const {
       name,
       phone,
@@ -103,7 +109,7 @@ export async function POST(req: Request) {
         ? "-"
         : `${formatMoney(lowRange)} - ${formatMoney(highRange)}`;
 
-    const officeSync = await syncLeadToOffice(officePayload).catch((error) => {
+    const officeSync = await syncLeadToOffice({ ...officePayload, whatsappConsent }).catch((error) => {
       console.error("Office lead sync crash:", error);
       return { ok: false, skipped: false, assignedTo: null as string | null };
     });
@@ -149,7 +155,7 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, data, officeSync });
+    return NextResponse.json({ success: officeSync.ok, data, officeSync }, { status: officeSync.ok ? 200 : 502 });
   } catch (err: unknown) {
     console.error("Send lead route error:", err);
     const errorMessage =

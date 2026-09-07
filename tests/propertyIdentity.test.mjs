@@ -241,7 +241,7 @@ test('send-lead normalizes the exact identity keys before preserving Office meta
     source,
     /const officePayload = buildLeadSyncPayload\(body, \{[\s\S]*canonicalProjectName: project_name,[\s\S]*postalCode: postal_code,[\s\S]*address,[\s\S]*unitNumber: unit_number,/
   )
-  assert.match(source, /syncLeadToOffice\(officePayload\)/)
+  assert.match(source, /syncLeadToOffice\(\{ \.\.\.officePayload, whatsappConsent \}\)/)
   assert.match(syncFunction, /"x-nexdoor-source": "HomeValue"/)
   assert.match(syncFunction, /"x-nexdoor-sync-token": syncToken/)
   assert.match(syncFunction, /\.\.\.body,[\s\S]*source: "HomeValue"/)
@@ -281,5 +281,5 @@ test('Office assignment remains available to the response and admin email', () =
   const source = readRepositoryFile(routePath)
   assert.match(source, /assignedTo: officeLead\?\.assignedTo \|\| null/)
   assert.match(source, /displayEmailHtmlValue\(officeSync\.assignedTo\)/)
-  assert.match(source, /success: true, data, officeSync/)
+  assert.match(source, /success: officeSync.ok, data, officeSync/)
 })

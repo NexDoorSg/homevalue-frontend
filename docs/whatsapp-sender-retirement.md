@@ -1,20 +1,22 @@
-# Retire the legacy WhatsApp sender
+# HomeValue consent and Office-only WhatsApp cutover
 
-This change removes direct Meta acknowledgement sending from `/api/send-lead`. Office synchronization, its returned assignment, and the existing admin email remain unchanged. Legacy WhatsApp environment variables no longer affect this route. No new dependencies or notification system are introduced.
+HomeValue's report-unlock and consultation forms offer the optional, unchecked notice `homevalue-whatsapp-v1`. Checking it captures an evidence UUID and ISO timestamp; editing the recipient phone clears it. The later intent selection forwards the same original evidence, without inferring consent from intent or refreshing the time. Missing consent still permits the existing HomeValue Lead save, Office sync and email.
 
-Do not merge or deploy until the replacement Office sender has been verified and the owner explicitly approves cutover. This branch alone does not change production.
+The server accepts only affirmative evidence with the recognized version, valid UUID and nonfuture timestamp. It forwards the validated object over the existing authenticated Office sync. Consent is not added to the browser-written HomeValue `leads` row: Office's existing private WhatsAppConsent ledger is the durable evidence store. Office must be deployed with the matching contract first. No HomeValue database migration or new notification system is needed.
 
-## Cutover with no overlap
+The route no longer calls Meta, regardless of legacy WhatsApp environment variables. Office assignment and the existing admin email are preserved. A failed Office sync now returns a failure status instead of success. No Ads credentials, registration/coexistence or Meta configuration changes are part of this PR.
 
-1. Keep Office automatic acknowledgements disabled. Verify the dedicated WhatsApp credential, exact phone registration/coexistence, approved template, callback, consent capture and status processing.
-2. After explicit approval of the exact recipient and message, run an isolated Office-code send test to an internal consenting recipient that never passes through HomeValue. Do not enable global production sending or submit a real HomeValue form for this test. Confirm acceptance, delivery/read status and reply matching.
-3. After a separate cutover approval, deploy this removal while Office sending is still off. Verify the production deployment and drain prior in-flight HomeValue requests. Leads continue syncing and email remains available during the temporary acknowledgement gap.
-4. Account for old deployment URLs and Preview deployments that still contain sender code and credentials. Before enabling Office, block their send capability by revoking the identified legacy WhatsApp token (only after its scope and other consumers are verified), or by removing access to all old sender deployments and proving requests have drained. Removing an environment variable from a new deployment does not neutralize old deployments.
-5. Verify actual source messaging-consent capture. HomeValue currently supplies no explicit PR9 consent proof; do not infer it from a phone number, intent or valuation request. Without recorded proof, Office correctly suppresses acknowledgement.
-6. Only after old-send capability is proven off, set Office's legacy-sender-retired gate and enable acknowledgements. Existing historical leads are not backfilled. Verify one authorized new lead and duplicate replay.
+## Approval and deployment order
 
-Rollback: disable Office sending first. Never restore the HomeValue sender while Office sending or an Office send request remains active. Preserve all acknowledgement claims and consent evidence.
+1. Review/deploy the coordinated Office consent PR first, with OFFICE_WHATSAPP_ACK_ENABLED=false. It accepts the optional contract, records evidence transactionally, preserves original Lead receipt identity, and prevents existing/re-engaged Leads from acquiring a new introductory acknowledgement. Old HomeValue clients remain compatible.
+2. With explicit cutover approval, deploy this HomeValue PR while Office acknowledgements stay false. Verify the production source and opt-in form, then verify consent, Lead assignment and consultant email with an approved consenting owner submission. An unchecked submission must still save/sync without a new consent grant. No automatic WhatsApp message is expected yet. Leads created while acknowledgements are off do not form a send backlog.
+3. Neutralize old HomeValue production/preview/branch deployment URLs containing sender code, and drain in-flight requests. Removing current environment variables alone does not revoke secrets embedded in old deployments. Prefer disabling access to old sender deployments and verify it. Revoke a legacy WhatsApp token only if its exact identity and every consumer are established and the owner explicitly approves; never guess or revoke shared Ads credentials. If old-send capability cannot be proven off, do not set the retirement gate or activate Office.
+4. Keep the generic Business App greeting disabled, and leave manual Quick Replies unchanged. Owner confirms there is no Away Message. Verify dedicated Office credential send permission without broadening access implicitly.
+5. After HomeValue retirement and consent are deployed and verified, stop and propose the normal PR9 controlled production test: one approved new consenting Company Lead through actual HomeValue intake, universal routing, assigned-consultant email, one exact approved Office template, status/reply checks and duplicate replay. Obtain the owner-approved window, recipient and rendered message. Set HOMEVALUE_SENDER_DISABLED=true only when step 3 is proven. Receiving/sending activation require the approved test window; no temporary bypass exists.
+6. Close the test window and restore Office flags OFF unless continuing live operation is separately approved. Preserve claims/evidence. No blind retry after timeout or uncertain provider outcome.
 
-## Validation
+A temporary acknowledgement gap is intentional: leads and email keep working while Office sending is off. Never enable both old HomeValue and Office automatic senders. A cutover rollback must disable/drain Office sends before any restoration of old sender code. Do not erase acknowledgement claims or consent records.
 
-Two executable route tests use synthetic credentials and mocked Office/email transports: successful/failed Office sync and repeated submissions retain sync/email behavior and never call Meta. Existing identity/email regression tests, TypeScript checks, and Python tests are also run. No real network message is sent by these tests.
+## Meta Ads readiness
+
+Future Meta Lead Forms and Website/Landing Page adapters must use Office's existing trusted intake and affirmative consent contract. The actual form/campaign, consent version and evidence mapping must be defined and verified before activating an adapter. No new campaign adapter or Ads permission is created by this work.

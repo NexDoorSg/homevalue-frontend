@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { HOMEVALUE_WHATSAPP_NOTICE, HOMEVALUE_WHATSAPP_NOTICE_VERSION, type HomeValueWhatsAppConsent } from '@/lib/whatsappConsent'
 import Head from 'next/head'
 import { getValuation } from '@/lib/valuation'
 import { supabase } from '@/lib/supabase'
@@ -724,6 +725,11 @@ export default function Home() {
   const [showUnlockModal, setShowUnlockModal] = useState(false)
   const [isUnlockingReport, setIsUnlockingReport] = useState(false)
 
+  const [leadConsent, setLeadConsent] = useState<HomeValueWhatsAppConsent | null>(null)
+  const [consultConsent, setConsultConsent] = useState<HomeValueWhatsAppConsent | null>(null)
+  const captureConsent = (checked: boolean): HomeValueWhatsAppConsent | null => checked ? {
+    granted: true, grantedAt: new Date().toISOString(), noticeVersion: HOMEVALUE_WHATSAPP_NOTICE_VERSION, evidenceId: crypto.randomUUID(),
+  } : null
   const [leadName, setLeadName] = useState('')
   const [leadPhone, setLeadPhone] = useState('')
   const [leadEmail, setLeadEmail] = useState('')
@@ -900,6 +906,7 @@ export default function Home() {
     setHasReport(false)
     setShowUnlockModal(false)
     setLeadId(null)
+    setLeadConsent(null)
     setPartialLeadSaved(false)
     setShowPlanPopup(false)
     setPlanPopupDismissed(false)
@@ -1505,7 +1512,7 @@ export default function Home() {
 
       if (insertedLeads && insertedLeads[0]?.id) setLeadId(insertedLeads[0].id)
 
-      const emailResult = await sendLeadEmail(leadPayload)
+      const emailResult = await sendLeadEmail({ ...leadPayload, whatsappConsent: leadConsent })
       if (!emailResult.ok) {
         console.error('Lead saved but email notification failed:', emailResult.error)
       }
@@ -1629,6 +1636,7 @@ export default function Home() {
     const emailResult = await sendLeadEmail({
       ...leadPayload,
       source: 'consultation',
+      whatsappConsent: consultConsent,
     })
 
     if (!emailResult.ok) {
@@ -1641,6 +1649,7 @@ export default function Home() {
 
     setConsultName('')
     setConsultPhone('')
+    setConsultConsent(null)
     setConsultEmail('')
     setConsultPlan('')
   }
@@ -1685,7 +1694,7 @@ export default function Home() {
       return
     }
 
-    const emailResult = await sendLeadEmail(leadPayload)
+    const emailResult = await sendLeadEmail({ ...leadPayload, whatsappConsent: leadConsent })
 
     if (!emailResult.ok) {
       setLeadFormMessage('Details saved, but email notification failed. Check Vercel logs.')
@@ -1695,6 +1704,7 @@ export default function Home() {
     setLeadFormMessage('Thanks — we will contact you shortly.')
     setLeadName('')
     setLeadPhone('')
+    setLeadConsent(null)
     setLeadEmail('')
   }
 
@@ -1715,6 +1725,7 @@ export default function Home() {
       plan,
       estimated_price: estimatedPrice,
       source: 'plan_popup',
+      whatsappConsent: leadConsent,
     }
     await sendLeadEmail(emailPayload)
 
@@ -3030,7 +3041,7 @@ export default function Home() {
                 <input
                   type="text"
                   value={leadPhone}
-                  onChange={(e) => setLeadPhone(e.target.value)}
+                  onChange={(e) => { setLeadPhone(e.target.value); setLeadConsent(null) }}
                   placeholder="Your phone number"
                   className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
@@ -3048,6 +3059,11 @@ export default function Home() {
                   className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
+
+              <label className="flex items-start gap-3 text-sm leading-6 text-[#4d555d]">
+                <input type="checkbox" checked={leadConsent !== null} onChange={(e) => setLeadConsent(captureConsent(e.target.checked))} className="mt-1" />
+                <span>{HOMEVALUE_WHATSAPP_NOTICE} <span className="text-[#67707a]">Optional.</span></span>
+              </label>
 
               <button
                 type="button"
@@ -3145,7 +3161,7 @@ export default function Home() {
                 <input
                   type="text"
                   value={consultPhone}
-                  onChange={(e) => setConsultPhone(e.target.value)}
+                  onChange={(e) => { setConsultPhone(e.target.value); setConsultConsent(null) }}
                   placeholder="Your phone number"
                   className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
@@ -3176,6 +3192,11 @@ export default function Home() {
                   className="w-full rounded-2xl border border-[#d7dde3] bg-[#fcfcfb] px-4 py-3 text-[#2d3135] outline-none transition focus:border-[#b76633] focus:bg-white"
                 />
               </div>
+
+              <label className="flex items-start gap-3 text-sm leading-6 text-[#4d555d]">
+                <input type="checkbox" checked={consultConsent !== null} onChange={(e) => setConsultConsent(captureConsent(e.target.checked))} className="mt-1" />
+                <span>{HOMEVALUE_WHATSAPP_NOTICE} <span className="text-[#67707a]">Optional.</span></span>
+              </label>
 
               <button
                 type="button"
