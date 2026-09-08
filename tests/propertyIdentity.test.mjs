@@ -226,16 +226,16 @@ test('both fallback OneMap resolvers retain POSTAL and canonical state cannot go
 })
 
 test('send-lead preserves HomeValue authentication and structured identity', () => {
-  const source = readRepositoryFile(routePath)
-  assert.match(source, /buildLeadSyncPayload\(body, \{/)
-  for (const field of ['project_name', 'postal_code', 'address', 'unit_number']) assert.ok(source.includes('body.' + field))
+  const source = readRepositoryFile('src/lib/homevalueOutbox.ts')
+  assert.match(source, /buildLeadSyncPayload\(/)
+  for (const field of ['project_name', 'postal_code', 'address', 'unit_number']) assert.ok(source.includes('s.' + field))
   assert.match(source, /'x-nexdoor-source': 'HomeValue'/)
-  assert.match(source, /'x-nexdoor-sync-token': syncToken/)
-  assert.match(source, /pageSource: body\.pageSource \|\| body\.page_source \|\| 'HomeValue'/)
+  assert.match(source, /'x-nexdoor-sync-token': config.token/)
+  assert.match(source, /pageSource: 'HomeValue'/)
 })
 
 test('standalone email and CRM assignment exposure are retired', () => {
   const source = readRepositoryFile(routePath)
   assert.doesNotMatch(source, /resend|emails\.send|assignedTo|officeLead|displayEmailHtmlValue/)
-  assert.match(source, /NextResponse\.json\(\{ success: true \}\)/)
+  assert.match(source, /success: true, captured: true/)
 })

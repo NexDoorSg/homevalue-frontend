@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { createLeadRecovery, type Draft, type Kind, type Saved } from '@/lib/leadRecovery'
 
 export function useLeadRecovery(onLocalSaved?: () => void) {
@@ -16,27 +15,16 @@ export function useLeadRecovery(onLocalSaved?: () => void) {
         setItem: (key, value) => sessionStorage.setItem(key, value),
         removeItem: key => sessionStorage.removeItem(key),
       },
-      saveLocal: async entry => {
-        if (entry.kind === 'intent') {
-          if (entry.updateId) {
-            const { error } = await supabase.from('leads').update(entry.local).eq('id', entry.updateId).abortSignal(AbortSignal.timeout(30000))
-            if (error) throw new Error('Save not confirmed')
-          }
-          return entry.updateId ?? null
-        }
-        const { data, error } = await supabase.from('leads').insert([entry.local]).select('id').abortSignal(AbortSignal.timeout(30000))
-        if (error || !data?.[0]?.id) throw new Error('Save not confirmed')
-        try { onLocalSaved?.() } catch { /* Existing analytics must not affect receipt recovery. */ }
-        return data[0].id
-      },
-      send: async payload => {
+      send: async entry => {
         const response = await fetch('/api/send-lead', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload), signal: AbortSignal.timeout(45000),
+          body: JSON.stringify({ version: 1, kind: entry.kind, submission: entry.office, parentSubmissionId: entry.parentSubmissionId }), signal: AbortSignal.timeout(55000),
         })
         if (response.status === 400 || response.status === 409) return 'review'
         const result = await response.json().catch(() => null)
-        return response.ok && result?.success === true
+        const accepted = response.ok && result?.success === true && result?.captured === true
+        if (accepted && entry.kind !== 'intent') { try { onLocalSaved?.() } catch { /* Analytics cannot affect capture. */ } }
+        return accepted
       },
     })
     return manager.current
@@ -56,7 +44,7 @@ export function useLeadRecovery(onLocalSaved?: () => void) {
     try {
       const result = await getManager().retry(kind)
       setPending(getManager().pending())
-      setMessage(result.ok ? 'Your saved request was received. You can continue with your report or enquiry.' : result.error || 'Receipt not confirmed.')
+      setMessage(result.ok ? 'Your request is securely received. NexDoor will finish processing it even if you close this tab.' : result.error || 'Receipt not confirmed.')
     } finally { setBusy(false) }
   }
   function download(entry: Saved) {
@@ -66,11 +54,11 @@ export function useLeadRecovery(onLocalSaved?: () => void) {
   }
   const recoveryPanel = (pending.length > 0 || message) ? (
     <aside role="status" className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-xl rounded-xl border border-[#b76633] bg-white p-4 text-sm text-[#2f3438] shadow-xl">
-      <p>{message || 'A previous request is saved in this tab. Retry its original details before starting another enquiry. Saved details expire after 24 hours.'}</p>
+      <p>{message || 'A previous request is saved in this tab. Retry its original details before starting another enquiry. Once received, NexDoor retains your request even if you close this tab.'}</p>
       {pending.map(entry => <div key={entry.kind} className="mt-2 flex flex-wrap gap-3">
-        <button type="button" disabled={busy || entry.phase === 'saving' || entry.phase === 'review'} onClick={() => retry(entry.kind)} className="underline disabled:opacity-50">Retry saved {entry.kind === 'lead' ? 'report request' : entry.kind}</button>
+        <button type="button" disabled={busy || entry.phase === 'review'} onClick={() => retry(entry.kind)} className="underline disabled:opacity-50">Retry saved {entry.kind === 'lead' ? 'report request' : entry.kind}</button>
         <button type="button" onClick={() => download(entry)} className="underline">Download saved details</button>
-        {(entry.phase === 'saving' || entry.phase === 'review') && <p>This request needs review. Please contact NexDoor with your saved details.</p>}
+        {entry.phase === 'review' && <p>This request needs review. Please contact NexDoor with your saved details.</p>}
       </div>)}
       {pending.length === 0 && <button type="button" className="mt-2 underline" onClick={() => setMessage('')}>Dismiss</button>}
     </aside>

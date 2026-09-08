@@ -4,6 +4,8 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
+      - 'supabase/migrations/**'
+      - 'vercel.json'
       - 'package*.json'
       - '.github/workflows/lead-recovery.yml'
 permissions:
@@ -12,6 +14,16 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: disposable-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,8 +36,11 @@ jobs:
       - run: npm ci
       - run: node --test tests/*.test.mjs
       - run: python -m unittest discover -s tests -p 'test_*.py'
+        env:
+          HOMEVALUE_TEST_PG_PORT: '5432'
+          PGPASSWORD: disposable-test-only
       - run: npx tsc --noEmit
-      - run: npx eslint src/components/LeadRecovery.tsx src/lib/leadRecovery.ts src/app/api/send-lead/route.ts
+      - run: npx eslint src/components/LeadRecovery.tsx src/lib/leadRecovery.ts src/app/api/send-lead/route.ts src/lib/homevalueOutbox.ts src/lib/homevalueOutboxServer.ts src/app/api/cron/homevalue-office-recovery/route.ts
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://build.example.invalid

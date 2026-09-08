@@ -1,15 +1,61 @@
-# HomeValue Office handoff recovery
+# Durable HomeValue → Office capture
 
-Office remains the sole Company Lead routing, assigned-consultant email and WhatsApp acknowledgement owner. `/api/send-lead` retains the existing HomeValue authentication and structured property payload. It sends no standalone admin email and never returns Office assignment or provider response bodies.
+PR #74 replaces the separate admin email and browser-only handoff with atomic HomeValue capture plus one private, source-specific outbox. Office retains Contact/open-Lead resolution, global routing, consultant email, consent and acknowledgement ownership. No Office change is required.
 
-Both public valuation pages use the same browser recovery helper for report requests, consultations and intent changes. It freezes a UUID `submissionId`, original `submittedAt`, property/contact payload and optional consent evidence before any attempt. Office's existing HomeValue canonical-payload receipt includes that stable identity; retries send the identical payload. No Office architecture or schema change is needed.
+## Capture and immutable identity
 
-The existing HomeValue `leads` save remains first. A confirmed save is checkpointed before Office handoff; recovery retries only Office and never inserts the local row again. Overlapping attempts are blocked. Failed handoffs retain form details and consent, do not unlock the report or show an intent-success confirmation, and expose a retry/download panel. Existing landing-page analytics still fires on a confirmed local insert, never on Office retry.
+Both current public forms submit a frozen versioned envelope to `/api/send-lead`. The server validates bounded JSON, same-origin requests, contact/property fields, UUID/time and original optional consent. It owns `source: HomeValue` and passes only validated fields to a service-role RPC. It does not accept a browser-supplied numeric Lead ID or routing/paid policy.
 
-Recovery is confined to this browser tab's session storage: versioned records, one per form kind, 24-hour retention. Reload/navigation restores the original request; edits cannot replace a pending request. Details are not logged. Blocked browser storage prevents a new network attempt. An uncertain local insert/update is held for manual review with a download option, never automatically repeated. Closing the tab or expiration ends browser recovery; this is not a durable server queue. Users should download unresolved details before leaving.
+`homevalue_capture_handoff` atomically creates the existing HomeValue Lead and its handoff. Replaying an identical UUID returns the existing state; a changed payload/time/kind/parent conflicts. The unique submission lock covers concurrent captures, including uncertain database responses. No retry generates a replacement UUID. New IDs are not backfilled from historical rows.
 
-Each user-triggered attempt performs at most one Office request, with bounded local-save, server handoff and browser timeouts. Office failures return safe 409 (review), 502 (handoff unavailable) or 503 (configuration unavailable); malformed JSON/consent returns 400. The browser accepts success only when both HTTP and `success: true` agree. Raw provider/customer errors are not logged or returned.
+An intent event has its own UUID and references the original capture UUID as a capability. The RPC resolves the local Lead server-side, checks the original contact/consent binding, updates the plan and inserts a separate immutable event in one transaction. A server-generated immutable capture order preserves per-Lead delivery ordering. Parent and older intent events must be delivered before later intent events; review blocks later events for that Lead until resolved. No standalone update can commit without its handoff.
 
-No migration, new dependency or new environment variable is required. Existing `NEXDOOR_OFFICE_URL` and `HOMEVALUE_OFFICE_SYNC_TOKEN` remain unchanged. Obsolete email variables/dependencies are deliberately not removed in this PR. HomeValue WhatsApp stays retired, and existing production firewall protections are unchanged. Do not merge until reviewed; no production submissions are part of validation.
+The exact Office JSONB snapshot includes submission UUID, original ISO timestamp, enriched project/postal/property details and optional consent evidence ID, granted time, notice version and submitted phone. JSONB key order may change, but the semantic payload is immutable. Office's canonical-payload receipt hash is order-independent. Workers never rebuild this payload from mutable Lead rows.
 
-Validation: mocked recovery/route tests, property and consent regressions, Python transaction-integrity unit tests, TypeScript, production build with synthetic build variables and provider fetch blocked, and CI. Full-repository lint has 93 errors on unchanged main; this PR does not broaden into unrelated lint repairs.
+## One private table and three server-only RPCs
+
+The single additive migration creates `homevalue_private.office_handoffs` with:
+
+- submission UUID, original timestamp, immutable server capture order, event kind, local Lead ID and optional parent submission UUID;
+- immutable Office payload (maximum 32 KB);
+- pending/delivered/review state, attempt count, next/last attempt times, delivered time;
+- claim UUID and lease expiration;
+- allowlisted failure code and HTTP status only, never provider text.
+
+RLS is enabled with no browser policies. PUBLIC, anon, authenticated and service_role have no direct schema/table privileges. Only the three explicitly granted RPCs are callable by service_role. They use fixed, empty search paths and qualified tables. Browser roles cannot execute them. An immutable-column trigger prevents changing identity, payload, consent or Lead association through status updates.
+
+RPCs: `homevalue_capture_handoff`, `homevalue_claim_handoffs`, `homevalue_finish_handoff`. Claim uses `FOR UPDATE SKIP LOCKED`, a fresh lease UUID and a two-minute lease. Claims are capped at ten even if a caller requests more. Settlement requires the current unexpired lease, so a stale worker cannot overwrite a newer result.
+
+## Delivery and recovery
+
+After capture commits, the request immediately attempts the existing authenticated Office `/api/leads` path with the stored payload. HTTP success marks delivered. Timeout, transport failure and retryable server errors remain pending with exponential backoff (two minutes initially, capped at 17 hours 4 minutes). Input/identity 400/409/422 becomes review and is not automatically retried. A failed settlement or crashed worker is recovered after lease expiry.
+
+If Office committed but the response was lost, replaying the identical snapshot reaches its existing canonical receipt rather than another routing turn or acknowledgement. HomeValue never calls Meta or retries provider messages. Provider response bodies are neither read nor returned. The public capture response is only `{ success: true, captured: true }` after the transaction commits, not a claim that Office delivery has completed.
+
+Session storage remains only a convenience for uncertain capture responses. Pending identities do not expire into new UUIDs. After confirmed durable capture, users can close the tab; the runner does not depend on their session. Completed browser conveniences expire after 24 hours. Prior #74 browser-only records are not converted into new captures.
+
+## Scheduler and later configuration
+
+`GET /api/cron/homevalue-office-recovery` requires timing-safe Bearer authentication using `CRON_SECRET` (at least 32 random characters). It returns only aggregate counts. Each invocation claims at most ten due rows and delivers them concurrently within a 60-second function limit; each Office request has a 30-second timeout. The two-minute leases outlive the function's execution window.
+
+`vercel.json` schedules one invocation daily at `0 1 * * *` (01:00 UTC, approximately 09:00–09:59 Singapore time on Hobby). This is compatible with the current Hobby plan, which permits only daily cron execution. It recovers up to ten due events per daily invocation; outage backlogs can take multiple days. A reviewed faster schedule on a supporting plan, or an approved manual authenticated invocation of the same runner, requires no new intake architecture. Do not treat this daily cadence as near-real-time recovery.
+
+Later Production configuration, **not performed by this PR**:
+
+- Existing `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are reused server-side.
+- Existing `NEXDOOR_OFFICE_URL` and `HOMEVALUE_OFFICE_SYNC_TOKEN` remain unchanged.
+- New `HOMEVALUE_DURABLE_INTAKE_ENABLED=true` enables capture and recovery only after the migration and scheduler credentials are installed. Default is disabled.
+- New `CRON_SECRET` authenticates Vercel's runner invocation. Set as a Production secret, never public.
+- Applying the migration, enabling the flag/cron, merging/deploying and real acceptance testing require separate approval. No Vercel variables were configured during development.
+
+## Migration and rollback safety
+
+One migration only: `supabase/migrations/20260908081054_homevalue_office_handoff.sql`. It creates only new schema/table/index/functions/trigger and grants. It does not modify existing customer rows, Lead policies, schema columns or historical data. There is no backfill: historical consent and submission identities cannot be reconstructed safely.
+
+For an operational rollback, disable the new flag and keep the table/records intact. This prevents new capture and automatic recovery without discarding pending work. Do not roll back to a browser-only sender while accepting new requests, and do not drop populated handoffs. A structural rollback may drop the three public RPCs and the new private schema only when the table is proven empty and that removal is separately approved. Existing Lead rows remain untouched.
+
+Both current public forms use atomic capture. The unused legacy `/api/unlock-full-report` POST delegates to the same validated handler, so it cannot silently insert without an outbox record; old payloads lacking immutable identity fail before writing. Historical deployments and existing direct database grants are not retroactively converted or backfilled; rollout must continue preserving existing legacy-deployment firewall protections.
+
+## Verification
+
+Disposable PostgreSQL tests exercise atomic rollback, replay/concurrency, immutable evidence, intent binding/order, RLS/privileges, leases and terminal states. Mocked route/worker tests exercise safe auth/config/input handling, lost Office responses, unchanged replay payload and one canonical routing/email/acknowledgement. No tests use production databases or real providers. CI includes PostgreSQL 17, all JS/Python regressions, typecheck, focused lint and a production build with synthetic variables and provider fetch blocked.
