@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { useLeadRecovery } from '@/components/LeadRecovery'
+import type { Kind } from '@/lib/leadRecovery'
 import { HOMEVALUE_WHATSAPP_NOTICE, HOMEVALUE_WHATSAPP_NOTICE_VERSION, type HomeValueWhatsAppConsent } from '@/lib/whatsappConsent'
 import Head from 'next/head'
 import { getValuation } from '@/lib/valuation'
@@ -544,10 +546,6 @@ async function resolveCanonicalProjectName(params: {
   }
 }
 
-type EmailResult = {
-  ok: boolean
-  error?: string
-}
 
 // ─── Loading skeleton component ───────────────────────────────────────────────
 function LoadingSkeleton({ category }: { category: 'hdb' | 'condo' | 'ec' | 'landed' }) {
@@ -719,6 +717,8 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState<'same' | 'nearby'>('same')
 
+  const { deliver, recoveryPanel, busy: handoffBusy } = useLeadRecovery()
+  const [planMessage, setPlanMessage] = useState('')
   const [leadFormMessage, setLeadFormMessage] = useState('')
   const [hasTeaser, setHasTeaser] = useState(false)
   const [hasReport, setHasReport] = useState(false)
@@ -883,8 +883,8 @@ export default function Home() {
 
       setSuggestions(results.slice(0, 8))
       setShowSuggestions(true)
-    } catch (error) {
-      console.error('Address search error:', error)
+    } catch {
+      console.warn('HomeValue operation failed')
       setSuggestions([])
       setShowSuggestions(false)
     }
@@ -1017,8 +1017,8 @@ export default function Home() {
       postalCode: resolvedPostal,
       lookupCandidates: resolvedLookupCandidates,
     }
-  } catch (error) {
-    console.error('Failed to resolve address for generation:', error)
+  } catch {
+    console.warn('HomeValue operation failed')
     return null
   }
 }
@@ -1347,8 +1347,8 @@ export default function Home() {
         num_of_comps: result.comparables,
         radius_used_m: result.radius,
       })
-    } catch (err) {
-      console.error(err)
+    } catch {
+      console.warn('HomeValue operation failed')
       setFormMessage('Error generating valuation.')
     } finally {
       setIsGenerating(false)
@@ -1441,13 +1441,13 @@ export default function Home() {
       const { error } = await supabase.from('partial_leads').insert([partialLeadPayload])
 
       if (error) {
-        console.error('Partial lead save error:', error)
+        console.warn('HomeValue operation failed')
         return
       }
 
       setPartialLeadSaved(true)
-    } catch (error) {
-      console.error('Partial lead save error:', error)
+    } catch {
+      console.warn('HomeValue operation failed')
     }
   }
 
@@ -1499,23 +1499,9 @@ export default function Home() {
         radius_used_m: radiusUsedM,
       }
 
-      const { data: insertedLeads, error: leadInsertError } = await supabase
-        .from('leads')
-        .insert([leadPayload])
-        .select('id')
-
-      if (leadInsertError) {
-        console.error('Valuation lead save error:', leadInsertError)
-        setLeadFormMessage(`Lead save failed: ${leadInsertError.message}`)
-        return
-      }
-
-      if (insertedLeads && insertedLeads[0]?.id) setLeadId(insertedLeads[0].id)
-
-      const emailResult = await sendLeadEmail({ ...leadPayload, whatsappConsent: leadConsent })
-      if (!emailResult.ok) {
-        console.error('Lead saved but email notification failed:', emailResult.error)
-      }
+      const handoff = await sendLeadToOffice('lead', leadPayload, leadConsent)
+      if (!handoff.ok) { setLeadFormMessage(handoff.error || 'Receipt not confirmed.'); return }
+      if (handoff.localId) setLeadId(handoff.localId)
 
       const comparables = await fetchRecentComparables(
         lat,
@@ -1539,20 +1525,20 @@ export default function Home() {
         setPlanPopupDismissed(false)
         setShowPlanPopup(true)
       }, 4000)
-    } catch (error) {
-      console.error(error)
+    } catch {
+      console.warn('HomeValue operation failed')
       setLeadFormMessage('Could not unlock your full report right now. Please try again.')
     } finally {
       setIsUnlockingReport(false)
     }
   }
 
-  const sendLeadEmail = async (
-    payload: Record<string, unknown>
-  ): Promise<EmailResult> => {
-    try {
+  const sendLeadToOffice = async (
+    kind: Kind, payload: Record<string, unknown>, consent: HomeValueWhatsAppConsent | null,
+    local: Record<string, unknown> = payload, updateId?: number | null
+  ) => {
       const propertyContextExists = hasPropertyContext()
-      const outgoingPayload = buildLeadSyncPayload(payload, {
+      const outgoingPayload = buildLeadSyncPayload({ ...payload, whatsappConsent: consent }, {
         canonicalProjectName: propertyContextExists ? resolvedProjectNameState : null,
         oneMapBuilding: propertyContextExists ? selectedProjectName : null,
         postalCode: propertyContextExists ? selectedPostal : null,
@@ -1562,30 +1548,7 @@ export default function Home() {
           : null,
       })
 
-      const response = await fetch('/api/send-lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(outgoingPayload),
-      })
-
-      const result = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        console.error('send-lead API failed:', result)
-        return {
-          ok: false,
-          error: result?.error || 'Email API failed',
-        }
-      }
-
-      return { ok: true }
-    } catch (error) {
-      console.error('send-lead fetch failed:', error)
-      return {
-        ok: false,
-        error: 'Could not reach email API',
-      }
-    }
+      return deliver({ kind, local, office: outgoingPayload, updateId })
   }
 
   const handleConsultationSubmit = async () => {
@@ -1625,27 +1588,9 @@ export default function Home() {
       plan: consultPlan.trim(),
     })
 
-    const { error } = await supabase.from('leads').insert([leadPayload])
-
-    if (error) {
-      console.error('Consultation lead save error:', error)
-      setConsultationMessage('Could not save your details right now. Please try again.')
-      return
-    }
-
-    const emailResult = await sendLeadEmail({
-      ...leadPayload,
-      source: 'consultation',
-      whatsappConsent: consultConsent,
-    })
-
-    if (!emailResult.ok) {
-      setConsultationMessage(
-        'Lead saved, but email notification failed. Check Vercel logs.'
-      )
-    } else {
-      setConsultationMessage('Thanks — we will contact you shortly.')
-    }
+    const handoff = await sendLeadToOffice('consultation', { ...leadPayload, source: 'consultation' }, consultConsent, leadPayload)
+    if (!handoff.ok) { setConsultationMessage(handoff.error || 'Receipt not confirmed.'); return }
+    setConsultationMessage('Thanks — we will contact you shortly.')
 
     setConsultName('')
     setConsultPhone('')
@@ -1686,20 +1631,8 @@ export default function Home() {
       radius_used_m: radiusUsedM,
     }
 
-    const { error } = await supabase.from('leads').insert([leadPayload])
-
-    if (error) {
-      console.error('Valuation lead save error:', error)
-      setLeadFormMessage('Could not save your details right now. Please try again.')
-      return
-    }
-
-    const emailResult = await sendLeadEmail({ ...leadPayload, whatsappConsent: leadConsent })
-
-    if (!emailResult.ok) {
-      setLeadFormMessage('Details saved, but email notification failed. Check Vercel logs.')
-      return
-    }
+    const handoff = await sendLeadToOffice('lead', leadPayload, leadConsent)
+    if (!handoff.ok) { setLeadFormMessage(handoff.error || 'Receipt not confirmed.'); return }
 
     setLeadFormMessage('Thanks — we will contact you shortly.')
     setLeadName('')
@@ -1709,30 +1642,14 @@ export default function Home() {
   }
 
   const handlePlanSelect = async (plan: string) => {
+    setPlanMessage('')
+    const handoff = await sendLeadToOffice('intent', {
+      name: leadName, phone: leadPhone, email: leadEmail, address, plan,
+      estimated_price: estimatedPrice, source: 'plan_popup',
+    }, leadConsent, { plan }, leadId)
+    if (!handoff.ok) { setPlanMessage(handoff.error || 'Intent update not confirmed.'); return }
     setPlanPopupStep('confirm')
-
-    const updatePayload: Record<string, unknown> = { plan }
-
-    if (leadId) {
-      await supabase.from('leads').update(updatePayload).eq('id', leadId)
-    }
-
-    const emailPayload = {
-      name: leadName,
-      phone: leadPhone,
-      email: leadEmail,
-      address: address,
-      plan,
-      estimated_price: estimatedPrice,
-      source: 'plan_popup',
-      whatsappConsent: leadConsent,
-    }
-    await sendLeadEmail(emailPayload)
-
-    setTimeout(() => {
-      setPlanPopupDismissed(true)
-      setShowPlanPopup(false)
-    }, 2500)
+    setTimeout(() => { setPlanPopupDismissed(true); setShowPlanPopup(false) }, 2500)
   }
 
   const handlePopupDismiss = () => {
@@ -1966,7 +1883,7 @@ export default function Home() {
     const { data, error } = await query
   
     if (error) {
-      console.error('Comparable fetch error:', error)
+      console.warn('HomeValue operation failed')
       return []
     }
   
@@ -2536,6 +2453,7 @@ export default function Home() {
       />
 
       <main className="min-h-screen bg-[#f8f1e7] text-[#2f3438]">
+        {recoveryPanel}
       <header className="border-b border-[#ead7c6] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl 2xl:max-w-screen-2xl items-center justify-between px-6 py-3 md:px-10">
           <a
@@ -3201,6 +3119,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={handleConsultationSubmit}
+                disabled={handoffBusy}
                 className="rounded-2xl bg-[#2f3438] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#24292d]"
               >
                 Submit
@@ -3218,6 +3137,7 @@ export default function Home() {
       {showPlanPopup && !planPopupDismissed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-[28px] border border-[#ead7c6] bg-white p-8 shadow-[0_20px_60px_rgba(37,42,46,0.18)] md:max-w-lg md:p-10">
+            {planMessage && <p role="status" className="mb-3 text-sm">{planMessage}</p>}
             {planPopupStep === 'question' ? (
               <>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b76633]">Quick question</p>
@@ -3234,6 +3154,7 @@ export default function Home() {
                       key={option.value}
                       type="button"
                       onClick={() => handlePlanSelect(option.value)}
+                      disabled={handoffBusy}
                       className="w-full rounded-2xl border border-[#ead7c6] bg-[#faf8f4] px-5 py-4 text-left text-sm font-medium text-[#2d3135] transition hover:border-[#b76633] hover:bg-white md:text-base"
                     >
                       {option.label}

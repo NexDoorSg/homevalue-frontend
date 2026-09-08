@@ -1,0 +1,33 @@
+name: HomeValue Lead Recovery
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package*.json'
+      - '.github/workflows/lead-recovery.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: node --test tests/*.test.mjs
+      - run: python -m unittest discover -s tests -p 'test_*.py'
+      - run: npx tsc --noEmit
+      - run: npx eslint src/components/LeadRecovery.tsx src/lib/leadRecovery.ts src/app/api/send-lead/route.ts
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://build.example.invalid
+          SUPABASE_SERVICE_ROLE_KEY: synthetic-build-only
+          NODE_OPTIONS: --require=./tests/block-provider-network.cjs

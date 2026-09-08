@@ -155,19 +155,15 @@ test('both valuation pages isolate database payloads from structured sync identi
     )
     const sender = section(
       source,
-      '  const sendLeadEmail = async (',
+      '  const sendLeadToOffice = async (',
       '  const handleConsultationSubmit = async ('
     )
 
     assert.doesNotMatch(leadBuilder, /\bproject_name\b|\bpostal_code\b/, path)
     assert.doesNotMatch(partialLeadBuilder, /\bproject_name\b|\bpostal_code\b/, path)
-    assert.match(sender, /buildLeadSyncPayload\(payload, \{/)
-    assert.match(sender, /body: JSON\.stringify\(outgoingPayload\)/)
-    assert.equal(
-      source.match(/fetch\('\/api\/send-lead'/g)?.length,
-      1,
-      `${path} must have one shared send boundary`
-    )
+    assert.match(sender, /buildLeadSyncPayload\(\{ \.\.\.payload, whatsappConsent: consent \}, \{/)
+    assert.match(sender, /deliver\(\{ kind, local, office: outgoingPayload, updateId \}\)/)
+    assert.match(source, /useLeadRecovery/, path)
   }
 })
 
@@ -177,7 +173,7 @@ test('full-report, normal, consultation, and plan-popup paths share the sender',
     const fullReport = section(
       source,
       '  const handleUnlockFullReport = async () => {',
-      '  const sendLeadEmail = async ('
+      '  const sendLeadToOffice = async ('
     )
     const consultation = section(
       source,
@@ -196,7 +192,7 @@ test('full-report, normal, consultation, and plan-popup paths share the sender',
     )
 
     for (const handler of [fullReport, consultation, normalLead, planPopup]) {
-      assert.match(handler, /sendLeadEmail\(/, path)
+      assert.match(handler, /sendLeadToOffice\(/, path)
     }
   }
 })
@@ -229,57 +225,17 @@ test('both fallback OneMap resolvers retain POSTAL and canonical state cannot go
   }
 })
 
-test('send-lead normalizes the exact identity keys before preserving Office metadata', () => {
+test('send-lead preserves HomeValue authentication and structured identity', () => {
   const source = readRepositoryFile(routePath)
-  const syncFunction = section(
-    source,
-    'async function syncLeadToOffice(',
-    'export async function POST('
-  )
-
-  assert.match(
-    source,
-    /const officePayload = buildLeadSyncPayload\(body, \{[\s\S]*canonicalProjectName: project_name,[\s\S]*postalCode: postal_code,[\s\S]*address,[\s\S]*unitNumber: unit_number,/
-  )
-  assert.match(source, /syncLeadToOffice\(\{ \.\.\.officePayload, whatsappConsent \}\)/)
-  assert.match(syncFunction, /"x-nexdoor-source": "HomeValue"/)
-  assert.match(syncFunction, /"x-nexdoor-sync-token": syncToken/)
-  assert.match(syncFunction, /\.\.\.body,[\s\S]*source: "HomeValue"/)
-  assert.match(
-    syncFunction,
-    /pageSource: body\.pageSource \|\| body\.page_source \|\| "HomeValue"/
-  )
+  assert.match(source, /buildLeadSyncPayload\(body, \{/)
+  for (const field of ['project_name', 'postal_code', 'address', 'unit_number']) assert.ok(source.includes('body.' + field))
+  assert.match(source, /'x-nexdoor-source': 'HomeValue'/)
+  assert.match(source, /'x-nexdoor-sync-token': syncToken/)
+  assert.match(source, /pageSource: body\.pageSource \|\| body\.page_source \|\| 'HomeValue'/)
 })
 
-test('send-lead email HTML safely renders every external text field', () => {
+test('standalone email and CRM assignment exposure are retired', () => {
   const source = readRepositoryFile(routePath)
-  const emailHtml = section(source, '      html: `', '      `,\n    });')
-
-  for (const value of [
-    'name',
-    'phone',
-    'email',
-    'officePayload.project_name',
-    'officePayload.postal_code',
-    'officePayload.address',
-    'officePayload.unit_number',
-    'unit_type',
-    'intent',
-    'officeSync.assignedTo',
-  ]) {
-    assert.match(
-      emailHtml,
-      new RegExp(`\\$\\{displayEmailHtmlValue\\(${value.replace('.', '\\.')}\\)\\}`)
-    )
-  }
-
-  assert.doesNotMatch(emailHtml, /\$\{displayValue\(/)
-  assert.doesNotMatch(emailHtml, /\$\{intent\}/)
-})
-
-test('Office assignment remains available to the response and admin email', () => {
-  const source = readRepositoryFile(routePath)
-  assert.match(source, /assignedTo: officeLead\?\.assignedTo \|\| null/)
-  assert.match(source, /displayEmailHtmlValue\(officeSync\.assignedTo\)/)
-  assert.match(source, /success: officeSync.ok, data, officeSync/)
+  assert.doesNotMatch(source, /resend|emails\.send|assignedTo|officeLead|displayEmailHtmlValue/)
+  assert.match(source, /NextResponse\.json\(\{ success: true \}\)/)
 })

@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 function files(dir) { return readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? files(join(dir,e.name)) : [join(dir,e.name)]); }
-const callers = files('src').filter(f => /\.tsx?$/.test(f) && readFileSync(f,'utf8').includes("fetch('/api/send-lead'"));
+const callers = files('src').filter(f => /\.tsx?$/.test(f) && readFileSync(f,'utf8').includes("sendLeadToOffice ="));
 test('all current send-lead surfaces offer the shared optional consent and preserve evidence', () => {
   assert.deepEqual(callers.sort(), ['src/app/free-property-valuation-singapore/page.tsx', 'src/app/page.tsx']);
   for (const file of callers) {
@@ -14,11 +14,14 @@ test('all current send-lead surfaces offer the shared optional consent and prese
       assert.match(source, new RegExp(`type="checkbox" checked=\\{${owner}Consent !== null\\}`), file);
       assert.match(source, new RegExp(`set${owner === 'lead' ? 'Lead' : 'Consult'}Phone\\(e.target.value\\); set${owner === 'lead' ? 'Lead' : 'Consult'}Consent\\(null\\)`), file);
     }
-    assert.match(source, /source: 'consultation',\s+whatsappConsent: consultConsent/, file);
-    assert.match(source, /source: 'plan_popup',\s+whatsappConsent: leadConsent/, file);
-    assert.match(source, /sendLeadEmail\(\{ \.\.\.leadPayload, whatsappConsent: leadConsent \}\)/, file);
-    assert.match(source, /setLeadId\(null\)\s+setLeadConsent\(null\)/, file);
-    const sender = source.slice(source.indexOf('const sendLeadEmail ='), source.indexOf('const handleConsultationSubmit ='));
-    assert.doesNotMatch(sender, /randomUUID|new Date/, file);
+    assert.match(source, /sendLeadToOffice\('consultation'.*consultConsent/, file);
+    assert.match(source, /sendLeadToOffice\('lead', leadPayload, leadConsent\)/, file);
+    assert.match(source, /source: 'plan_popup'/, file);
+    assert.match(source, /\}, leadConsent, \{ plan \}, leadId\)/, file);
+    assert.match(source, /\{recoveryPanel\}/, file);
+    assert.match(source, /if \(!handoff.ok\).*return/, file);
+    const intent = source.slice(source.indexOf('const handlePlanSelect ='), source.indexOf('const handlePopupDismiss ='));
+    assert.ok(intent.indexOf('if (!handoff.ok)') < intent.indexOf("setPlanPopupStep('confirm')"), file);
+    assert.doesNotMatch(source, /sendLeadEmail|email notification failed|console\.error/, file);
   }
 });

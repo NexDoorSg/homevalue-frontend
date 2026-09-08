@@ -1,174 +1,48 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
-import { displayEmailHtmlValue } from "@/lib/emailHtml";
 import { buildLeadSyncPayload } from "@/lib/propertyIdentity";
-
 import { parseHomeValueWhatsAppConsent } from "@/lib/whatsappConsent";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+export const maxDuration = 60;
 
-function displayValue(value: unknown) {
-  if (value === null || value === undefined || value === "") return "-";
-  return String(value);
-}
-
-function formatMoney(value: unknown) {
-  const numberValue = Number(value);
-  if (!Number.isFinite(numberValue) || numberValue <= 0) return "-";
-  return `$${Math.round(numberValue).toLocaleString("en-SG")}`;
-}
-
-function formatSqftFromSqm(value: unknown) {
-  const numberValue = Number(value);
-  if (!Number.isFinite(numberValue) || numberValue <= 0) return "-";
-  return `${Math.round(numberValue * 10.7639).toLocaleString("en-SG")} sqft`;
-}
-
-function getFirstAvailable(...values: unknown[]) {
-  return values.find((value) => value !== null && value !== undefined && value !== "");
-}
-
-async function syncLeadToOffice(body: Record<string, unknown>) {
+// Office is the sole notification/acknowledgement owner. Never return or log
+// provider bodies, contact details, assignment, credentials or raw exceptions.
+export async function POST(req: Request) {
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error();
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid request.' }, { status: 400 });
+  }
+  let whatsappConsent;
+  try { whatsappConsent = parseHomeValueWhatsAppConsent(body.whatsappConsent); }
+  catch { return NextResponse.json({ success: false, error: 'Invalid WhatsApp consent evidence.' }, { status: 400 }); }
   const officeUrl = process.env.NEXDOOR_OFFICE_URL;
   const syncToken = process.env.HOMEVALUE_OFFICE_SYNC_TOKEN;
-
   if (!officeUrl || !syncToken) {
-    console.warn("Office lead sync skipped: missing environment variables");
-    return { ok: false, skipped: true, assignedTo: null as string | null };
+    console.warn('HomeValue handoff unavailable', { code: 'configuration' });
+    return NextResponse.json({ success: false, error: 'Receipt unavailable. Keep your saved request and retry later.' }, { status: 503 });
   }
-
-  const response = await fetch(`${officeUrl.replace(/\/$/, "")}/api/leads`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-nexdoor-source": "HomeValue",
-      "x-nexdoor-sync-token": syncToken,
-    },
-    body: JSON.stringify({
-      ...body,
-      source: "HomeValue",
-      pageSource: body.pageSource || body.page_source || "HomeValue",
-    }),
+  const payload = buildLeadSyncPayload(body, {
+    canonicalProjectName: body.project_name, postalCode: body.postal_code,
+    address: body.address, unitNumber: body.unit_number,
   });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown Office sync error");
-    console.error("Office lead sync failed:", errorText);
-    return { ok: false, skipped: false, assignedTo: null as string | null };
-  }
-
-  const officeLead = await response.json().catch(() => null);
-
-  return {
-    ok: true,
-    skipped: false,
-    assignedTo: officeLead?.assignedTo || null,
-  };
-}
-
-export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as Record<string, unknown>;
-
-    let whatsappConsent;
-    try { whatsappConsent = parseHomeValueWhatsAppConsent(body.whatsappConsent); }
-    catch { return NextResponse.json({ success: false, error: "Invalid WhatsApp consent evidence" }, { status: 400 }); }
-
-    const {
-      name,
-      phone,
-      email,
-      project_name,
-      postal_code,
-      address,
-      unit_number,
-      unit_type,
-      floor_area_sqm,
-      plan,
-      estimated_price,
-      estimated_low,
-      estimated_high,
-      estimatedPrice,
-      estimatedLow,
-      estimatedHigh,
-    } = body;
-    const officePayload = buildLeadSyncPayload(body, {
-      canonicalProjectName: project_name,
-      postalCode: postal_code,
-      address,
-      unitNumber: unit_number,
+    const response = await fetch(`${officeUrl.replace(/\/$/, '')}/api/leads`, {
+      method: 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(30000),
+      headers: { 'Content-Type': 'application/json', 'x-nexdoor-source': 'HomeValue', 'x-nexdoor-sync-token': syncToken },
+      body: JSON.stringify({ ...payload, whatsappConsent, source: 'HomeValue', pageSource: body.pageSource || body.page_source || 'HomeValue' }),
     });
-
-    const intent = displayValue(plan || "Pending");
-    const isIntentUpdate = !!plan;
-    const estimatedValue = getFirstAvailable(estimated_price, estimatedPrice);
-    const lowRange = getFirstAvailable(estimated_low, estimatedLow);
-    const highRange = getFirstAvailable(estimated_high, estimatedHigh);
-    const rangeText =
-      formatMoney(lowRange) === "-" && formatMoney(highRange) === "-"
-        ? "-"
-        : `${formatMoney(lowRange)} - ${formatMoney(highRange)}`;
-
-    const officeSync = await syncLeadToOffice({ ...officePayload, whatsappConsent }).catch((error) => {
-      console.error("Office lead sync crash:", error);
-      return { ok: false, skipped: false, assignedTo: null as string | null };
-    });
-
-    // Office owns lead acknowledgements; this route only syncs the lead and emails admin.
-
-    const subject = isIntentUpdate
-      ? `HomeValue Intent - ${intent}`
-      : `New HomeValue Lead - ${address || "Valuation Completed"}`;
-
-    const { data, error } = await resend.emails.send({
-      from: "NexDoor <onboarding@resend.dev>",
-      to: ["admin@nexdoor.sg"],
-      subject,
-      html: `
-        <h2>${isIntentUpdate ? "HomeValue lead intent updated." : "New HomeValue lead received."}</h2>
-
-        <p><strong>Name:</strong> ${displayEmailHtmlValue(name)}</p>
-        <p><strong>Phone:</strong> ${displayEmailHtmlValue(phone)}</p>
-        <p><strong>Email:</strong> ${displayEmailHtmlValue(email)}</p>
-
-        <p><strong>Property / Development:</strong> ${displayEmailHtmlValue(officePayload.project_name)}</p>
-        <p><strong>Postal Code:</strong> ${displayEmailHtmlValue(officePayload.postal_code)}</p>
-        <p><strong>Address:</strong> ${displayEmailHtmlValue(officePayload.address)}</p>
-        <p><strong>Unit:</strong> ${displayEmailHtmlValue(officePayload.unit_number)}</p>
-        <p><strong>Property Type:</strong> ${displayEmailHtmlValue(unit_type)}</p>
-        <p><strong>Floor Area:</strong> ${formatSqftFromSqm(floor_area_sqm)}</p>
-
-        <p><strong>Estimated Value:</strong> ${formatMoney(estimatedValue)}</p>
-        <p><strong>Range:</strong> ${rangeText}</p>
-
-        <p><strong>Intent:</strong> ${displayEmailHtmlValue(intent)}</p>
-        <p><strong>Assigned To:</strong> ${displayEmailHtmlValue(officeSync.assignedTo)}</p>
-        <p><strong>Office Sync:</strong> ${officeSync.ok ? "Synced" : officeSync.skipped ? "Skipped" : "Failed"}</p>
-      `,
-    });
-
-    if (error) {
-      console.error("Resend error:", error);
-      return NextResponse.json(
-        { success: false, error: error.message || "Failed to send email" },
-        { status: 500 }
-      );
+    if (!response.ok) {
+      console.warn('HomeValue handoff rejected', { code: 'office_response', status: response.status });
+      const review = response.status === 400 || response.status === 409 || response.status === 422;
+      return NextResponse.json({ success: false, error: review ? 'Your saved request needs review. Please contact NexDoor.' : 'Receipt could not be confirmed. Retry your saved request.' }, { status: review ? 409 : 502 });
     }
-
-    return NextResponse.json({ success: officeSync.ok, data, officeSync }, { status: officeSync.ok ? 200 : 502 });
-  } catch (err: unknown) {
-    console.error("Send lead route error:", err);
-    const errorMessage =
-      typeof err === "object" &&
-      err !== null &&
-      "message" in err &&
-      typeof err.message === "string" &&
-      err.message
-        ? err.message
-        : "Unexpected server error";
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: 500 }
-    );
+    // A successful Office response follows the canonical transaction. Its body
+    // contains private CRM details and is deliberately not consumed or forwarded.
+    return NextResponse.json({ success: true });
+  } catch {
+    console.warn('HomeValue handoff unavailable', { code: 'transport' });
+    return NextResponse.json({ success: false, error: 'Receipt could not be confirmed. Retry your saved request.' }, { status: 502 });
   }
 }

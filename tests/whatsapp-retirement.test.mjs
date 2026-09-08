@@ -23,7 +23,7 @@ for (const syncOk of [true, false]) {
     const emails = [];
     const exports = {};
     const context = {
-      exports,
+      exports, AbortSignal,
       process: { env: {
         RESEND_API_KEY: 'synthetic', NEXDOOR_OFFICE_URL: 'https://office.example.invalid',
         HOMEVALUE_OFFICE_SYNC_TOKEN: 'synthetic', WHATSAPP_ACCESS_TOKEN: 'synthetic',
@@ -33,7 +33,7 @@ for (const syncOk of [true, false]) {
       fetch: async (url, options) => {
         calls.push({ url, options });
         assert.equal(url, 'https://office.example.invalid/api/leads');
-        return { ok: syncOk, json: async () => ({ assignedTo: 'consultant@example.invalid' }), text: async () => 'synthetic failure' };
+        return { ok: syncOk, status: syncOk ? 200 : 503, json: async () => ({ assignedTo: 'consultant@example.invalid' }), text: async () => 'synthetic failure' };
       },
       require: (name) => {
         if (name === 'next/server') return { NextResponse: { json: (body, options) => ({ body, status: options?.status ?? 200 }) } };
@@ -49,14 +49,15 @@ for (const syncOk of [true, false]) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const result = await exports.POST({ json: async () => body });
       assert.equal(result.status, syncOk ? 200 : 502);
-      assert.equal(result.body.officeSync.ok, syncOk);
+      assert.equal(result.body.success, syncOk);
+      assert.equal(result.body.officeSync, undefined);
     }
     assert.deepEqual(JSON.parse(calls[0].options.body).whatsappConsent, grant);
     assert.deepEqual(JSON.parse(calls[1].options.body).whatsappConsent, grant);
     const rejected = await exports.POST({ json: async () => ({ ...body, whatsappConsent: { ...grant, noticeVersion: 'unknown' } }) });
     assert.equal(rejected.status, 400);
     assert.equal(calls.length, 2);
-    assert.equal(emails.length, 2);
+    assert.equal(emails.length, 0);
     assert.equal(JSON.parse(calls[0].options.body).source, 'HomeValue');
   });
 }
