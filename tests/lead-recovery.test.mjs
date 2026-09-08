@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {readFileSync} from 'node:fs'
+import ts from 'typescript'
+const exports={};new Function('exports',ts.transpileModule(readFileSync('src/lib/leadRecovery.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports)
+const draft={kind:'lead',local:{name:'Synthetic'},office:{name:'Synthetic',phone:'+12025550123',whatsappConsent:null}}
+function setup(){const values=new Map(), sent=[];let accept=false;return {sent,accept:()=>accept=true,deps:{storage:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},now:()=>Date.parse('2026-09-08T00:00:00.000Z'),uuid:()=> '11111111-1111-4111-8111-111111111111',send:async e=>{sent.push(JSON.stringify(e.office));return accept}}}}
+test('uncertain atomic capture retries same UUID/payload after restoration',async()=>{const h=setup();const m=exports.createLeadRecovery(h.deps);assert.equal((await m.submit(draft)).ok,false);h.accept();const restored=exports.createLeadRecovery(h.deps);assert.equal((await restored.retry('lead')).ok,true);assert.equal(h.sent[0],h.sent[1]);assert.equal((await restored.submit(draft)).ok,true);assert.equal(h.sent.length,2)})
+test('uncertain identity does not expire into replacement UUID',async()=>{const h=setup();await exports.createLeadRecovery(h.deps).submit(draft);const restored=exports.createLeadRecovery({...h.deps,now:()=>h.deps.now()+86400001});h.accept();await restored.retry('lead');assert.equal(h.sent[0],h.sent[1])})
+test('changed recipient cannot replace uncertain capture',async()=>{const h=setup();const m=exports.createLeadRecovery(h.deps);await m.submit(draft);assert.equal((await m.submit({...draft,office:{...draft.office,phone:'+12025550124'}})).ok,false);assert.equal(h.sent.length,1)})
+test('overlapping clicks do not double-capture',async()=>{const h=setup();let release;h.deps.send=()=>new Promise(r=>release=r);const m=exports.createLeadRecovery(h.deps);const first=m.submit(draft);assert.equal((await m.submit(draft)).ok,false);release(true);assert.equal((await first).ok,true)})
+test('intent carries parent capability, never numeric Lead ID to capture',async()=>{const h=setup();h.accept();const m=exports.createLeadRecovery(h.deps);await m.submit(draft);let received;h.deps.send=async e=>{received=e;return true};await m.submit({...draft,kind:'intent',updateId:999,office:{...draft.office,plan:'selling'}});assert.equal(received.parentSubmissionId,'11111111-1111-4111-8111-111111111111')})

@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/homevalue-office-recovery", "schedule": "0 1 * * *" }
+  ]
+}
