@@ -70,6 +70,13 @@ begin
        or parent.office_payload->'whatsappConsent' is distinct from p_payload->'whatsappConsent' then
       raise exception using message = 'Invalid parent capture', errcode = '22023';
     end if;
+    -- Parent lock serializes this check with every intent capture. Arrival order
+    -- alone cannot establish chronology; reject stale first-time identities.
+    -- Accepted UUID replays have already returned above without updating the Lead.
+    if exists (select 1 from homevalue_private.office_handoffs h
+      where h.parent_submission_id = p_parent and h.event_kind = 'intent' and h.submitted_at > p_at) then
+      raise exception using message = 'Submission conflict', errcode = '22023';
+    end if;
     target := parent.lead_id;
     update public.leads set plan = p_payload->>'plan' where id = target;
   else

@@ -1,5 +1,5 @@
 import { buildLeadSyncPayload } from './propertyIdentity'
-import { parseHomeValueWhatsAppConsent } from './whatsappConsent'
+import { HOMEVALUE_CAPTURE_CLOCK_SKEW_MS, parseHomeValueWhatsAppConsent } from './whatsappConsent'
 
 export type RPC = (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string } | null }>
 export type Capture = { id: string; at: string; kind: string; payload: Record<string, unknown>; parent: string | null }
@@ -14,7 +14,7 @@ export function parseCapture(value: unknown, now = Date.now()): Capture {
   const s = b.submission as Record<string, unknown>
   if (Object.keys(s).some(k => ![...textFields,...numberFields,'submissionId','submittedAt','whatsappConsent'].includes(k)) || !uuid(s.submissionId)
     || typeof s.submittedAt !== 'string' || !Number.isFinite(Date.parse(s.submittedAt))
-    || new Date(s.submittedAt).toISOString() !== s.submittedAt || Date.parse(s.submittedAt) > now || Date.parse(s.submittedAt) < Date.parse('2026-01-01')) throw new Error('input')
+    || new Date(s.submittedAt).toISOString() !== s.submittedAt || Date.parse(s.submittedAt) > now + HOMEVALUE_CAPTURE_CLOCK_SKEW_MS || Date.parse(s.submittedAt) < Date.parse('2026-01-01')) throw new Error('input')
   for (const key of textFields) if (s[key] != null && (typeof s[key] !== 'string' || (s[key] as string).length > (key === 'address' ? 1000 : 200))) throw new Error('input')
   for (const key of numberFields) if (s[key] != null && (typeof s[key] !== 'number' || !Number.isFinite(s[key]) || s[key] < 0 || s[key] > 1e12)) throw new Error('input')
   for (const key of ['num_of_comps','radius_used_m']) if (s[key] != null && !Number.isInteger(s[key])) throw new Error('input')

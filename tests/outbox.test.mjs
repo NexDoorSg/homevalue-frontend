@@ -46,3 +46,22 @@ test('browser loss and lost Office response replay one canonical receipt, routin
  await deliverDue(rpc,config,null,office)
  assert.equal(durable.size,1);assert.equal(receipts.size,1);assert.equal(routes,1);assert.equal(emails,1);assert.equal(acks,1);assert.equal(bodies[0],bodies[1]);assert.equal([...durable.values()][0].state,'delivered')
 })
+
+test('submission and consent accept up to 60 seconds clock skew without relaxing chronology or ISO format',()=>{
+ const now=Date.parse('2026-09-08T00:00:00.000Z')
+ const withTimes=(submittedAt,grantedAt)=>({...envelope,submission:{...envelope.submission,submittedAt,whatsappConsent:{...grant,grantedAt}}})
+ for(const ms of [1,30000,60000]) {
+  const at=new Date(now+ms).toISOString()
+  const parsed=parseCapture(withTimes(at,at),now)
+  assert.equal(parsed.at,at);assert.equal(parsed.payload.whatsappConsent.grantedAt,at)
+ }
+ const beyond=new Date(now+60001).toISOString(),limit=new Date(now+60000).toISOString()
+ assert.throws(()=>parseCapture(withTimes(beyond,limit),now))
+ assert.throws(()=>parseCapture(withTimes(limit,beyond),now))
+ assert.throws(()=>consent.parseHomeValueWhatsAppConsent({...grant,grantedAt:beyond},new Date(now)))
+ assert.throws(()=>parseCapture(withTimes(new Date(now+30000).toISOString(),limit),now))
+ for(const at of ['2026-09-08T00:00:30Z','2026-09-08T00:00:30.000+00:00']) {
+  assert.throws(()=>parseCapture(withTimes(at,grant.grantedAt),now))
+  assert.throws(()=>parseCapture(withTimes(limit,at),now))
+ }
+})

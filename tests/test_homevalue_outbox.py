@@ -105,3 +105,45 @@ class Outbox(unittest.TestCase):
             rows=json.loads(self.scalar('select public.homevalue_claim_handoffs()'));self.assertEqual(len(rows),1)
             r=rows[0];self.assertEqual(r['submission_id'],payload(expected)['submissionId'])
             command(f"select public.homevalue_finish_handoff({quote(r['submission_id'])},{quote(r['lease_id'])},'delivered',null,200)")
+
+    def assert_final_intent(self, expected):
+        delivered=[]
+        while True:
+            rows=json.loads(self.scalar('select public.homevalue_claim_handoffs()'))
+            if not rows: break
+            self.assertEqual(len(rows),1)
+            row=rows[0];delivered.append(row['office_payload'])
+            command(f"select public.homevalue_finish_handoff({quote(row['submission_id'])},{quote(row['lease_id'])},'delivered',null,200)")
+        self.assertEqual(delivered[-1],expected)
+        return delivered
+    def test_late_stale_intent_rejected_without_local_or_delivery_effect(self):
+        parent=payload(plan=None);command(capture(parent))
+        newer={**payload(2,plan='selling'),'submittedAt':'2026-09-08T00:02:00.000Z'}
+        older={**payload(3,plan='buying'),'submittedAt':'2026-09-08T00:01:00.000Z'}
+        command(capture(newer,'intent',parent['submissionId']))
+        for _ in range(2):
+            rejected=command(capture(older,'intent',parent['submissionId']),check=False)
+            self.assertNotEqual(rejected.returncode,0)
+            self.assertIn('Submission conflict',rejected.stderr)
+        self.assertEqual(self.scalar('select plan from public.leads'),'selling')
+        self.assertEqual(self.scalar('select count(*) from homevalue_private.office_handoffs'),'2')
+        self.assertEqual(self.scalar(f"select public.homevalue_claim_handoffs({quote(older['submissionId'])})"),'[]')
+        command(capture(newer,'intent',parent['submissionId']))
+        self.assertEqual(self.assert_final_intent(newer),[parent,newer])
+        command(capture(newer,'intent',parent['submissionId']))
+        self.assertEqual(self.scalar('select public.homevalue_claim_handoffs()'),'[]')
+    def test_concurrent_intent_capture_keeps_newest_authoritative_and_accepted_replay_safe(self):
+        parent=payload();command(capture(parent))
+        older={**payload(2,plan='buying'),'submittedAt':'2026-09-08T00:01:00.000Z'}
+        newer={**payload(3,plan='selling'),'submittedAt':'2026-09-08T00:02:00.000Z'}
+        with concurrent.futures.ThreadPoolExecutor(2) as ex:
+            results=list(ex.map(lambda p:command('begin;'+capture(p,'intent',parent['submissionId'])+'select pg_sleep(0.2);commit;',check=False),[older,newer]))
+        self.assertEqual(results[1].returncode,0)
+        self.assertEqual(self.scalar('select plan from public.leads'),'selling')
+        # If the older UUID was accepted first, exact replay is still valid but
+        # cannot reapply its plan after the newer intent has committed.
+        replay=command(capture(older,'intent',parent['submissionId']),check=False)
+        self.assertEqual(replay.returncode==0,results[0].returncode==0)
+        self.assertEqual(self.scalar('select plan from public.leads'),'selling')
+        delivered=self.assert_final_intent(newer)
+        self.assertEqual(delivered,[parent,older,newer] if results[0].returncode==0 else [parent,newer])
