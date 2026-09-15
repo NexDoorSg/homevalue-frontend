@@ -1,38 +1,14 @@
+import { normalizeHdbStreet } from './hdbStreetAbbrev'
+
 function normalizeText(value: string | null | undefined) {
   return (value || '').toUpperCase().replace(/\s+/g, ' ').trim()
 }
 
+// Delegates to the canonical normaliser (single source of truth). Byte-identical
+// to the previous inline 27-rule chain: same base (upper/collapse/trim), same
+// rules, same final collapse/trim.
 function normalizeStreetName(streetName: string | null | undefined) {
-  return normalizeText(streetName)
-    .replace(/\bBUKIT\b/g, 'BT')
-    .replace(/\bMOUNT\b/g, 'MT')
-    .replace(/\bSAINT\b/g, 'ST')
-    .replace(/\bAVENUE\b/g, 'AVE')
-    .replace(/\bSTREET\b/g, 'ST')
-    .replace(/\bROAD\b/g, 'RD')
-    .replace(/\bDRIVE\b/g, 'DR')
-    .replace(/\bCRESCENT\b/g, 'CRES')
-    .replace(/\bPLACE\b/g, 'PL')
-    .replace(/\bCLOSE\b/g, 'CL')
-    .replace(/\bLANE\b/g, 'LN')
-    .replace(/\bTERRACE\b/g, 'TER')
-    .replace(/\bBOULEVARD\b/g, 'BLVD')
-    .replace(/\bCENTRAL\b/g, 'CTRL')
-    .replace(/\bHEIGHTS\b/g, 'HTS')
-    .replace(/\bGARDENS\b/g, 'GDNS')
-    .replace(/\bNORTH\b/g, 'NTH')
-    .replace(/\bSOUTH\b/g, 'STH')
-    .replace(/\bEAST\b/g, 'EST')
-    .replace(/\bWEST\b/g, 'WEST')
-    .replace(/\bKAMPONG\b/g, 'KG')
-    .replace(/\bJALAN\b/g, 'JLN')
-    .replace(/\bLORONG\b/g, 'LOR')
-    .replace(/\bUPPER\b/g, 'UPP')
-    .replace(/\bCOMMONWEALTH\b/g, "C'WEALTH")
-    .replace(/\bTANJONG\b/g, 'TG')
-    .replace(/\bPARK\b/g, 'PK')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return normalizeHdbStreet(streetName)
 }
 
 function normalizeProjectName(projectName: string | null | undefined) {

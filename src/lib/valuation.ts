@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import condoEcFloorTierBetaCache from './condoEcFloorTierBeta.json'
 import { MRT_STATIONS } from './mrtStations'
+import { normalizeHdbStreetKey, subjectHdbStreetKey } from './hdbStreetAbbrev'
 
 type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
 
@@ -419,46 +420,11 @@ function extractBlockNumber(address: string | null | undefined): string {
   return match ? match[1] : ''
 }
 
-// HDB street-key normaliser. Kept equivalent to normalizeStreetName() in
-// comparableRanking.ts and normalize_street() in
-// scripts/hdb_sync/sync_hdb_block_info.py, so a subject street resolves to the
-// exact key stored in hdb_block_info. The data.gov.sg HDB streets already use
-// these abbreviations (KG ARANG RD, BEDOK STH AVE 1), so most rules are no-ops
-// here; they exist to normalise the SUBJECT side, which may arrive fuller
-// ("MACPHERSON LANE" -> "MACPHERSON LN").
-const HDB_STREET_ABBREV: [RegExp, string][] = [
-  [/\bBUKIT\b/g, 'BT'], [/\bMOUNT\b/g, 'MT'], [/\bSAINT\b/g, 'ST'],
-  [/\bAVENUE\b/g, 'AVE'], [/\bSTREET\b/g, 'ST'], [/\bROAD\b/g, 'RD'],
-  [/\bDRIVE\b/g, 'DR'], [/\bCRESCENT\b/g, 'CRES'], [/\bPLACE\b/g, 'PL'],
-  [/\bCLOSE\b/g, 'CL'], [/\bLANE\b/g, 'LN'], [/\bTERRACE\b/g, 'TER'],
-  [/\bBOULEVARD\b/g, 'BLVD'], [/\bCENTRAL\b/g, 'CTRL'], [/\bHEIGHTS\b/g, 'HTS'],
-  [/\bGARDENS\b/g, 'GDNS'], [/\bNORTH\b/g, 'NTH'], [/\bSOUTH\b/g, 'STH'],
-  [/\bEAST\b/g, 'EST'], [/\bWEST\b/g, 'WEST'],
-  [/\bKAMPONG\b/g, 'KG'], [/\bJALAN\b/g, 'JLN'], [/\bLORONG\b/g, 'LOR'],
-  [/\bUPPER\b/g, 'UPP'], [/\bCOMMONWEALTH\b/g, "C'WEALTH"], [/\bTANJONG\b/g, 'TG'],
-  [/\bPARK\b/g, 'PK'],
-]
-
-function normalizeHdbStreetKey(street: string | null | undefined): string {
-  let s = (street || '').toUpperCase().replace(/\s+/g, ' ').trim()
-  for (const [rx, rep] of HDB_STREET_ABBREV) s = s.replace(rx, rep)
-  return s.replace(/\s+/g, ' ').trim()
-}
-
-// Subject street from the explicit street name, else parsed off the address
-// (leading block token removed). Normalised to the hdb_block_info key form.
-// Exported so the internal-valuation route reuses the exact same normaliser for
-// its "same block" comparable split (block number alone collides across streets
-// — e.g. "40 BEDOK STH RD" vs "40 CHAI CHEE AVE" both extract block "40").
-export function subjectHdbStreetKey(
-  streetName: string | null | undefined,
-  address: string | null | undefined
-): string {
-  const direct = normalizeHdbStreetKey(streetName)
-  if (direct) return direct
-  const fromAddress = normalizeText(address).replace(/^(\d+[A-Z]?)\s+/, '').trim()
-  return normalizeHdbStreetKey(fromAddress)
-}
+// HDB street-key normaliser + subjectHdbStreetKey now live in the canonical
+// ./hdbStreetAbbrev module (single source of truth, shared server + client).
+// Imported at the top; re-exported here so the internal-valuation route keeps
+// importing subjectHdbStreetKey from '@/lib/valuation' unchanged.
+export { subjectHdbStreetKey }
 
 // Zero-history fallback: an HDB block with NO resale transactions has no
 // same-block completion year to derive (buildHdbCandidate's Fix 1 yields null),
