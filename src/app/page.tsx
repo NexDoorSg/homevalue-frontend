@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { applyHdbStreetAbbrev } from '@/lib/hdbStreetAbbrev'
 import { useLeadRecovery } from '@/components/LeadRecovery'
 import type { Kind } from '@/lib/leadRecovery'
 import { HOMEVALUE_WHATSAPP_NOTICE, HOMEVALUE_WHATSAPP_NOTICE_VERSION, type HomeValueWhatsAppConsent } from '@/lib/whatsappConsent'
@@ -1670,30 +1671,13 @@ export default function Home() {
       return (value || '').toUpperCase().replace(/\s+/g, ' ').trim()
     }
   
+    // Street abbreviations now come from the canonical @/lib/hdbStreetAbbrev
+    // module (single source of truth). Previously an inline 20-rule copy that had
+    // drifted — missing KAMPONG/JALAN/LORONG/UPPER/COMMONWEALTH/TANJONG/PARK and
+    // carrying a divergent EAST->'EAST' (canonical: EAST->'EST'). Base normalize
+    // + final collapse/trim preserved exactly.
     function normalizeStreet(value: string | null | undefined) {
-      return normalizeText(value)
-        .replace(/\bBUKIT\b/g, 'BT')
-        .replace(/\bMOUNT\b/g, 'MT')
-        .replace(/\bSAINT\b/g, 'ST')
-        .replace(/\bAVENUE\b/g, 'AVE')
-        .replace(/\bSTREET\b/g, 'ST')
-        .replace(/\bROAD\b/g, 'RD')
-        .replace(/\bDRIVE\b/g, 'DR')
-        .replace(/\bCRESCENT\b/g, 'CRES')
-        .replace(/\bPLACE\b/g, 'PL')
-        .replace(/\bCLOSE\b/g, 'CL')
-        .replace(/\bLANE\b/g, 'LN')
-        .replace(/\bTERRACE\b/g, 'TER')
-        .replace(/\bBOULEVARD\b/g, 'BLVD')
-        .replace(/\bCENTRAL\b/g, 'CTRL')
-        .replace(/\bHEIGHTS\b/g, 'HTS')
-        .replace(/\bGARDENS\b/g, 'GDNS')
-        .replace(/\bNORTH\b/g, 'NTH')
-        .replace(/\bSOUTH\b/g, 'STH')
-        .replace(/\bEAST\b/g, 'EAST')
-        .replace(/\bWEST\b/g, 'WEST')
-        .replace(/\s+/g, ' ')
-        .trim()
+      return applyHdbStreetAbbrev(normalizeText(value)).replace(/\s+/g, ' ').trim()
     }
   
     function normalizeProject(value: string | null | undefined) {
