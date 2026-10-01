@@ -1,25 +1,25 @@
 {
   "betas": {
-    "low": 0.0108,
-    "mid": 0.031,
-    "high": 0.0443,
-    "vhigh": 0.0544
+    "low": 0.0132,
+    "mid": 0.0311,
+    "high": 0.047,
+    "vhigh": 0.0522
   },
   "meta": {
-    "updated": "2026-08-01",
+    "updated": "2026-10-01",
     "source": "scheduled recompute (scripts/floor_beta_recompute/recompute_floor_betas.py)",
     "method": "within-project-demeaned pooled OLS  ln(psm) ~ b*ln(floor) + g*ln(area)  over condo/EC transactions in the last 5y, pooled by project-max-floor height tier (low<=12 / mid 13-24 / high 25-40 / vhigh>40)",
     "samples": {
-      "low": 29773,
-      "mid": 59741,
-      "high": 18205,
-      "vhigh": 2682
+      "low": 27320,
+      "mid": 57132,
+      "high": 19017,
+      "vhigh": 4482
     },
     "projects": {
-      "low": 653,
-      "mid": 418,
-      "high": 123,
-      "vhigh": 16
+      "low": 723,
+      "mid": 491,
+      "high": 172,
+      "vhigh": 21
     },
     "warnings": []
   }
