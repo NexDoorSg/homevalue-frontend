@@ -2,6 +2,8 @@ import { supabase } from './supabase'
 import condoEcFloorTierBetaCache from './condoEcFloorTierBeta.json'
 import { MRT_STATIONS } from './mrtStations'
 import { normalizeHdbStreetKey, subjectHdbStreetKey } from './hdbStreetAbbrev'
+import { getHdbCandidateValuation } from './hdbValuationCandidateData'
+import type { HdbCandidateResult } from './hdbValuationCandidate'
 
 type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
 
@@ -23,6 +25,9 @@ type ValuationParams = {
   subjectBlockNo?: string | null
   subjectCompletionYearHdb?: number | null
   cacheKey?: string
+  // Explicit research opt-in. Candidate results never read/write valuation_cache.
+  hdbModel?: 'candidate_v2'
+  valuationDate?: string
 }
 
 type TransactionRow = {
@@ -70,6 +75,7 @@ type CandidateResult = {
   comparables: number
   radius: number
   method?: string
+  hdbDiagnostics?: HdbCandidateResult
   // Stage 2: set when the repeat-sale blend runs on a thin pool AND excluding the
   // subject unit swung the comparable by more than REPEAT_SWING_THRESHOLD — a
   // signal that the estimate leans heavily on one prior transaction. The UI can
@@ -3027,6 +3033,12 @@ async function attachIndexedMarketValue(
 export async function getValuation(
   params: ValuationParams
 ): Promise<CandidateResult | null> {
+  if (params.hdbModel === 'candidate_v2') {
+    if (params.propertyCategory !== 'hdb') throw new Error('The candidate model supports HDB only.')
+    const candidate = await getHdbCandidateValuation(params)
+    return candidate ? { ...candidate, hdbDiagnostics: candidate, ...EMPTY_INDEXED_MV, blendedEstimate: candidate.estimated } : null
+  }
+  if (params.valuationDate) throw new Error('Historical dates require the HDB candidate model.')
   const result = await getValuationCore(params)
   if (!result) return result
   const withIndexed = await attachIndexedMarketValue(result, params)

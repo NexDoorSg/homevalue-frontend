@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getValuation, subjectHdbStreetKey } from '@/lib/valuation'
 import { getRenovationConditionTiers } from '@/lib/renovationTiers'
 import { supabase } from '@/lib/supabase'
+import { hdbAsOf } from '@/lib/hdbValuationCandidate'
 
 type PropertyCategory = 'hdb' | 'condo' | 'ec' | 'landed'
 
@@ -22,6 +23,8 @@ type Payload = {
   subjectStreetName?: string | null
   subjectBlockNo?: string | null
   subjectCompletionYearHdb?: number | null
+  hdbModel?: 'candidate_v2'
+  valuationDate?: string
 }
 
 // CHANGE 1: Added floor_level to ComparableRow type
@@ -53,6 +56,12 @@ function validate(data: Partial<Payload>) {
   if (!Number.isFinite(Number(data.floorAreaSqm)) || Number(data.floorAreaSqm) <= 0) return 'Floor area is required.'
   if (!data.propertyType) return 'Property type is required.'
   if (!data.propertyCategory || !['hdb', 'condo', 'ec', 'landed'].includes(data.propertyCategory)) return 'Property category is required.'
+  if (data.hdbModel !== undefined && data.hdbModel !== 'candidate_v2') return 'Unknown HDB model.'
+  if (data.hdbModel && data.propertyCategory !== 'hdb') return 'The candidate model supports HDB only.'
+  if (data.valuationDate && !data.hdbModel) return 'Historical dates require the HDB candidate model.'
+  if (data.valuationDate) {
+    try { hdbAsOf(data.valuationDate) } catch { return 'Valuation date must be a valid YYYY-MM-DD date.' }
+  }
   return null
 }
 
@@ -216,6 +225,8 @@ export async function POST(request: NextRequest) {
       subjectStreetName: body.subjectStreetName || null,
       subjectBlockNo: body.subjectBlockNo || null,
       subjectCompletionYearHdb: body.subjectCompletionYearHdb ? Number(body.subjectCompletionYearHdb) : null,
+      hdbModel: body.hdbModel,
+      valuationDate: body.valuationDate,
     })
 
     // Renovation-condition tiers: a COST-APPROACH overlay computed from the Market
@@ -230,7 +241,16 @@ export async function POST(request: NextRequest) {
         )
       : null
 
-    const comparables = await getComparableTransactions(body)
+    // Candidate evidence is the exact weighted pool and obeys the as-of date;
+    // legacy display queries can include future rows and must not be reused here.
+    const comparables = result?.hdbDiagnostics
+      ? {
+          primary: result.hdbDiagnostics.evidence.filter(r => r.role !== 'recent_nearby'),
+          nearby: result.hdbDiagnostics.evidence.filter(r => r.role === 'recent_nearby'),
+          historical: result.hdbDiagnostics.historicalReferences,
+          basis: 'candidate_calculation_evidence',
+        }
+      : body.hdbModel ? { primary: [], nearby: [], historical: [], basis: 'candidate_calculation_evidence' } : await getComparableTransactions(body)
     return NextResponse.json({
       result: result && conditionTiers ? { ...result, ...conditionTiers } : result,
       comparables,

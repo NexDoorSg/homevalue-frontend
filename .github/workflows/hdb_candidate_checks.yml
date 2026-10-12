@@ -1,0 +1,39 @@
+name: HDB candidate checks
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/valuation.ts'
+      - 'src/lib/hdbValuationCandidate*.ts'
+      - 'src/app/api/internal/valuation/route.ts'
+      - 'src/app/hdb-valuation-preview/**'
+      - 'src/components/HdbCandidateEvidence.tsx'
+      - 'scripts/hdb_valuation/**'
+      - 'tests/hdb-valuation-candidate.test.cjs'
+      - 'tests/fixtures/hdb-block-870.json'
+      - '.github/workflows/hdb_candidate_checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test tests/hdb-valuation-candidate.test.cjs
+      - run: node --test tests/*.test.mjs
+      - run: npx tsc --noEmit
+      - run: npx eslint src/lib/hdbValuationCandidate.ts src/lib/hdbValuationCandidateData.ts src/components/HdbCandidateEvidence.tsx src/app/hdb-valuation-preview/*.tsx src/app/api/internal/valuation/route.ts scripts/hdb_valuation/*.cjs tests/hdb-valuation-candidate.test.cjs
+      - run: npm run build
+        env:
+          # Satisfy existing server-route construction without production credentials.
+          NEXT_PUBLIC_SUPABASE_URL: https://build-only.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: build-only-placeholder
