@@ -162,7 +162,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // is a real failure and must not be mistaken for "no master row".
     const { data: master, error: masterError } = await supabase
       .from('projects_master')
-      .select('project_name, district, tenure, total_units')
+      .select('project_name, district, tenure, total_units, property_type')
       .ilike('project_name', decoded)
       .limit(1)
       .maybeSingle()
@@ -251,6 +251,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (blockList.length === 0) {
       return json({
         projectName: canonicalName,
+        propertyType: master?.property_type ?? null,
         district: master?.district ?? null,
         tenure: master?.tenure ?? null,
         totalUnits: master?.total_units ?? null,
@@ -288,6 +289,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return json({
       projectName: canonicalName,
+      propertyType: master?.property_type ?? null,
       district: master?.district ?? null,
       tenure: master?.tenure ?? null,
       totalUnits: master?.total_units ?? null,
