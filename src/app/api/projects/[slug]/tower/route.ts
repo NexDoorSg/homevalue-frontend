@@ -172,7 +172,33 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const canonicalName = (master?.project_name as string) || decoded
-    const rows = await fetchUnitTransactions(canonicalName)
+    // Narrow, source-verified legacy aliases. Never resolve by street alone:
+    // nearby developments can share the same road but are not the same project.
+    const transactionName = canonicalName === 'ENCHANTÃ‰' ? 'ENCHANTÉ'
+      : canonicalName === 'GREEN  HILL ESTATE' ? 'GREEN HILL ESTATE'
+      : canonicalName
+    const rows = await fetchUnitTransactions(transactionName)
+
+    // Surface source coverage separately from unit-level coverage. Older URA
+    // transactions sometimes only identify a building, not an individual unit.
+    // Never infer a floor/stack from these building-level addresses.
+    const { count: totalTransactionRecords, error: coverageError } = await supabase
+      .from('property_transactions_v2')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_name', transactionName)
+    if (coverageError) {
+      throw new Error(`tower coverage query failed: ${coverageError.message}`)
+    }
+    // A literal '#' is not sufficient: HTML-encoded apostrophes (&#039;)
+    // and basement tokens (#B1-02) are not parseable tower units.
+    const parsedUnitAddressRecords = rows.filter((row) =>
+      row.address != null && parseAddress(row.address) != null,
+    ).length
+    const coverage = {
+      totalTransactionRecords: totalTransactionRecords ?? 0,
+      unitAddressRecords: parsedUnitAddressRecords,
+      buildingOnlyRecords: Math.max(0, (totalTransactionRecords ?? 0) - parsedUnitAddressRecords),
+    }
 
     // Deduplicate transactions — URA data can carry duplicate rows (e.g. an
     // option + exercise pair) with identical address, date and price. Keep one.
@@ -231,6 +257,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         tenure: master?.tenure ?? null,
         totalUnits: master?.total_units ?? null,
         blocks: [],
+        coverage,
         selectedBlock: '',
         floors: {},
         maxFloor: 0,
@@ -267,6 +294,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       tenure: master?.tenure ?? null,
       totalUnits: master?.total_units ?? null,
       blocks: blockList,
+      coverage,
       selectedBlock,
       floors,
       maxFloor: Number.isFinite(maxFloor) ? maxFloor : 0,
