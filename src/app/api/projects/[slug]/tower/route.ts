@@ -172,7 +172,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const canonicalName = (master?.project_name as string) || decoded
-    const rows = await fetchUnitTransactions(canonicalName)
+    // Narrow, source-verified legacy aliases. Never resolve by street alone:
+    // nearby developments can share the same road but are not the same project.
+    const transactionName = canonicalName === 'ENCHANTÃ‰' ? 'ENCHANTÉ'
+      : canonicalName === 'GREEN  HILL ESTATE' ? 'GREEN HILL ESTATE'
+      : canonicalName
+    const rows = await fetchUnitTransactions(transactionName)
 
     // Surface source coverage separately from unit-level coverage. Older URA
     // transactions sometimes only identify a building, not an individual unit.
@@ -180,7 +185,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { count: totalTransactionRecords, error: coverageError } = await supabase
       .from('property_transactions_v2')
       .select('id', { count: 'exact', head: true })
-      .eq('project_name', canonicalName)
+      .eq('project_name', transactionName)
     if (coverageError) {
       throw new Error(`tower coverage query failed: ${coverageError.message}`)
     }
