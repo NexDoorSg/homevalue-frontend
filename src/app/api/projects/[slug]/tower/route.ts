@@ -174,6 +174,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const canonicalName = (master?.project_name as string) || decoded
     const rows = await fetchUnitTransactions(canonicalName)
 
+    // Surface source coverage separately from unit-level coverage. Older URA
+    // transactions sometimes only identify a building, not an individual unit.
+    // Never infer a floor/stack from these building-level addresses.
+    const { count: totalTransactionRecords, error: coverageError } = await supabase
+      .from('property_transactions_v2')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_name', canonicalName)
+    if (coverageError) {
+      throw new Error(`tower coverage query failed: ${coverageError.message}`)
+    }
+    const coverage = {
+      totalTransactionRecords: totalTransactionRecords ?? 0,
+      unitAddressRecords: rows.length,
+      buildingOnlyRecords: Math.max(0, (totalTransactionRecords ?? 0) - rows.length),
+    }
+
     // Deduplicate transactions — URA data can carry duplicate rows (e.g. an
     // option + exercise pair) with identical address, date and price. Keep one.
     const seen = new Set<string>()
@@ -231,6 +247,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         tenure: master?.tenure ?? null,
         totalUnits: master?.total_units ?? null,
         blocks: [],
+        coverage,
         selectedBlock: '',
         floors: {},
         maxFloor: 0,
@@ -267,6 +284,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       tenure: master?.tenure ?? null,
       totalUnits: master?.total_units ?? null,
       blocks: blockList,
+      coverage,
       selectedBlock,
       floors,
       maxFloor: Number.isFinite(maxFloor) ? maxFloor : 0,
