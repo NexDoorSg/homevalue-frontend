@@ -184,10 +184,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (coverageError) {
       throw new Error(`tower coverage query failed: ${coverageError.message}`)
     }
+    // A literal '#' is not sufficient: HTML-encoded apostrophes (&#039;)
+    // and basement tokens (#B1-02) are not parseable tower units.
+    const parsedUnitAddressRecords = rows.filter((row) =>
+      row.address != null && parseAddress(row.address) != null,
+    ).length
     const coverage = {
       totalTransactionRecords: totalTransactionRecords ?? 0,
-      unitAddressRecords: rows.length,
-      buildingOnlyRecords: Math.max(0, (totalTransactionRecords ?? 0) - rows.length),
+      unitAddressRecords: parsedUnitAddressRecords,
+      buildingOnlyRecords: Math.max(0, (totalTransactionRecords ?? 0) - parsedUnitAddressRecords),
     }
 
     // Deduplicate transactions — URA data can carry duplicate rows (e.g. an
