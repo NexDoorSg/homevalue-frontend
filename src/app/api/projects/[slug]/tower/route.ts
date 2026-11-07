@@ -72,11 +72,13 @@ function parseAddress(address: string): { block: string; floor: number; stack: n
   const [before, after] = address.split('#')
   const block = (before || '').trim().split(/\s+/)[0]
   const unit = (after || '').trim()
-  const parts = unit.split('-')
-  if (parts.length < 2) return null
-  const floor = parseInt(parts[0], 10)
-  const stack = parseInt(parts[1], 10)
-  if (!block || !Number.isFinite(floor) || !Number.isFinite(stack)) return null
+  // Only an explicit, single-unit floor-stack belongs in Tower View.
+  // '#04-06 ETC' denotes a multi-unit transaction; parseInt would wrongly
+  // assign its full price to #04-06 and corrupt unit profitability.
+  const match = /^(\\d+)-(\\d+)$/.exec(unit)
+  if (!block || !match) return null
+  const floor = Number(match[1])
+  const stack = Number(match[2])
   return { block, floor, stack, unit }
 }
 
