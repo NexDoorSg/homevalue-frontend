@@ -75,7 +75,7 @@ function parseAddress(address: string): { block: string; floor: number; stack: n
   // Only an explicit, single-unit floor-stack belongs in Tower View.
   // '#04-06 ETC' denotes a multi-unit transaction; parseInt would wrongly
   // assign its full price to #04-06 and corrupt unit profitability.
-  const match = /^(\\d+)-(\\d+)$/.exec(unit)
+  const match = /^(\d+)-(\d+)$/.exec(unit)
   if (!block || !match) return null
   const floor = Number(match[1])
   const stack = Number(match[2])
