@@ -68,17 +68,17 @@ async function fetchUnitTransactions(projectName: string): Promise<RawRow[]> {
 
 // "45 NORMANTON PARK #06-05" -> { block: "45", floor: 6, stack: 5, unit: "06-05" }
 function parseAddress(address: string): { block: string; floor: number; stack: number; unit: string } | null {
-  if (!address.includes('#')) return null
-  const [before, after] = address.split('#')
-  const block = (before || '').trim().split(/\s+/)[0]
-  const unit = (after || '').trim()
+  if (/\b(?:ETC|ENBLOC)\b/i.test(address)) return null
   // Only an explicit, single-unit floor-stack belongs in Tower View.
   // '#04-06 ETC' denotes a multi-unit transaction; parseInt would wrongly
   // assign its full price to #04-06 and corrupt unit profitability.
-  const match = /^(\d+)-(\d+)$/.exec(unit)
-  if (!block || !match) return null
-  const floor = Number(match[1])
-  const stack = Number(match[2])
+  const match = /^\s*([0-9]+[A-Za-z]?)\s+[^#]+\s+#(\d+)-(\d+)\s*$/.exec(address)
+  if (!match) return null
+  const block = match[1]
+  const floor = Number(match[2])
+  const stack = Number(match[3])
+  if (!Number.isSafeInteger(floor) || !Number.isSafeInteger(stack)) return null
+  const unit = `${match[2]}-${match[3]}`
   return { block, floor, stack, unit }
 }
 
