@@ -1,5 +1,7 @@
 # HomeValue production recovery audit — 7 November 2026
 
+Follow-up: [10 November encoded-name recovery](realis-encoded-name-recovery-2026-11-10.md) restored another 118 transactions and resolves two of the three project gaps listed below.
+
 Baseline: merged PR #86, main commit `df2be6456df9eeb880473326a08811940f93418c`.
 Production Supabase project: HomeValue By NexDoor (`uooqynhqjeusryuwghhe`).
 
