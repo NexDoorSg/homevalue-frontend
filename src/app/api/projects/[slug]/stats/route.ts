@@ -72,6 +72,7 @@ function buildPriceHistory(rows: TxRow[]): PriceHistoryPoint[] {
   const buckets = new Map<string, { sum: number; count: number }>()
 
   for (const row of rows) {
+    if (/\b(?:ETC|ENBLOC)\b/i.test(row.address || '')) continue
     if (!row.transaction_date) continue
     const psf = Number(row.price_psf)
     if (!Number.isFinite(psf) || psf <= 0) continue
@@ -103,13 +104,16 @@ function buildPriceHistory(rows: TxRow[]): PriceHistoryPoint[] {
 // QUERY B: per-unit profitability from the last two transactions of each unit.
 // If the most recent price beats the one before it, the unit is profitable.
 // Units with a single transaction can't be judged and are excluded.
-function buildProfitability(rows: TxRow[]) {
+function buildProfitability(rows: TxRow[], requireUnitAddress: boolean) {
   type UnitTx = { price: number; date: string }
   const units = new Map<string, UnitTx[]>()
 
   for (const row of rows) {
     const address = (row.address || '').trim()
     if (!address) continue
+    if (/\b(?:ETC|ENBLOC)\b/i.test(address)) continue
+    // A building-only condo sale cannot identify one residential unit.
+    if (requireUnitAddress && !/^[0-9]+[A-Za-z]?\s+[^#]+\s+#\d+-\d+$/.test(address)) continue
     const price = Number(row.transaction_price)
     if (!Number.isFinite(price) || price <= 0) continue
     if (!row.transaction_date) continue
@@ -169,10 +173,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Use the canonical name from the master row so the transactions query hits
     // the project_name index with an exact (fast) match.
     const canonicalName = (projectRow.project_name as string) || projectName
-    const rows = await fetchProjectTransactions(canonicalName)
+    const transactionName = canonicalName === 'ENCHANTÃ‰' ? 'ENCHANTÉ' : canonicalName
+    const rows = await fetchProjectTransactions(transactionName)
 
     const priceHistory = buildPriceHistory(rows)
-    const profitability = buildProfitability(rows)
+    const requireUnitAddress = /apartment|condominium/i.test(String(projectRow.property_type || ''))
+    const profitability = buildProfitability(rows, requireUnitAddress)
 
     return json({ project: projectRow, priceHistory, profitability })
   } catch (error) {
