@@ -1,0 +1,30 @@
+name: HDB Rental Sync
+on:
+  schedule:
+    - cron: '30 2 * * 5'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hdb-rental-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify sync safeguards
+        run: python -m unittest discover -s tests -p 'test_hdb_rentals.py'
+      - name: Append and verify official rental approvals
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python -u scripts/hdb_sync/sync_hdb_rentals.py --apply
+      - name: Report failure
+        if: failure()
+        run: |
+          echo '::error::HDB rental sync failed. Review this run before retrying; existing records are never overwritten.'
+          echo '### HDB rental sync failed — review logs and rerun after resolving the cause.' >> "$GITHUB_STEP_SUMMARY"
