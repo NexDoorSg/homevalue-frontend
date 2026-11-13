@@ -1,5 +1,10 @@
 name: HDB Rental Sync
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hdb_rental_sync.yml'
+      - 'scripts/hdb_sync/sync_hdb_rentals.py'
   schedule:
     - cron: '30 2 * * 5'
   workflow_dispatch:
