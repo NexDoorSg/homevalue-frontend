@@ -80,6 +80,7 @@ SQFT_PER_SQM = 10.7639
 
 # Columns we write (must exist on the table).
 OUT_COLS = [
+    "property_type",
     "address", "street_name", "project_name", "transaction_date", "transaction_price",
     "floor_area_sqm", "price_psf", "unit_type", "property_group", "property_subtype",
     "floor_level", "tenure", "completion_year", "source", "latitude", "longitude",
@@ -210,6 +211,7 @@ def transform(row):
     lease = (row.get("lease_commence_date") or "").strip()
     psf = round(price / (sqm * SQFT_PER_SQM), 2) if price and sqm else None
     return {
+        "property_type": "hdb",
         "address": f"{block} {street}".strip(),
         "street_name": street or None,
         "project_name": None,
